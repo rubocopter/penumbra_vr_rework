@@ -1462,10 +1462,10 @@ void cPlayer::Update(float afTimeStep)
       FootStep(0.8f);
     }
 
-    cVector3f headDelta = mpInit->mpGame->vr_head_view_mat.GetTranslation() - mpInit->mpGame->vr_old_head_view_mat.GetTranslation();
+    cVector3f headDelta = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation() - mpInit->mpGame->vr_old_head_tracking_pose.GetTranslation();
     headDelta.y = 0.0f;
 
-    mpInit->mpGame->vr_old_head_view_mat = mpInit->mpGame->vr_head_view_mat;
+    mpInit->mpGame->vr_old_head_tracking_pose = mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
 
     if (headDelta.Length() != 0.0f) {
       vr_headPos += headDelta;
@@ -1509,23 +1509,23 @@ void cPlayer::Update(float afTimeStep)
 
     vr_headPos.y = mpCharBody->GetFeetPosition().y;
 
-    mpInit->mpGame->vr_player_pos = cMath::MatrixTranslate(vr_headPos);
+    mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
 
     mpCharBody->vr_velocity = cVector3f(0.0f, 0.0f, 0.0f);
   }
   else {
     // Not in a proper "body move". We should still move the head around, but don't move the body.
-    cVector3f headDelta = mpInit->mpGame->vr_head_view_mat.GetTranslation() - mpInit->mpGame->vr_old_head_view_mat.GetTranslation();
+    cVector3f headDelta = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation() - mpInit->mpGame->vr_old_head_tracking_pose.GetTranslation();
     headDelta.y = 0.0f;
 
-    mpInit->mpGame->vr_old_head_view_mat = mpInit->mpGame->vr_head_view_mat;
+    mpInit->mpGame->vr_old_head_tracking_pose = mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
 
     if (headDelta.Length() != 0.0f) {
       vr_headPos += headDelta;
     }
 
     vr_headPos.y = mpCharBody->GetFeetPosition().y;
-    mpInit->mpGame->vr_player_pos = cMath::MatrixTranslate(vr_headPos);
+    mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
   }
 }
 

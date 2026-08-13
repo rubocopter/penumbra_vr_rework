@@ -596,7 +596,7 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
       iconMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), iconMat);
 
       // Move to hand's position
-      cMatrixf handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+      cMatrixf handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
       iconMat = cMath::MatrixMul(cMath::MatrixTranslate(handMat.GetTranslation()), iconMat);
 
       mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(pCamera3D->GetViewMatrix(), iconMat));
@@ -988,7 +988,7 @@ void cPlayerState_UseItem_VR::OnUpdate(float afTimeStep)
   iPhysicsWorld *pPhysicsWorld = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
   cVector3f vStart, vEnd;
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
 
   vStart = handMat.GetTranslation();
   vEnd = vStart + cMath::MatrixInverse(handMat.GetRotation()).GetForward() * -1.0f;
@@ -1028,7 +1028,7 @@ void cPlayerState_UseItem_VR::OnPostSceneDraw() {
   mpLowGfx->SetDepthTestActive(false);
   mpLowGfx->PushMatrix(eMatrix_ModelView);
 
-  cMatrixf handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  cMatrixf handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
   mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(((cCamera3D*)mpInit->mpGame->GetScene()->GetCamera())->GetViewMatrix(), handMat ));
 
   auto ofs = itemMat->GetTextureOffset(eMaterialTexture_Diffuse);

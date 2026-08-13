@@ -973,9 +973,9 @@ void cNotebook::Update(float afTimeStep)
     auto centerPos = pCamera3D->GetPosition();
 
     cMatrixf camInverse = cMath::MatrixInverse(pCamera3D->GetViewMatrix());
-    cVector3f uiPos = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
+    cVector3f uiPos = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
 
-    auto translateMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
+    auto translateMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
     auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 1450.0f, -1.0f / 1450.0f, 1.0f / 1450.0f));
 
     // Move the UI in front of the player's eyes
@@ -1022,7 +1022,7 @@ void cNotebook::Update(float afTimeStep)
   // Get right hand and see if it's intersecting
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
-  auto worldMat = VRHelper::ViveToWorldSpace(handMat, mpInit->mpGame);
+  auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
 
   auto handPos = worldMat.GetTranslation();
   auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(worldMat.GetRotation()).GetForward()) * -1.0f;

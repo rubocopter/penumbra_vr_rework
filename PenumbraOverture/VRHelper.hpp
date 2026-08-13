@@ -8,16 +8,8 @@
 using namespace hpl;
 
 namespace VRHelper {
-  static inline cMatrixf ViveToWorldSpace(cMatrixf viveSpaceMtx, cGame* game) {
-    // Subtract Vive-space head position and make relative to world space
-    cVector3f headPos_viveSpace = game->vr_head_view_mat.GetTranslation();
-    cVector3f headPos_worldSpace = game->GetScene()->GetVRWorldSpaceHeadMatrix().GetTranslation();
-
-    cVector3f handPos_viveSpace = viveSpaceMtx.GetTranslation();
-
-    viveSpaceMtx.SetTranslation(handPos_viveSpace - headPos_viveSpace + headPos_worldSpace);
-
-    return viveSpaceMtx;
+  static inline cMatrixf TrackingToWorldSpace(const cMatrixf& trackingSpaceMtx, cGame* game) {
+    return game->vr_tracking.TrackingToWorld(trackingSpaceMtx);
   }
 
   static inline cVector3f CollideCenter(tCollidePointVec collidePoints, int numContactPoints) {

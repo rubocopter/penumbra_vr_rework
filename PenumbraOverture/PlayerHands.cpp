@@ -104,8 +104,7 @@ bool iHudModel::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
 
-  // Subtract Vive-space head position and make relative to world space
-  aPoseMtx = VRHelper::ViveToWorldSpace(aPoseMtx, mpInit->mpGame);
+  aPoseMtx = VRHelper::TrackingToWorldSpace(aPoseMtx, mpInit->mpGame);
 
   return true;
 }

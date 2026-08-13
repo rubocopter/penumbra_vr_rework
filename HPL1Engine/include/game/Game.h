@@ -22,6 +22,7 @@
 #include "openvr.h"
 #include "system/SystemTypes.h"
 #include "math/Math.h"
+#include "game/VRTracking.h"
 #include "input/SteamVRInput.h"
 #include "input/TrackedController.h"
 
@@ -95,11 +96,8 @@ namespace hpl {
     vr::IVRSystem *vr_hmd;
     vr::TrackedDevicePose_t vr_rTrackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 
-    cMatrixf vr_old_head_view_mat;
-    cMatrixf vr_head_view_mat;
-    cMatrixf vr_head_world_view_mat;
-
-    cMatrixf vr_player_pos;
+    cMatrixf vr_old_head_tracking_pose;
+    cVRTrackingSpace vr_tracking;
 
     TrackedController vr_left_hand;
     TrackedController vr_right_hand;

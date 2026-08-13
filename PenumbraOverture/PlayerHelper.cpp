@@ -2177,7 +2177,7 @@ void cPlayerVRTeleport::Update(float afTimeStep)
         auto scene = mpInit->mpGame->GetScene();
         auto physicsWorld = scene->GetWorld3D()->GetPhysicsWorld();
 
-        auto handWorldMat = VRHelper::ViveToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
+        auto handWorldMat = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
 
         cVector3f start = handWorldMat.GetTranslation();
         cVector3f current = start;
@@ -2882,7 +2882,7 @@ static float GetMaxRGB(const cColor &aCol)
 void cPlayerHidden::Update(float afTimeStep)
 {
 	iCharacterBody *pCharBody = mpInit->mpPlayer->GetCharacterBody();
-  bool bIsCrouching = mpInit->mpGame->vr_head_view_mat.GetTranslation().y < 1.5f;
+  bool bIsCrouching = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y < 1.5f;
 
 	///////////////////////////////////
 	// Update Hidden effect

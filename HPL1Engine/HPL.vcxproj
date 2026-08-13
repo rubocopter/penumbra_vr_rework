@@ -92,6 +92,7 @@
     <ClInclude Include="include\game\ScriptFuncs.h" />
     <ClInclude Include="include\game\Updateable.h" />
     <ClInclude Include="include\game\Updater.h" />
+    <ClInclude Include="include\game\VRTracking.h" />
     <ClInclude Include="include\graphics\Animation.h" />
     <ClInclude Include="include\graphics\AnimationTrack.h" />
     <ClInclude Include="include\graphics\BackgroundImage.h" />

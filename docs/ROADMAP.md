@@ -16,6 +16,7 @@ Baseline validation was completed on 13 August 2026. The Release build launched 
 
 ## Phase 1 — runtime and input boundary
 
+- [x] Route HMD and controller world poses through one explicit TrackingToWorld transform.
 - [x] Update the bundled OpenVR SDK and Win32 loader from 1.0.2 to 2.15.6.
 - [x] Introduce device-independent gameplay and UI action sets with an automatic legacy fallback.
 - [x] Add explicit default bindings for PS VR2 Sense and HTC Vive controllers.

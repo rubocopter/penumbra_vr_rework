@@ -829,7 +829,7 @@ void cInventoryContext::Update(float afTimeStep)
   // Get right hand and see if it's intersecting
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
-  auto worldMat = VRHelper::ViveToWorldSpace(handMat, mpInit->mpGame);
+  auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
 
   auto handPos = worldMat.GetTranslation();
   auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(worldMat.GetRotation()).GetForward()) * - 1.0f;

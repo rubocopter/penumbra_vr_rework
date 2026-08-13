@@ -202,23 +202,7 @@ namespace hpl {
 
   cMatrixf cScene::GetVRWorldSpaceHeadMatrix(const cMatrixf& offset) {
     if (mpActiveCamera->GetType() == eCameraType_3D) {
-      cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
-
-      cMatrixf head_mat = gGame->vr_head_view_mat;
-
-      cVector3f pPos = head_mat.GetTranslation();
-      pPos.x = pPos.z = 0.0f;
-
-      // This has to be done so you can reach into the floor
-      // No longer 1:1 for height, though :c
-      pPos.y -= 0.2f;
-      pPos.y *= 1.065f;
-
-      head_mat.SetTranslation(pPos);
-
-      head_mat = cMath::MatrixMul(head_mat, offset);
-
-      return cMath::MatrixMul(gGame->vr_player_pos, head_mat);
+      return gGame->vr_tracking.GetHeadWorldPose(offset);
     }
 
     return cMatrixf::Identity;
@@ -384,7 +368,7 @@ namespace hpl {
           cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
 
           cMatrixf proj_mat;
-          cMatrixf head_mat = gGame->vr_head_view_mat;
+          cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
           cMatrixf eye_mat;
           cMatrixf view_mat;
 
@@ -461,7 +445,7 @@ namespace hpl {
           if (gGame->mbRenderToMonitor)
           {
             cMatrixf proj_mat;
-            cMatrixf head_mat = gGame->vr_head_view_mat;
+            cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
             cMatrixf eye_mat;
             cMatrixf view_mat;
 
@@ -559,7 +543,7 @@ namespace hpl {
 
           for (int i = 0; i < 2; ++i) {
             cMatrixf proj_mat;
-            cMatrixf head_mat = gGame->vr_head_view_mat;
+            cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
             cMatrixf eye_mat;
             cMatrixf view_mat;
 
@@ -713,7 +697,7 @@ namespace hpl {
         cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
 
         cMatrixf proj_mat;
-        cMatrixf head_mat = gGame->vr_head_view_mat;
+        cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
         cMatrixf eye_mat;
         cMatrixf view_mat;
 

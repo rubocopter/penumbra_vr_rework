@@ -10,7 +10,9 @@ The `modernization` branch now has a reproducible Windows build and has started 
 
 The initial compatibility target is SteamVR with PS VR2 on PC. Native OpenXR support is a later milestone; keeping OpenVR for the first working baseline reduces the number of systems changed at once. See [the current controller bindings](docs/INPUT.md) for the default layout and testing notes.
 
-See [the modernization roadmap](docs/ROADMAP.md) for the planned stages.
+See [the modernization roadmap](docs/ROADMAP.md) for the planned stages and
+[the VR architecture](docs/VR_ARCHITECTURE.md) for the tracking, world-space,
+height, hand-state, and gameplay boundaries.
 
 ## Build
 

@@ -695,11 +695,11 @@ void cButtonHandler::Update(float afTimeStep)
 					///////////////////////////////////////
 					// Player Movement ////////////////////
           if (leftHandButtons.touchContact) {
-            cVector3f handForward = cMath::MatrixInverse(mpInit->mpGame->vr_head_view_mat.GetRotation()).GetForward();
+            cVector3f handForward = cMath::MatrixInverse(mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetRotation()).GetForward();
             handForward.y = 0.0f;
             handForward = cMath::Vector3Normalize(handForward);
 
-            cVector3f handRight = cMath::MatrixInverse(mpInit->mpGame->vr_head_view_mat.GetRotation()).GetRight();
+            cVector3f handRight = cMath::MatrixInverse(mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetRotation()).GetRight();
             handRight.y = 0.0f;
             handRight = cMath::Vector3Normalize(handRight);
 

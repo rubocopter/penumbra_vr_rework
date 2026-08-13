@@ -173,6 +173,7 @@ namespace hpl {
 	void cGame::GameInit(iLowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars)
 	{
 		mpGameSetup = apGameSetup;
+		vr_old_head_tracking_pose = cMatrixf::Identity;
 
 		Log("Creating Engine Modules\n");
 		Log("--------------------------------------------------------\n");
@@ -404,8 +405,7 @@ namespace hpl {
             switch (vr_hmd->GetTrackedDeviceClass(nDevice)) {
             case vr::TrackedDeviceClass_HMD:
             {
-              vr_head_view_mat = cMatrixf::FromSteamVRMatrix34(pose_mat);
-              vr_head_view_mat = cMath::MatrixMul(heightAdd, vr_head_view_mat);
+              vr_tracking.SetHeadTrackingPose(cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)));
               break;
             }
 

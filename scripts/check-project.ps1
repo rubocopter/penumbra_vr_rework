@@ -9,6 +9,7 @@ $requiredPaths = @(
     'PenumbraVR.sln',
     'OALWrapper\OALWrapper.vcxproj',
     'HPL1Engine\HPL.vcxproj',
+    'HPL1Engine\include\game\VRTracking.h',
     'PenumbraOverture\Penumbra.vcxproj',
     'dependencies\openvr-2.15.6\headers\openvr.h',
     'dependencies\openvr-2.15.6\lib\win32\openvr_api.lib',
@@ -103,6 +104,26 @@ $missingLiteralTranslations = @($literalTranslationKeys.Keys | Where-Object {
 } | Sort-Object)
 if ($missingLiteralTranslations) {
     throw "Literal translations used by the game are missing:`n - $($missingLiteralTranslations -join "`n - ")"
+}
+
+$legacyVRSpaceSymbols = @(
+    'vr_head_view_mat',
+    'vr_head_world_view_mat',
+    'vr_player_pos',
+    'ViveToWorldSpace'
+)
+$vrSourceRoots = @(
+    (Join-Path $repositoryRoot 'HPL1Engine\include'),
+    (Join-Path $repositoryRoot 'HPL1Engine\sources'),
+    (Join-Path $repositoryRoot 'PenumbraOverture')
+)
+
+foreach ($legacySymbol in $legacyVRSpaceSymbols) {
+    $legacyMatches = Get-ChildItem -LiteralPath $vrSourceRoots -Recurse -Include '*.cpp', '*.h', '*.hpp' -File |
+        Select-String -SimpleMatch $legacySymbol
+    if ($legacyMatches) {
+        throw "Legacy VR-space symbol '$legacySymbol' bypasses the TrackingToWorld boundary."
+    }
 }
 
 $vrDataRoot = Join-Path $repositoryRoot 'data\vr'

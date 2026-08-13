@@ -100,7 +100,7 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 
   // Move relative to the player's hand
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   mpPushBody->SetGravity(false);
@@ -383,7 +383,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 							cMath::MatrixMul(	mpPushBody->GetWorldMatrix(),
 												mpPushBody->GetMassCentre());
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
   localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), mpPushBody->GetLocalMatrix());
 
 	//Set cross hair image.
@@ -425,7 +425,7 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 
 	mpPlayer->SetSpeedMul(1.0f);
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -537,11 +537,11 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 		mpPlayer->GetCharacterBody()->Move(eCharDir_Forward,-1,afTimeStep);
 	}
 
-  //cVector3f pos = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
+  //cVector3f pos = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
 
   //mpPushBody->SetLinearVelocity(mpPushBody->GetWorldPosition() - pos);
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -740,7 +740,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPushBody->SetAutoDisable(false);
 
 	//The pick point relative to the body
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
 	mvPickPoint = handMat.GetTranslation();
 
 	/////////////////////////////////////////
@@ -910,7 +910,7 @@ void cPlayerState_Push_VR::OnUpdate(float afTimeStep)
 	mvLastBodyPos = mpPushBody->GetLocalPosition();
   */
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
 
   auto destDiff = handMat.GetTranslation() - (mpPushBody->GetLocalPosition() + mvRelPickPoint);
   auto moveDirection = cMath::Vector3Normalize(destDiff);
@@ -1145,7 +1145,7 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 	mlForward = 0;
 	mlSideways = 0;
 
-  auto handMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
 
   //The pick point relative to the body
   mvRelPickPoint = handMat.GetTranslation() - mpPushBody->GetLocalPosition();
