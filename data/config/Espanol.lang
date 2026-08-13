@@ -372,8 +372,15 @@
     <Entry Name="Show Crosshair:">Mostrar punto de mira:</Entry>
     <Entry Name="VRRenderToMonitor">Mostrar en el monitor:</Entry>
     <Entry Name="VRSettings">Ajustes de VR</Entry>
+    <Entry Name="VR Settings">Ajustes de VR</Entry>
     <Entry Name="VRTrackpadMovement">Movimiento con joystick:</Entry>
     <Entry Name="VRTutorial">Tutorial de VR</Entry>
+    <Entry Name="ActionMode Camera Speed:">Velocidad de cámara en modo acción:</Entry>
+    <Entry Name="InteractMode Camera Speed:">Velocidad de cámara en modo interacción:</Entry>
+    <Entry Name="Output Device:">Dispositivo de salida:</Entry>
+    <Entry Name="TipSoundOutputDevice">Selecciona el dispositivo de salida de audio. Requiere reiniciar.</Entry>
+    <Entry Name="Use Haptics:">Usar respuesta háptica:</Entry>
+    <Entry Name="Weight Force Scale:">Escala de fuerza del peso:</Entry>
     <Entry Name="StartNewGame">¿Comenzar nueva partida?</Entry>
     <Entry Name="Yes">Sí</Entry>
     <Entry Name="No">No</Entry>

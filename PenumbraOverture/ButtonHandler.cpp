@@ -207,11 +207,26 @@ void cButtonHandler::Update(float afTimeStep)
 	static bool bLockState = true;
 
 
-  mpInit->mpGame->vr_right_hand.UpdateButtonState();
-  mpInit->mpGame->vr_left_hand.UpdateButtonState();
+  bool vrUIContext = mState != eButtonHandlerState_Game ||
+    mpInit->mpDeathMenu->IsActive() ||
+    mpPlayer->IsDead() ||
+    mpInit->mpNumericalPanel->IsActive() ||
+    mpInit->mpNotebook->IsActive() ||
+    mpInit->mpInventory->IsActive();
+
+  bool actionInputActive = mpInit->mpGame->vr_input.Update(
+    vrUIContext ? eSteamVRInputContext_UI : eSteamVRInputContext_Gameplay,
+    mpInit->mpGame->vr_left_hand,
+    mpInit->mpGame->vr_right_hand);
+
+  if (!actionInputActive) {
+    mpInit->mpGame->vr_right_hand.UpdateButtonState();
+    mpInit->mpGame->vr_left_hand.UpdateButtonState();
+  }
 
   auto leftHandButtons = mpInit->mpGame->vr_left_hand.GetButtonState();
   auto rightHandButtons = mpInit->mpGame->vr_right_hand.GetButtonState();
+  bool vrUIClosePressed = mpInit->mpGame->vr_input.WasUIClosePressed();
 	///////////////////////////////////
 	// GLOBAL Key Strokes
 	///////////////////////////////////
@@ -271,7 +286,7 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_PreMenu)
 	{
-		if(	mpInput->BecameTriggerd("Escape")
+		if(	mpInput->BecameTriggerd("Escape") || vrUIClosePressed
       || rightHandButtons.menuJustPressed)
 			mpInit->mpPreMenu->OnButtonDown();
 		if(mpInput->BecameTriggerd("LeftClick")
@@ -288,6 +303,7 @@ void cButtonHandler::Update(float afTimeStep)
 		if(	mpInput->BecameTriggerd("Escape") ||
 			mpInput->BecameTriggerd("RightClick") ||
 			mpInput->BecameTriggerd("LeftClick") ||
+			vrUIClosePressed ||
       rightHandButtons.triggerJustPressed ||
       rightHandButtons.menuJustPressed)
 		{
@@ -299,7 +315,7 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_MainMenu)
 	{
-		if(mpInput->BecameTriggerd("Escape")
+		if(mpInput->BecameTriggerd("Escape") || vrUIClosePressed
       || rightHandButtons.menuJustPressed)
 		{
 			mpInit->mpMainMenu->Exit();
@@ -360,7 +376,7 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_Intro)
 	{
-		if(mpInput->BecameTriggerd("Escape")
+		if(mpInput->BecameTriggerd("Escape") || vrUIClosePressed
       || rightHandButtons.gripJustPressed
       || rightHandButtons.menuJustPressed
       || rightHandButtons.padJustPressed)
@@ -402,7 +418,7 @@ void cButtonHandler::Update(float afTimeStep)
 		// Death menu ////////////////////
 		if(mpInit->mpDeathMenu->IsActive())
 		{
-			if(mpInput->BecameTriggerd("Escape") ||
+			if(mpInput->BecameTriggerd("Escape") || vrUIClosePressed ||
         rightHandButtons.menuJustPressed ||
         rightHandButtons.gripJustPressed)
 			{
@@ -443,7 +459,7 @@ void cButtonHandler::Update(float afTimeStep)
 		// Death ////////////////////
 		else if(mpPlayer->IsDead())
 		{
-			if(mpInput->BecameTriggerd("Escape") ||
+			if(mpInput->BecameTriggerd("Escape") || vrUIClosePressed ||
         rightHandButtons.menuJustPressed ||
         rightHandButtons.gripJustPressed)
 			{
@@ -454,7 +470,7 @@ void cButtonHandler::Update(float afTimeStep)
 		// Numerical panel ////////////////////
 		else if(mpInit->mpNumericalPanel->IsActive())
 		{
-			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
+			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") || vrUIClosePressed ||
         rightHandButtons.gripJustPressed ||
         rightHandButtons.menuJustPressed)
 			{
@@ -492,7 +508,7 @@ void cButtonHandler::Update(float afTimeStep)
 		// Notebook ////////////////////
 		else if(mpInit->mpNotebook->IsActive())
 		{
-			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
+			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") || vrUIClosePressed ||
         rightHandButtons.gripJustPressed || leftHandButtons.menuJustPressed)
 			{
 				mpInit->mpNotebook->OnExit();
@@ -541,7 +557,7 @@ void cButtonHandler::Update(float afTimeStep)
 		{
 			////////////////////////////
 			//Normal Input
-			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
+			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") || vrUIClosePressed ||
         rightHandButtons.gripJustPressed)
 			{
 				mpInit->mpInventory->OnInventoryDown();
@@ -608,7 +624,7 @@ void cButtonHandler::Update(float afTimeStep)
 		{
 			bPlayerStateIsActive = true;
 
-			if(mpInput->BecameTriggerd("Escape"))
+			if(mpInput->BecameTriggerd("Escape") || mpInit->mpGame->vr_input.WasPausePressed())
 			{
 				mpInit->mpMainMenu->SetActive(true);
 			}

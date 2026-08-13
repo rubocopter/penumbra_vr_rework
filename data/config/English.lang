@@ -376,8 +376,15 @@
     <Entry Name="SureQuit">Sure you want to quit?</Entry>
     <Entry Name="VRTutorial">VR Tutorial</Entry>
     <Entry Name="VRSettings">VR Settings</Entry>
+    <Entry Name="VR Settings">VR Settings</Entry>
     <Entry Name="VRTrackpadMovement">Trackpad Movement:</Entry>
     <Entry Name="VRRenderToMonitor">Render to Monitor:</Entry>
+    <Entry Name="ActionMode Camera Speed:">Action Mode Camera Speed:</Entry>
+    <Entry Name="InteractMode Camera Speed:">Interaction Mode Camera Speed:</Entry>
+    <Entry Name="Output Device:">Output Device:</Entry>
+    <Entry Name="TipSoundOutputDevice">Select the audio output device. Requires restart.</Entry>
+    <Entry Name="Use Haptics:">Use Haptics:</Entry>
+    <Entry Name="Weight Force Scale:">Weight Force Scale:</Entry>
     <Entry Name="Controls">Controls</Entry>
     <Entry Name="Game">Game</Entry>
     <Entry Name="Graphics">Graphics</Entry>

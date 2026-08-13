@@ -22,6 +22,7 @@
 #include "openvr.h"
 #include "system/SystemTypes.h"
 #include "math/Math.h"
+#include "input/SteamVRInput.h"
 #include "input/TrackedController.h"
 
 namespace hpl {
@@ -102,6 +103,7 @@ namespace hpl {
 
     TrackedController vr_left_hand;
     TrackedController vr_right_hand;
+    cSteamVRInput vr_input;
 
 	private:
 		void GameInit(iLowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars);

@@ -6,9 +6,9 @@ This fork is unofficial and is not affiliated with Frictional Games, Valve, or S
 
 ## Project status
 
-The `modernization` branch is currently restoring a reproducible Windows build before changing runtime behaviour. The historical implementation still uses OpenVR 1.0.2, legacy controller polling designed around HTC Vive wands, and 32-bit engine dependencies.
+The `modernization` branch now has a reproducible Windows build and has started migrating runtime input. It uses OpenVR 2.15.6, SteamVR Input action sets with native PS VR2 Sense and legacy HTC Vive bindings, and an automatic fallback to the historical controller polling path. Rendering and controller poses still use the proven OpenVR compositor path, and the engine remains 32-bit because of its legacy binary dependencies.
 
-The initial compatibility target is SteamVR with PS VR2 on PC. Native OpenXR support is a later milestone; keeping OpenVR for the first working baseline reduces the number of systems changed at once.
+The initial compatibility target is SteamVR with PS VR2 on PC. Native OpenXR support is a later milestone; keeping OpenVR for the first working baseline reduces the number of systems changed at once. See [the current controller bindings](docs/INPUT.md) for the default layout and testing notes.
 
 See [the modernization roadmap](docs/ROADMAP.md) for the planned stages.
 

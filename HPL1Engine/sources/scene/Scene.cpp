@@ -794,7 +794,7 @@ namespace hpl {
 		}
 
     {
-      vr::Texture_t leftEyeTexture = { (void*)mpGraphics->GetRenderer3D()->leftEyeDesc.m_nRenderTextureId, vr::API_OpenGL, vr::ColorSpace_Gamma };
+      vr::Texture_t leftEyeTexture = { (void*)mpGraphics->GetRenderer3D()->leftEyeDesc.m_nRenderTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
       vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::Eye_Left, &leftEyeTexture);
 
       if (err)
@@ -802,7 +802,7 @@ namespace hpl {
     }
 
     {
-      vr::Texture_t rightEyeTexture = { (void*)mpGraphics->GetRenderer3D()->rightEyeDesc.m_nRenderTextureId, vr::API_OpenGL, vr::ColorSpace_Gamma };
+      vr::Texture_t rightEyeTexture = { (void*)mpGraphics->GetRenderer3D()->rightEyeDesc.m_nRenderTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
       vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture);
 
       if (err)

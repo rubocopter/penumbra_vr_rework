@@ -16,10 +16,15 @@ Baseline validation was completed on 13 August 2026. The Release build launched 
 
 ## Phase 1 — runtime and input boundary
 
-- Introduce device-independent head, hand, action, and haptics interfaces.
-- Replace direct Vive button/axis polling with SteamVR Input actions.
-- Add explicit default bindings for PS VR2 Sense and common SteamVR controllers.
-- Preserve the existing OpenVR compositor while the input path changes.
+- [x] Update the bundled OpenVR SDK and Win32 loader from 1.0.2 to 2.15.6.
+- [x] Introduce device-independent gameplay and UI action sets with an automatic legacy fallback.
+- [x] Add explicit default bindings for PS VR2 Sense and HTC Vive controllers.
+- [x] Expose device-independent pose and haptic actions for the next migration step.
+- [ ] Replace device-index controller pose discovery with the new pose actions.
+- [ ] Route gameplay feedback through the new haptic actions.
+- [ ] Add and validate default bindings for additional common SteamVR controllers.
+- [ ] Confirm the new action path on PS VR2 hardware.
+- [x] Preserve the existing OpenVR compositor while the input path changes.
 
 ## Phase 2 — PS VR2 and comfort
 

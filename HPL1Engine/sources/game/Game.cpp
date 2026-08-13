@@ -236,6 +236,7 @@ namespace hpl {
       FatalError("Unable to init OpenVR runtime:\n%s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
     }
 
+    vr_input.Initialize();
     mpGraphics->GetRenderer3D()->CreateVREyeTextures(vr_hmd);
 
 		//Init Sound
@@ -451,15 +452,6 @@ namespace hpl {
           }
         }
 
-        // Process SteamVR controller state
-        for (vr::TrackedDeviceIndex_t unDevice = 0; unDevice < vr::k_unMaxTrackedDeviceCount; unDevice++)
-        {
-          vr::VRControllerState_t state;
-          if (vr_hmd->GetControllerState(unDevice, &state))
-          {
-            // do wut wit dis
-          }
-        }
       }
 
       //if (!mbGameIsDone)

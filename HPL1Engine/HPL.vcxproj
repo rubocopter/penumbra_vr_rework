@@ -57,7 +57,7 @@
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\dependencies\openvr-1.0.2\headers;$(ProjectDir)include;$(ProjectDir)..\dependencies\include;$(ProjectDir)..\OALWrapper\include;$(ProjectDir)..\dependencies\include\AL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\dependencies\openvr-2.15.6\headers;$(ProjectDir)include;$(ProjectDir)..\dependencies\include;$(ProjectDir)..\OALWrapper\include;$(ProjectDir)..\dependencies\include\AL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)HPL.lib</OutputFile>
@@ -66,7 +66,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\dependencies\openvr-1.0.2\headers;$(ProjectDir)include;$(ProjectDir)..\dependencies\include;$(ProjectDir)..\OALWrapper\include;$(ProjectDir)..\dependencies\include\AL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\dependencies\openvr-2.15.6\headers;$(ProjectDir)include;$(ProjectDir)..\dependencies\include;$(ProjectDir)..\OALWrapper\include;$(ProjectDir)..\dependencies\include\AL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;HPL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -234,6 +234,7 @@
     <ClInclude Include="include\input\Keyboard.h" />
     <ClInclude Include="include\input\LowLevelInput.h" />
     <ClInclude Include="include\input\Mouse.h" />
+    <ClInclude Include="include\input\SteamVRInput.h" />
     <ClInclude Include="include\input\TrackedController.h" />
     <ClInclude Include="include\math\BoundingVolume.h" />
     <ClInclude Include="include\math\CRC.h" />
@@ -491,6 +492,7 @@
     <ClCompile Include="sources\input\InputDevice.cpp" />
     <ClCompile Include="sources\input\Keyboard.cpp" />
     <ClCompile Include="sources\input\Mouse.cpp" />
+    <ClCompile Include="sources\input\SteamVRInput.cpp" />
     <ClCompile Include="sources\input\TrackedController.cpp" />
     <ClCompile Include="sources\math\BoundingVolume.cpp" />
     <ClCompile Include="sources\math\CRC.cpp" />

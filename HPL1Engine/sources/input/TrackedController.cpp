@@ -9,7 +9,6 @@ namespace hpl {
 }
 
 TrackedController::TrackedController() : device_index_(-1), button_state_(true), last_packet_(0) {
-  memset(&button_state_, 0, sizeof(ButtonState));
 }
 
 TrackedController::~TrackedController() {
@@ -49,12 +48,7 @@ void TrackedController::SetDeviceIndex(vr::TrackedDeviceIndex_t index) {
 
 void TrackedController::UpdateButtonState() {
   if (device_index_ == -1) {
-    memset(&button_state_, 0, sizeof(ButtonState));
-
-    button_state_.touchX = 0.0f;
-    button_state_.touchY = 0.0f;
-    button_state_.triggerMargin = 0.0f;
-
+    button_state_ = ButtonState(false);
     return;
   }
 
@@ -62,7 +56,7 @@ void TrackedController::UpdateButtonState() {
 
   vr::VRControllerState_t state;
 
-  if (!hmd->GetControllerState(device_index_, &state)) {
+  if (!hmd->GetControllerState(device_index_, &state, sizeof(state))) {
     button_state_.valid_ = false;
     return;
   }
@@ -87,7 +81,7 @@ void TrackedController::UpdateButtonState() {
   if ((state.ulButtonPressed & (1ULL << ((int)k_EButton_SteamVR_Touchpad))) > 0)
     button_state_.padJustPressed = !button_state_.padPressed;
   else
-    button_state_.padJustReleased = !button_state_.padPressed;
+    button_state_.padJustReleased = button_state_.padPressed;
 
   button_state_.padPressed = (state.ulButtonPressed & (1ULL << ((int)k_EButton_SteamVR_Touchpad))) > 0;
 
@@ -130,6 +124,10 @@ void TrackedController::UpdateButtonState() {
     button_state_.menuJustReleased = button_state_.menuPressed;
 
   button_state_.menuPressed = (state.ulButtonPressed & (1ULL << ((int)k_EButton_ApplicationMenu))) > 0;
+}
+
+void TrackedController::SetButtonState(const ButtonState& state) {
+  button_state_ = state;
 }
 
 TrackedController::ButtonState TrackedController::GetButtonState() {

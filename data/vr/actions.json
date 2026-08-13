@@ -1,0 +1,147 @@
+{
+  "actions": [
+    {
+      "name": "/actions/global/in/left_pose",
+      "type": "pose"
+    },
+    {
+      "name": "/actions/global/in/right_pose",
+      "type": "pose"
+    },
+    {
+      "name": "/actions/global/out/left_haptic",
+      "type": "vibration"
+    },
+    {
+      "name": "/actions/global/out/right_haptic",
+      "type": "vibration"
+    },
+    {
+      "name": "/actions/gameplay/in/move",
+      "requirement": "mandatory",
+      "type": "vector2"
+    },
+    {
+      "name": "/actions/gameplay/in/sprint",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/interact",
+      "requirement": "mandatory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/examine",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/inventory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/notebook",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/quick_light",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/jump",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay/in/pause",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui/in/select",
+      "requirement": "mandatory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui/in/drag",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui/in/back",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui/in/close",
+      "type": "boolean"
+    }
+  ],
+  "action_sets": [
+    {
+      "name": "/actions/global",
+      "usage": "leftright"
+    },
+    {
+      "name": "/actions/gameplay",
+      "usage": "leftright"
+    },
+    {
+      "name": "/actions/ui",
+      "usage": "leftright"
+    }
+  ],
+  "default_bindings": [
+    {
+      "controller_type": "playstation_vr2_sense",
+      "binding_url": "bindings/psvr2_sense.json"
+    },
+    {
+      "controller_type": "vive_controller",
+      "binding_url": "bindings/vive_controller.json"
+    }
+  ],
+  "localization": [
+    {
+      "language_tag": "en_US",
+      "/actions/global": "Hands",
+      "/actions/global/in/left_pose": "Left hand pose",
+      "/actions/global/in/right_pose": "Right hand pose",
+      "/actions/global/out/left_haptic": "Left hand haptics",
+      "/actions/global/out/right_haptic": "Right hand haptics",
+      "/actions/gameplay": "Gameplay",
+      "/actions/gameplay/in/move": "Move",
+      "/actions/gameplay/in/sprint": "Sprint",
+      "/actions/gameplay/in/interact": "Interact",
+      "/actions/gameplay/in/examine": "Examine",
+      "/actions/gameplay/in/inventory": "Inventory",
+      "/actions/gameplay/in/notebook": "Notebook",
+      "/actions/gameplay/in/quick_light": "Quick light",
+      "/actions/gameplay/in/jump": "Jump",
+      "/actions/gameplay/in/pause": "Pause menu",
+      "/actions/ui": "Menus and inventory",
+      "/actions/ui/in/select": "Select",
+      "/actions/ui/in/drag": "Drag or combine",
+      "/actions/ui/in/back": "Back or examine",
+      "/actions/ui/in/close": "Close"
+    },
+    {
+      "language_tag": "es_ES",
+      "/actions/global": "Manos",
+      "/actions/global/in/left_pose": "Posición de la mano izquierda",
+      "/actions/global/in/right_pose": "Posición de la mano derecha",
+      "/actions/global/out/left_haptic": "Vibración de la mano izquierda",
+      "/actions/global/out/right_haptic": "Vibración de la mano derecha",
+      "/actions/gameplay": "Juego",
+      "/actions/gameplay/in/move": "Moverse",
+      "/actions/gameplay/in/sprint": "Correr",
+      "/actions/gameplay/in/interact": "Interactuar",
+      "/actions/gameplay/in/examine": "Examinar",
+      "/actions/gameplay/in/inventory": "Inventario",
+      "/actions/gameplay/in/notebook": "Cuaderno",
+      "/actions/gameplay/in/quick_light": "Luz rápida",
+      "/actions/gameplay/in/jump": "Saltar",
+      "/actions/gameplay/in/pause": "Menú de pausa",
+      "/actions/ui": "Menús e inventario",
+      "/actions/ui/in/select": "Seleccionar",
+      "/actions/ui/in/drag": "Arrastrar o combinar",
+      "/actions/ui/in/back": "Atrás o examinar",
+      "/actions/ui/in/close": "Cerrar"
+    }
+  ]
+}

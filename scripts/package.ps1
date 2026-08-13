@@ -27,7 +27,7 @@ if (Test-Path -LiteralPath $packageRoot) {
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 
 Copy-Item -LiteralPath $executablePath -Destination $packageRoot
-Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dependencies\openvr-1.0.2\bin\win32\openvr_api.dll') -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dependencies\openvr-2.15.6\bin\win32\openvr_api.dll') -Destination $packageRoot
 $dataRoot = Join-Path $repositoryRoot 'data'
 Get-ChildItem -LiteralPath $dataRoot -Force | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $packageRoot -Recurse
@@ -35,7 +35,7 @@ Get-ChildItem -LiteralPath $dataRoot -Force | ForEach-Object {
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'readme.md') -Destination (Join-Path $packageRoot 'README.md')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\COPYING') -Destination (Join-Path $packageRoot 'COPYING.txt')
 
-foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'config\English.lang', 'config\Espanol.lang', 'maps', 'models')) {
+foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'config\English.lang', 'config\Espanol.lang', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json')) {
     $packagedPath = Join-Path $packageRoot $requiredPath
     if (-not (Test-Path -LiteralPath $packagedPath)) {
         throw "Required package entry was not created: $packagedPath"

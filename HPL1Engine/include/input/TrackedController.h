@@ -9,9 +9,15 @@ namespace hpl {
   class TrackedController {
   public:
     struct ButtonState {
-      ButtonState(bool valid) {
-        valid_ = valid;
-      };
+      ButtonState(bool valid = false)
+        : touchX(0.0f), touchY(0.0f),
+          touchContact(false), touchJustContacted(false), touchJustReleased(false),
+          padPressed(false), padJustPressed(false), padJustReleased(false),
+          gripPressed(false), gripJustPressed(false), gripJustReleased(false),
+          triggerMargin(0.0f), triggerPressed(false), triggerJustPressed(false), triggerJustReleased(false),
+          menuPressed(false), menuJustPressed(false), menuJustReleased(false),
+          valid_(valid) {
+      }
 
       float touchX;
       float touchY;
@@ -57,6 +63,7 @@ namespace hpl {
     void SetDeviceIndex(vr::TrackedDeviceIndex_t device_index);
 
     void UpdateButtonState();
+    void SetButtonState(const ButtonState& state);
     ButtonState GetButtonState();
 
   private:
