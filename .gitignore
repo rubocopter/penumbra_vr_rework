@@ -1,0 +1,9 @@
+/.vs/
+/build/
+/redist/
+/release/
+
+*.suo
+*.user
+*.VC.db
+*.VC.opendb

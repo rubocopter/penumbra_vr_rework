@@ -1,0 +1,46 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Release'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$buildRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'build'))
+$packageRoot = [System.IO.Path]::GetFullPath((Join-Path $buildRoot "package\$Configuration\PenumbraVR"))
+$expectedPrefix = $buildRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+
+if (-not $packageRoot.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to package outside the build directory: $packageRoot"
+}
+
+$executablePath = Join-Path $buildRoot "bin\$Configuration\Penumbra_vr.exe"
+if (-not (Test-Path -LiteralPath $executablePath)) {
+    throw "Build output not found: $executablePath"
+}
+
+if (Test-Path -LiteralPath $packageRoot) {
+    Remove-Item -LiteralPath $packageRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
+
+Copy-Item -LiteralPath $executablePath -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dependencies\openvr-1.0.2\bin\win32\openvr_api.dll') -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'data') -Destination $packageRoot -Recurse
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'readme.md') -Destination (Join-Path $packageRoot 'README.md')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\COPYING') -Destination (Join-Path $packageRoot 'COPYING.txt')
+
+$manifestPath = Join-Path $packageRoot 'SHA256SUMS.txt'
+$manifestLines = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
+    Where-Object { $_.FullName -ne $manifestPath } |
+    Sort-Object FullName |
+    ForEach-Object {
+        $relativePath = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace('\', '/')
+        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $relativePath"
+    }
+$manifestLines | Set-Content -LiteralPath $manifestPath -Encoding utf8
+
+Write-Host "Package created at $packageRoot" -ForegroundColor Green
