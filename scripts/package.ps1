@@ -28,9 +28,23 @@ New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 
 Copy-Item -LiteralPath $executablePath -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dependencies\openvr-1.0.2\bin\win32\openvr_api.dll') -Destination $packageRoot
-Copy-Item -LiteralPath (Join-Path $repositoryRoot 'data') -Destination $packageRoot -Recurse
+$dataRoot = Join-Path $repositoryRoot 'data'
+Get-ChildItem -LiteralPath $dataRoot -Force | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination $packageRoot -Recurse
+}
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'readme.md') -Destination (Join-Path $packageRoot 'README.md')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\COPYING') -Destination (Join-Path $packageRoot 'COPYING.txt')
+
+foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'config', 'maps', 'models')) {
+    $packagedPath = Join-Path $packageRoot $requiredPath
+    if (-not (Test-Path -LiteralPath $packagedPath)) {
+        throw "Required package entry was not created: $packagedPath"
+    }
+}
+
+if (Test-Path -LiteralPath (Join-Path $packageRoot 'data')) {
+    throw "Invalid package layout: data must be merged into the game redist root."
+}
 
 $manifestPath = Join-Path $packageRoot 'SHA256SUMS.txt'
 $manifestLines = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |

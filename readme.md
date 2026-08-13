@@ -39,7 +39,7 @@ build/package/Release/PenumbraVR
 
 1. Install Penumbra: Overture through Steam.
 2. Back up saves and any files previously installed by another mod version.
-3. Copy the contents of the generated `PenumbraVR` package into the game's `redist` directory.
+3. Copy the contents of the generated `PenumbraVR` package into the game's `redist` directory. The package's `config`, `maps`, and `models` folders must merge with the folders of the same name directly under `redist`; do not create a `redist/data` directory.
 4. Install and configure SteamVR. PS VR2 users also need Sony's PlayStation VR2 App and the required PC hardware.
 5. Install the Microsoft Visual C++ 2015–2022 Redistributable (x86) if it is not already present.
 6. Start SteamVR, then run `Penumbra_vr.exe` from the game directory.
