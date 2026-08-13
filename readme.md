@@ -46,6 +46,12 @@ build/package/Release/PenumbraVR
 
 The package only contains this project's executable, its OpenVR loader, modified open-source/game-patch data already present in the upstream repository, documentation, and checksums. It does not bundle the base game.
 
+### Spanish language
+
+The package includes `config/Espanol.lang`. Select **Español** under **Options → Game → Language**. The VR tutorial, VR menu options, and controller notes have been translated for this rework.
+
+The base Spanish localization originated with the official Penumbra: Overture translation, was prepared for later Windows and Linux digital releases by DeM, and was revised by Oscar “darkpadawan” Rodríguez for [Clan DLAN](https://www.clandlan.net/). This project adds only the VR-specific strings. The accompanying translation readme did not state explicit redistribution terms, so permission should be confirmed before publishing a formal release containing the full language file.
+
 ## Original project
 
 The original mod added head and hand tracking for the HTC Vive. Its last upstream commit was published in 2018. Historical releases and preview material remain available through the links in the upstream repository.
