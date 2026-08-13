@@ -356,6 +356,40 @@ namespace hpl {
 
 		return true;
 	}
+
+	//-----------------------------------------------------------------------
+
+	int cSoundHandler::StopAllByName(const tString& asName)
+	{
+		int lStopped = 0;
+		const tString sLowerName = cString::ToLowerCase(asName);
+
+		tSoundEntryListIt it = mlstGuiSounds.begin();
+		while(it != mlstGuiSounds.end())
+		{
+			if(cString::ToLowerCase(it->msName) == sLowerName)
+			{
+				it->mpSound->SetPaused(false);
+				it->mpSound->Stop();
+				++lStopped;
+			}
+			++it;
+		}
+
+		it = mlstWorldSounds.begin();
+		while(it != mlstWorldSounds.end())
+		{
+			if(cString::ToLowerCase(it->msName) == sLowerName)
+			{
+				it->mpSound->SetPaused(false);
+				it->mpSound->Stop();
+				++lStopped;
+			}
+			++it;
+		}
+
+		return lStopped;
+	}
 	
 	//-----------------------------------------------------------------------
 

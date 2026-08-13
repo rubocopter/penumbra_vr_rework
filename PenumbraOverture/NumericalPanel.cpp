@@ -256,6 +256,8 @@ void cNumericalPanel::Update(float afTimeStep)
 
   // For VR, use controller as laser pointer thing
   // Get right hand and see if it's intersecting
+  if (mpInit->mpGame->vr_right_hand.IsPoseValid())
+  {
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
   auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
@@ -300,6 +302,7 @@ void cNumericalPanel::Update(float afTimeStep)
         SetMousePos(cVector2f(x, y));
       }
     }
+  }
   }
 }
 

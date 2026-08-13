@@ -2511,6 +2511,8 @@ void cMainMenu::Update(float afTimeStep)
 
   // For VR, use controller as laser pointer thing
   // Get right hand and see if it's intersecting
+  if (mpInit->mpGame->vr_right_hand.IsPoseValid())
+  {
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
   auto handPos = handMat.GetTranslation();
@@ -2554,6 +2556,7 @@ void cMainMenu::Update(float afTimeStep)
         SetMousePos(cVector2f(x, y));
       }
     }
+  }
   }
 }
 
@@ -2687,14 +2690,15 @@ void cMainMenu::SetActive(bool abX)
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Pause();
 
 			mbGameActive = true;
+			pSoundHandler->StopAllByName("gui_wind1");
 			pSoundHandler->PlayGui("gui_wind1",true,1);
 		}
 		else
 		{
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Play("music_theme.ogg",1,5.0f,false);
-			
-			if(pSoundHandler->IsPlaying("gui_rain1")==false)
-				pSoundHandler->PlayGui("gui_rain1",true,1);
+
+			pSoundHandler->StopAllByName("gui_rain1");
+			pSoundHandler->PlayGui("gui_rain1",true,1);
 			
 			mbGameActive = false;
 			mbFadeIn = true;
@@ -2739,16 +2743,14 @@ void cMainMenu::SetActive(bool abX)
 		
 		if(mpInit->mpMapHandler->GetCurrentMapName() != "")
 		{
-			if (pSoundHandler->IsPlaying("gui_wind1"))
-				pSoundHandler->Stop("gui_wind1");
+			pSoundHandler->StopAllByName("gui_wind1");
 
 			pSoundHandler->ResumeAll(eSoundDest_World | eSoundDest_Gui);
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Resume();
 		}
 		else
 		{
-			if (pSoundHandler->IsPlaying("gui_rain1"))
-				pSoundHandler->Stop("gui_rain1");
+			pSoundHandler->StopAllByName("gui_rain1");
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Stop(0.3f);
 		}
 

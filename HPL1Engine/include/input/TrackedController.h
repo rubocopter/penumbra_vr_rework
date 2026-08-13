@@ -60,16 +60,26 @@ namespace hpl {
     void SetAngularVelocity(const cVector3f& angular_velocity);
     cVector3f GetAngularVelocity();
 
+    void BeginPoseFrame();
+    void SetPose(const cMatrixf& matrix, const cVector3f& velocity,
+      const cVector3f& angularVelocity, vr::TrackedDeviceIndex_t deviceIndex);
+    void SetPoseValid(bool valid);
+    bool IsPoseValid() const { return pose_valid_; }
+
     void SetDeviceIndex(vr::TrackedDeviceIndex_t device_index);
+    vr::TrackedDeviceIndex_t GetDeviceIndex() const { return device_index_; }
 
     void UpdateButtonState();
     void SetButtonState(const ButtonState& state);
     ButtonState GetButtonState();
 
   private:
+    void InvalidateButtonState();
+
     uint32_t last_packet_;
     ButtonState button_state_;
     vr::TrackedDeviceIndex_t device_index_;
+    bool pose_valid_;
     cMatrixf last_matrix_;
     cMatrixf matrix_;
     cVector3f velocity_;

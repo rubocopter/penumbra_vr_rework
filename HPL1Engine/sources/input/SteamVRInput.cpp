@@ -11,7 +11,10 @@
 namespace hpl {
 
   cSteamVRInput::cSteamVRInput()
-    : mbAvailable(false), mbUsingActions(false), mbFallbackReported(false), mbPauseJustPressed(false),
+    : mbAvailable(false), mbUsingActions(false), mbFallbackReported(false), mbHasActiveContext(false),
+      mbLeftPoseStateKnown(false), mbRightPoseStateKnown(false),
+      mbLeftPoseWasValid(false), mbRightPoseWasValid(false),
+      mActiveContext(eSteamVRInputContext_Gameplay), mbPauseJustPressed(false),
       mbHolsterJustPressed(false), mbUICloseJustPressed(false),
       mGlobalActionSet(vr::k_ulInvalidActionSetHandle),
       mGameplayActionSet(vr::k_ulInvalidActionSetHandle),
@@ -94,6 +97,11 @@ namespace hpl {
       return false;
     }
 
+    // SteamVR reports a held physical control as changed when the newly active
+    // action set binds that control to another action. Without latching the
+    // first state, R1/Options can open a UI and immediately close it again.
+    const bool suppressContextEdges = !mbUsingActions || !mbHasActiveContext || context != mActiveContext;
+
     vr::VRActiveActionSet_t activeSets[2];
     memset(activeSets, 0, sizeof(activeSets));
     activeSets[0].ulActionSet = mGlobalActionSet;
@@ -109,6 +117,13 @@ namespace hpl {
       return false;
     }
 
+    // Pose actions follow their bound hand rather than a transient tracked-device
+    // index. A reconnect can assign a different index, so action origins are the
+    // authoritative controller identity whenever the pose action is active.
+    UpdatePoseAction(mLeftPoseAction, leftHand, "left", mbLeftPoseStateKnown, mbLeftPoseWasValid);
+    UpdatePoseAction(mRightPoseAction, rightHand, "right", mbRightPoseStateKnown, mbRightPoseWasValid);
+
+    const TrackedController::ButtonState previousRightState = rightHand.GetButtonState();
     TrackedController::ButtonState leftState(true);
     TrackedController::ButtonState rightState(true);
     bool anyActionActive = false;
@@ -130,6 +145,27 @@ namespace hpl {
       DigitalState jump = ReadDigital(mJumpAction);
       DigitalState pause = ReadDigital(mPauseAction);
 
+      // World interaction needs a current pointing pose. Preserve non-spatial
+      // controls such as pause/inventory, but release an in-progress interact
+      // cleanly if tracking disappears.
+      if (!rightHand.IsPoseValid()) {
+        interact.pressed = false;
+        interact.justPressed = false;
+        interact.justReleased = previousRightState.triggerPressed;
+      }
+
+      if (suppressContextEdges) {
+        SuppressDigitalEdges(sprint);
+        SuppressDigitalEdges(interact);
+        SuppressDigitalEdges(examine);
+        SuppressDigitalEdges(holster);
+        SuppressDigitalEdges(inventory);
+        SuppressDigitalEdges(notebook);
+        SuppressDigitalEdges(quickLight);
+        SuppressDigitalEdges(jump);
+        SuppressDigitalEdges(pause);
+      }
+
       ApplyDigital(sprint, rightState.padPressed, rightState.padJustPressed, rightState.padJustReleased);
       ApplyDigital(interact, rightState.triggerPressed, rightState.triggerJustPressed, rightState.triggerJustReleased);
       ApplyDigital(examine, rightState.menuPressed, rightState.menuJustPressed, rightState.menuJustReleased);
@@ -140,10 +176,10 @@ namespace hpl {
       ApplyDigital(jump, leftState.triggerPressed, leftState.triggerJustPressed, leftState.triggerJustReleased);
       mbPauseJustPressed = pause.justPressed;
 
-      if (interact.justPressed) Log(" SteamVR Input action: interact pressed.\n");
-      if (interact.justReleased) Log(" SteamVR Input action: interact released.\n");
-      if (inventory.justPressed) Log(" SteamVR Input action: inventory pressed.\n");
-      if (holster.justPressed) Log(" SteamVR Input action: holster pressed.\n");
+      if (interact.justPressed) Log(" [VR input +%lu ms] action: interact pressed.\n", GetApplicationTime());
+      if (interact.justReleased) Log(" [VR input +%lu ms] action: interact released.\n", GetApplicationTime());
+      if (inventory.justPressed) Log(" [VR input +%lu ms] action: inventory pressed.\n", GetApplicationTime());
+      if (holster.justPressed) Log(" [VR input +%lu ms] action: holster pressed.\n", GetApplicationTime());
 
       anyActionActive = anyActionActive || sprint.active || interact.active || examine.active || holster.active ||
         inventory.active || notebook.active || quickLight.active || jump.active || pause.active;
@@ -154,6 +190,24 @@ namespace hpl {
       DigitalState back = ReadDigital(mUIBackAction);
       DigitalState close = ReadDigital(mUICloseAction);
 
+      // Selection and dragging are pointer operations. Closing or backing out
+      // remains available even if optical hand tracking is temporarily lost.
+      if (!rightHand.IsPoseValid()) {
+        select.pressed = false;
+        select.justPressed = false;
+        select.justReleased = previousRightState.triggerPressed;
+        drag.pressed = false;
+        drag.justPressed = false;
+        drag.justReleased = previousRightState.padPressed;
+      }
+
+      if (suppressContextEdges) {
+        SuppressDigitalEdges(select);
+        SuppressDigitalEdges(drag);
+        SuppressDigitalEdges(back);
+        SuppressDigitalEdges(close);
+      }
+
       ApplyDigital(select, rightState.triggerPressed, rightState.triggerJustPressed, rightState.triggerJustReleased);
       ApplyDigital(drag, rightState.padPressed, rightState.padJustPressed, rightState.padJustReleased);
       ApplyDigital(back, rightState.menuPressed, rightState.menuJustPressed, rightState.menuJustReleased);
@@ -161,8 +215,8 @@ namespace hpl {
       ApplyDigital(close, leftState.menuPressed, leftState.menuJustPressed, leftState.menuJustReleased);
       mbUICloseJustPressed = close.justPressed;
 
-      if (select.justPressed) Log(" SteamVR Input action: UI select pressed.\n");
-      if (close.justPressed) Log(" SteamVR Input action: UI close pressed.\n");
+      if (select.justPressed) Log(" [VR input +%lu ms] action: UI select pressed.\n", GetApplicationTime());
+      if (close.justPressed) Log(" [VR input +%lu ms] action: UI close pressed.\n", GetApplicationTime());
 
       anyActionActive = select.active || drag.active || back.active || close.active;
     }
@@ -181,6 +235,8 @@ namespace hpl {
     }
     mbUsingActions = true;
     mbFallbackReported = false;
+    mbHasActiveContext = true;
+    mActiveContext = context;
     leftHand.SetButtonState(leftState);
     rightHand.SetButtonState(rightState);
     return true;
@@ -212,6 +268,62 @@ namespace hpl {
       Log(" SteamVR Input could not resolve action '%s' (error %d).\n", path, (int)error);
       return false;
     }
+    return true;
+  }
+
+  bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
+    const char* handName, bool& stateKnown, bool& wasValid) {
+    vr::InputPoseActionData_t data;
+    memset(&data, 0, sizeof(data));
+
+    const vr::ETrackingUniverseOrigin trackingSpace = vr::VRCompositor()->GetTrackingSpace();
+    vr::EVRInputError error = vr::VRInput()->GetPoseActionDataForNextFrame(
+      handle, trackingSpace, &data, sizeof(data), vr::k_ulInvalidInputValueHandle);
+
+    // An inactive pose has no binding for the current controller. Leave the
+    // compositor/device-role result in place so legacy bindings still work.
+    if (error != vr::VRInputError_None || !data.bActive) {
+      if (stateKnown && wasValid) {
+        Log(" [VR input +%lu ms] %s pose action lost (%s, error %d).\n", GetApplicationTime(),
+          handName, data.bActive ? "read failure" : "inactive", (int)error);
+        wasValid = false;
+      }
+      return false;
+    }
+
+    const bool valid = data.pose.bPoseIsValid && data.pose.bDeviceIsConnected;
+    if (!stateKnown || valid != wasValid) {
+      Log(" [VR input +%lu ms] %s pose action %s.\n", GetApplicationTime(), handName,
+        valid ? "acquired" : "lost");
+      stateKnown = true;
+      wasValid = valid;
+    }
+
+    if (!valid) {
+      hand.SetPoseValid(false);
+      return true;
+    }
+
+    vr::TrackedDeviceIndex_t deviceIndex = hand.GetDeviceIndex();
+    if (data.activeOrigin != vr::k_ulInvalidInputValueHandle) {
+      vr::InputOriginInfo_t originInfo;
+      memset(&originInfo, 0, sizeof(originInfo));
+      if (vr::VRInput()->GetOriginTrackedDeviceInfo(data.activeOrigin, &originInfo, sizeof(originInfo)) ==
+        vr::VRInputError_None) {
+        deviceIndex = originInfo.trackedDeviceIndex;
+      }
+    }
+
+    static const cMatrixf heightAdd = cMath::MatrixTranslate(cVector3f(0.0f, 0.02f, 0.0f));
+    const vr::HmdMatrix34_t& poseMatrix = data.pose.mDeviceToAbsoluteTracking;
+    const vr::HmdVector3_t& velocity = data.pose.vVelocity;
+    const vr::HmdVector3_t& angularVelocity = data.pose.vAngularVelocity;
+
+    hand.SetPose(
+      cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(poseMatrix)),
+      cVector3f(velocity.v[0], velocity.v[1], velocity.v[2]),
+      cVector3f(angularVelocity.v[0], angularVelocity.v[1], angularVelocity.v[2]),
+      deviceIndex);
     return true;
   }
 
@@ -248,6 +360,11 @@ namespace hpl {
     state.x = data.x;
     state.y = data.y;
     return state;
+  }
+
+  void cSteamVRInput::SuppressDigitalEdges(DigitalState& state) const {
+    state.justPressed = false;
+    state.justReleased = false;
   }
 
   void cSteamVRInput::ApplyDigital(const DigitalState& source, bool& pressed, bool& justPressed, bool& justReleased) const {

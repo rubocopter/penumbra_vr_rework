@@ -1034,7 +1034,7 @@ void cPlayerState_UseItem_VR::OnPostSceneDraw() {
   auto ofs = itemMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
   tVertexVec vtx;
-  vtx.reserve(4);
+  vtx.resize(4);
 
   cColor color = mpPlayer->GetItemFlash() ? cColor(1.0f, 1.0f) : cColor(1.0f, 0.0f, 0.0f, 1.0f);
 

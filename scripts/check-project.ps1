@@ -20,7 +20,9 @@ $requiredPaths = @(
     'data\config\Espanol.lang',
     'data\vr\actions.json',
     'data\vr\bindings\psvr2_sense.json',
-    'data\vr\bindings\vive_controller.json'
+    'data\vr\bindings\vive_controller.json',
+    'docs\INPUT_ARCHITECTURE.md',
+    'scripts\deploy.ps1'
 )
 
 $missingPaths = foreach ($relativePath in $requiredPaths) {

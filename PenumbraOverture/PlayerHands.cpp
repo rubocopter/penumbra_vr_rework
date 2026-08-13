@@ -92,9 +92,11 @@ bool iHudModel::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
 
   cMatrixf vr_handMtx;
   if (mlHandIndex == 0) {
+    if (!mpInit->mpGame->vr_left_hand.IsPoseValid()) return false;
     vr_handMtx = mpInit->mpGame->vr_left_hand.GetMatrix();
   }
   else {
+    if (!mpInit->mpGame->vr_right_hand.IsPoseValid()) return false;
     vr_handMtx = mpInit->mpGame->vr_right_hand.GetMatrix();
   }
 
@@ -316,6 +318,14 @@ void cPlayerHands::Update(float afTimeStep)
 	{
 		iHudModel *pHudModel = mvCurrentHudModels[i];
     if (pHudModel == NULL) {continue;}
+
+    const bool poseValid = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
+      mpInit->mpGame->vr_right_hand.IsPoseValid();
+    if (!poseValid) {
+      if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(false);
+      continue;
+    }
+    if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(true);
 		
 		cMatrixf mtxPose = cMatrixf::Identity;
 

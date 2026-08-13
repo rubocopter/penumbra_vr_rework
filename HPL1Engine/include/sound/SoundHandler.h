@@ -143,6 +143,7 @@ namespace hpl {
 		bool GetSilent(){ return mbSilent; }
 		
 		bool Stop(const tString& asName);
+		int StopAllByName(const tString& asName);
 		bool StopAllExcept(const tString& asName);
 		
 		void StopAll(tFlag mTypes);

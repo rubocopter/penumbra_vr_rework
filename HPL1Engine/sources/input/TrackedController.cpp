@@ -8,7 +8,10 @@ namespace hpl {
   extern cGame* gGame;
 }
 
-TrackedController::TrackedController() : device_index_(-1), button_state_(true), last_packet_(0) {
+TrackedController::TrackedController()
+  : last_packet_(0), button_state_(false), device_index_(vr::k_unTrackedDeviceIndexInvalid),
+    pose_valid_(false), last_matrix_(cMatrixf::Identity), matrix_(cMatrixf::Identity),
+    velocity_(0.0f), angular_velocity_(0.0f) {
 }
 
 TrackedController::~TrackedController() {
@@ -42,13 +45,38 @@ cVector3f TrackedController::GetAngularVelocity() {
   return angular_velocity_;
 }
 
+void TrackedController::BeginPoseFrame() {
+  pose_valid_ = false;
+  device_index_ = vr::k_unTrackedDeviceIndexInvalid;
+  velocity_ = cVector3f(0.0f);
+  angular_velocity_ = cVector3f(0.0f);
+}
+
+void TrackedController::SetPose(const cMatrixf& matrix, const cVector3f& velocity,
+  const cVector3f& angularVelocity, vr::TrackedDeviceIndex_t deviceIndex) {
+  SetMatrix(matrix);
+  SetVelocity(velocity);
+  SetAngularVelocity(angularVelocity);
+  SetDeviceIndex(deviceIndex);
+  pose_valid_ = true;
+}
+
+void TrackedController::SetPoseValid(bool valid) {
+  pose_valid_ = valid;
+  if (!valid) {
+    device_index_ = vr::k_unTrackedDeviceIndexInvalid;
+    velocity_ = cVector3f(0.0f);
+    angular_velocity_ = cVector3f(0.0f);
+  }
+}
+
 void TrackedController::SetDeviceIndex(vr::TrackedDeviceIndex_t index) {
   device_index_ = index;
 }
 
 void TrackedController::UpdateButtonState() {
-  if (device_index_ == -1) {
-    button_state_ = ButtonState(false);
+  if (device_index_ == vr::k_unTrackedDeviceIndexInvalid) {
+    InvalidateButtonState();
     return;
   }
 
@@ -57,7 +85,7 @@ void TrackedController::UpdateButtonState() {
   vr::VRControllerState_t state;
 
   if (!hmd->GetControllerState(device_index_, &state, sizeof(state))) {
-    button_state_.valid_ = false;
+    InvalidateButtonState();
     return;
   }
 
@@ -124,6 +152,16 @@ void TrackedController::UpdateButtonState() {
     button_state_.menuJustReleased = button_state_.menuPressed;
 
   button_state_.menuPressed = (state.ulButtonPressed & (1ULL << ((int)k_EButton_ApplicationMenu))) > 0;
+}
+
+void TrackedController::InvalidateButtonState() {
+  ButtonState disconnected(false);
+  disconnected.touchJustReleased = button_state_.touchContact;
+  disconnected.padJustReleased = button_state_.padPressed;
+  disconnected.gripJustReleased = button_state_.gripPressed;
+  disconnected.triggerJustReleased = button_state_.triggerPressed;
+  disconnected.menuJustReleased = button_state_.menuPressed;
+  button_state_ = disconnected;
 }
 
 void TrackedController::SetButtonState(const ButtonState& state) {

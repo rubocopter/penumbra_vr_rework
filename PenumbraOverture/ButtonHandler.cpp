@@ -571,10 +571,18 @@ void cButtonHandler::Update(float afTimeStep)
 				mpInput->BecameTriggerd("Interact");
 			}
 			
-			if(mpInput->DoubleTriggerd("LeftClick",0.2f) ||
-        rightHandButtons.triggerJustPressed)
+			if(mpInput->DoubleTriggerd("LeftClick",0.2f))
 			{
 				mpInit->mpInventory->OnDoubleClick(eMButton_Left);
+			}
+			if(rightHandButtons.triggerJustPressed)
+			{
+				// R2 activates the highlighted context action when one is open;
+				// otherwise it performs the item's default action directly.
+				if(mpInit->mpInventory->GetContext()->IsActive())
+					mpInit->mpInventory->OnMouseDown(eMButton_Left);
+				else
+					mpInit->mpInventory->OnDoubleClick(eMButton_Left);
 			}
 			if(mpInput->WasTriggerd("LeftClick") ||
         rightHandButtons.padJustReleased)

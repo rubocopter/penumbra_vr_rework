@@ -52,14 +52,23 @@ namespace hpl {
 
     bool ResolveActionSet(const char* path, vr::VRActionSetHandle_t& handle);
     bool ResolveAction(const char* path, vr::VRActionHandle_t& handle);
+    bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
+      const char* handName, bool& stateKnown, bool& wasValid);
     DigitalState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
+    void SuppressDigitalEdges(DigitalState& state) const;
     void ApplyDigital(const DigitalState& source, bool& pressed, bool& justPressed, bool& justReleased) const;
     tString FindManifestPath() const;
 
     bool mbAvailable;
     bool mbUsingActions;
     bool mbFallbackReported;
+    bool mbHasActiveContext;
+    bool mbLeftPoseStateKnown;
+    bool mbRightPoseStateKnown;
+    bool mbLeftPoseWasValid;
+    bool mbRightPoseWasValid;
+    eSteamVRInputContext mActiveContext;
     bool mbPauseJustPressed;
     bool mbHolsterJustPressed;
     bool mbUICloseJustPressed;

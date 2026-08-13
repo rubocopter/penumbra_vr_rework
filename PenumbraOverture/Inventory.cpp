@@ -827,6 +827,8 @@ void cInventoryContext::Update(float afTimeStep)
 {
   // For VR, use controller as laser pointer thing
   // Get right hand and see if it's intersecting
+  if (mpInit->mpGame->vr_right_hand.IsPoseValid())
+  {
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
   auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
@@ -834,15 +836,16 @@ void cInventoryContext::Update(float afTimeStep)
   auto handPos = worldMat.GetTranslation();
   auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(worldMat.GetRotation()).GetForward()) * - 1.0f;
 
-  // Make traces relative to the inventory's position
+  // Trace the complete 800x600 inventory plane. mvPos belongs to the optional
+  // item context menu and must not move the controller pointer's origin.
   cMatrixf uiMatrix = mpInit->mpGame->GetScene()->GetUIMatrix();
 
   cVector2f scrSize = cVector2f(800 * 4.0f, 600 * 4.0f);
 
   float points[] = {
-    mvPos.x, mvPos.y, 0.0f,
-    mvPos.x, mvPos.y + scrSize.y, 0.0f,
-    mvPos.x + scrSize.x, mvPos.y, 0.0f
+    0.0f, 0.0f, 0.0f,
+    0.0f, scrSize.y, 0.0f,
+    scrSize.x, 0.0f, 0.0f
   };
 
   for (int i = 0; i < 3; ++i) {
@@ -871,6 +874,7 @@ void cInventoryContext::Update(float afTimeStep)
         mpInit->mpInventory->SetMousePos(cVector2f(x, y));
       }
     }
+  }
   }
 
   //mpInit->mpInventory->SetMousePos(cVector2f(-300.0f, -300.0f));
@@ -1496,9 +1500,6 @@ void cInventory::OnMouseDown(eMButton aButton)
 		return;
 	}
 
-	//To this to remove context temporarly.
-	if(aButton == eMButton_Right) return;
-	
 	/////////////////////////////////
 	// Context is active
 	if(mpContext->IsActive())

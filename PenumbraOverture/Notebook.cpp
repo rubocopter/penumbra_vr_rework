@@ -966,6 +966,7 @@ void cNotebook::Update(float afTimeStep)
 
   //////////////////////////////
   //Stick the notebook to the player's left hand
+  if (mpInit->mpGame->vr_left_hand.IsPoseValid())
   {
     auto scene = mpInit->mpGame->GetScene();
 
@@ -1020,6 +1021,8 @@ void cNotebook::Update(float afTimeStep)
 
   // For VR, use controller as laser pointer thing
   // Get right hand and see if it's intersecting
+  if (mpInit->mpGame->vr_right_hand.IsPoseValid())
+  {
   auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
 
   auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
@@ -1064,6 +1067,7 @@ void cNotebook::Update(float afTimeStep)
         SetMousePos(cVector2f(x, y));
       }
     }
+  }
   }
 }
 

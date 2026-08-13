@@ -34,8 +34,10 @@ Get-ChildItem -LiteralPath $dataRoot -Force | ForEach-Object {
 }
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'readme.md') -Destination (Join-Path $packageRoot 'README.md')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\COPYING') -Destination (Join-Path $packageRoot 'COPYING.txt')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs') -Destination $packageRoot -Recurse
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\deploy.ps1') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.ps1')
 
-foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'config\English.lang', 'config\Espanol.lang', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json')) {
+foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'Install-PenumbraVR.ps1', 'config\English.lang', 'config\Espanol.lang', 'docs\INPUT.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json')) {
     $packagedPath = Join-Path $packageRoot $requiredPath
     if (-not (Test-Path -LiteralPath $packagedPath)) {
         throw "Required package entry was not created: $packagedPath"

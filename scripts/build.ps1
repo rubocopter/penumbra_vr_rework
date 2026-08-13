@@ -3,7 +3,13 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
-    [switch]$Package
+    [switch]$Package,
+
+    [switch]$Deploy,
+
+    [string]$InstallRoot,
+
+    [switch]$NoSteamLauncher
 )
 
 Set-StrictMode -Version Latest
@@ -46,6 +52,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "MSBuild failed with exit code $LASTEXITCODE"
 }
 
-if ($Package) {
+if ($Package -or $Deploy) {
     & (Join-Path $PSScriptRoot 'package.ps1') -Configuration $Configuration
+}
+
+if ($Deploy) {
+    $deployArguments = @{
+        Configuration = $Configuration
+        SteamLauncher = -not $NoSteamLauncher
+    }
+    if ($InstallRoot) {
+        $deployArguments.InstallRoot = $InstallRoot
+    }
+    & (Join-Path $PSScriptRoot 'deploy.ps1') @deployArguments
 }
