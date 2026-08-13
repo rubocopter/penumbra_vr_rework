@@ -82,6 +82,11 @@ namespace hpl {
 		mbDrawScene = true;
 		mbUpdateMap = true;
 
+    mVRMenuState = MenuState_Facelock;
+    mVRMenuTransform = cMatrixf::Identity;
+    mVRMenuModelMatrix = cMatrixf::Identity;
+    mVRMainMenuModelMatrix = cMatrixf::Identity;
+
 		mpActiveCamera = NULL;
 	}
 
@@ -524,6 +529,8 @@ namespace hpl {
 
               // Project to world space
               uiViewMat = cMath::MatrixMul(pCamera3D->GetViewMatrix(), mVRMenuTransform);
+
+              break;
             }
 
             case MenuState_WorldPosition:
@@ -638,6 +645,8 @@ namespace hpl {
 
                 // Project to world space
                 uiViewMat = cMath::MatrixMul(pCamera3D->GetViewMatrix(), mVRMenuTransform);
+
+                break;
               }
 
               case MenuState_WorldPosition:
@@ -736,20 +745,20 @@ namespace hpl {
 
         cMatrixf uiViewMat = cMatrixf::Identity;
 
-        // Translate to center of vision
-        auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
+        // Center the 800x600 surface around the viewer.
+        auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -300.0f, 0.0f));
         uiViewMat = cMath::MatrixMul(centerTranslationMat, uiViewMat);
 
-        // Scale it down
-        auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 550.0f, -1.0f / 550.0f, 1.0f / 550.0f));
+        // Keep menus and cinematics at a comfortable angular size.
+        auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 650.0f, -1.0f / 650.0f, 1.0f / 650.0f));
         uiViewMat = cMath::MatrixMul(scaleMat, uiViewMat);
 
-        // Move to face height, edge of play space
-        float xSize, ySize;
-        vr::VRChaperone()->GetPlayAreaSize(&xSize, &ySize);
-
-        auto faceTranslationMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 1.35f, -ySize / 2.0f + 0.25f));
-        uiViewMat = cMath::MatrixMul(faceTranslationMatrix, uiViewMat);
+        // Anchor the surface to the current HMD pose instead of the edge of the
+        // chaperone area. PS VR2 may report a very small play area, which used
+        // to place this plane almost on top of the viewer's face.
+        auto viewDistanceMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -1.75f));
+        uiViewMat = cMath::MatrixMul(viewDistanceMatrix, uiViewMat);
+        uiViewMat = cMath::MatrixMul(head_mat, uiViewMat);
 
         mVRMainMenuModelMatrix = uiViewMat;
 

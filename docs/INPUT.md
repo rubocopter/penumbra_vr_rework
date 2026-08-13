@@ -14,8 +14,9 @@ The action manifest is installed as `vr/actions.json` beside `Penumbra_vr.exe`. 
 | L3 | Sprint |
 | L1 | Toggle the current quick light |
 | Square | Notebook |
+| Triangle | Holster the equipped tool or weapon |
 | Cross | Jump |
-| R2 | Interact |
+| R2 | Interact, or use the equipped tool or weapon |
 | R1 | Inventory |
 | Circle | Examine |
 | Options | Pause menu |
@@ -28,6 +29,8 @@ The action manifest is installed as `vr/actions.json` beside `Penumbra_vr.exe`. 
 | R3 | Drag or combine |
 | Circle | Back or examine |
 | R1, Square, or Options | Close the current screen |
+
+When a tool such as the hammer is equipped, R2 operates that tool. Press Triangle to holster it before using R2 to interact with doors and other objects again.
 
 ## HTC Vive compatibility defaults
 

@@ -28,6 +28,9 @@ Baseline validation was completed on 13 August 2026. The Release build launched 
 
 ## Phase 2 — PS VR2 and comfort
 
+- [x] Correct the PS VR2 Sense shoulder bindings and add an explicit holster action.
+- [x] Place main menus and cinematics at a comfortable, headset-relative distance.
+- [ ] Confirm the revised controls and screen placement on PS VR2 hardware.
 - Calibrate controller grip/aim poses and hand offsets for PS VR2 Sense.
 - Add smooth and snap turning, configurable handedness, dead zones, seated/standing height, and recentering.
 - Add controller rumble for interaction, impact, damage, and weapon events where supported on PC.

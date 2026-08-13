@@ -35,6 +35,10 @@
       "type": "boolean"
     },
     {
+      "name": "/actions/gameplay/in/holster",
+      "type": "boolean"
+    },
+    {
       "name": "/actions/gameplay/in/inventory",
       "type": "boolean"
     },
@@ -109,6 +113,7 @@
       "/actions/gameplay/in/sprint": "Sprint",
       "/actions/gameplay/in/interact": "Interact",
       "/actions/gameplay/in/examine": "Examine",
+      "/actions/gameplay/in/holster": "Holster equipped tool",
       "/actions/gameplay/in/inventory": "Inventory",
       "/actions/gameplay/in/notebook": "Notebook",
       "/actions/gameplay/in/quick_light": "Quick light",
@@ -132,6 +137,7 @@
       "/actions/gameplay/in/sprint": "Correr",
       "/actions/gameplay/in/interact": "Interactuar",
       "/actions/gameplay/in/examine": "Examinar",
+      "/actions/gameplay/in/holster": "Guardar herramienta equipada",
       "/actions/gameplay/in/inventory": "Inventario",
       "/actions/gameplay/in/notebook": "Cuaderno",
       "/actions/gameplay/in/quick_light": "Luz rápida",

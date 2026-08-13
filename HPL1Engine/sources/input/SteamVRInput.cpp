@@ -12,7 +12,7 @@ namespace hpl {
 
   cSteamVRInput::cSteamVRInput()
     : mbAvailable(false), mbUsingActions(false), mbFallbackReported(false), mbPauseJustPressed(false),
-      mbUICloseJustPressed(false),
+      mbHolsterJustPressed(false), mbUICloseJustPressed(false),
       mGlobalActionSet(vr::k_ulInvalidActionSetHandle),
       mGameplayActionSet(vr::k_ulInvalidActionSetHandle),
       mUIActionSet(vr::k_ulInvalidActionSetHandle),
@@ -20,6 +20,7 @@ namespace hpl {
       mSprintAction(vr::k_ulInvalidActionHandle),
       mInteractAction(vr::k_ulInvalidActionHandle),
       mExamineAction(vr::k_ulInvalidActionHandle),
+      mHolsterAction(vr::k_ulInvalidActionHandle),
       mInventoryAction(vr::k_ulInvalidActionHandle),
       mNotebookAction(vr::k_ulInvalidActionHandle),
       mQuickLightAction(vr::k_ulInvalidActionHandle),
@@ -58,6 +59,7 @@ namespace hpl {
     resolved = ResolveAction("/actions/gameplay/in/sprint", mSprintAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/interact", mInteractAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/examine", mExamineAction) && resolved;
+    resolved = ResolveAction("/actions/gameplay/in/holster", mHolsterAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/inventory", mInventoryAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/notebook", mNotebookAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/quick_light", mQuickLightAction) && resolved;
@@ -86,6 +88,7 @@ namespace hpl {
 
   bool cSteamVRInput::Update(eSteamVRInputContext context, TrackedController& leftHand, TrackedController& rightHand) {
     mbPauseJustPressed = false;
+    mbHolsterJustPressed = false;
     mbUICloseJustPressed = false;
     if (!mbAvailable) {
       return false;
@@ -120,6 +123,7 @@ namespace hpl {
       DigitalState sprint = ReadDigital(mSprintAction);
       DigitalState interact = ReadDigital(mInteractAction);
       DigitalState examine = ReadDigital(mExamineAction);
+      DigitalState holster = ReadDigital(mHolsterAction);
       DigitalState inventory = ReadDigital(mInventoryAction);
       DigitalState notebook = ReadDigital(mNotebookAction);
       DigitalState quickLight = ReadDigital(mQuickLightAction);
@@ -129,13 +133,19 @@ namespace hpl {
       ApplyDigital(sprint, rightState.padPressed, rightState.padJustPressed, rightState.padJustReleased);
       ApplyDigital(interact, rightState.triggerPressed, rightState.triggerJustPressed, rightState.triggerJustReleased);
       ApplyDigital(examine, rightState.menuPressed, rightState.menuJustPressed, rightState.menuJustReleased);
+      mbHolsterJustPressed = holster.justPressed;
       ApplyDigital(inventory, rightState.gripPressed, rightState.gripJustPressed, rightState.gripJustReleased);
       ApplyDigital(notebook, leftState.menuPressed, leftState.menuJustPressed, leftState.menuJustReleased);
       ApplyDigital(quickLight, leftState.gripPressed, leftState.gripJustPressed, leftState.gripJustReleased);
       ApplyDigital(jump, leftState.triggerPressed, leftState.triggerJustPressed, leftState.triggerJustReleased);
       mbPauseJustPressed = pause.justPressed;
 
-      anyActionActive = anyActionActive || sprint.active || interact.active || examine.active ||
+      if (interact.justPressed) Log(" SteamVR Input action: interact pressed.\n");
+      if (interact.justReleased) Log(" SteamVR Input action: interact released.\n");
+      if (inventory.justPressed) Log(" SteamVR Input action: inventory pressed.\n");
+      if (holster.justPressed) Log(" SteamVR Input action: holster pressed.\n");
+
+      anyActionActive = anyActionActive || sprint.active || interact.active || examine.active || holster.active ||
         inventory.active || notebook.active || quickLight.active || jump.active || pause.active;
     }
     else {
@@ -150,6 +160,9 @@ namespace hpl {
       ApplyDigital(close, rightState.gripPressed, rightState.gripJustPressed, rightState.gripJustReleased);
       ApplyDigital(close, leftState.menuPressed, leftState.menuJustPressed, leftState.menuJustReleased);
       mbUICloseJustPressed = close.justPressed;
+
+      if (select.justPressed) Log(" SteamVR Input action: UI select pressed.\n");
+      if (close.justPressed) Log(" SteamVR Input action: UI close pressed.\n");
 
       anyActionActive = select.active || drag.active || back.active || close.active;
     }

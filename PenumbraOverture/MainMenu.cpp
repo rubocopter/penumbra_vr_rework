@@ -238,12 +238,12 @@ void cMainMenuWidget_VRTutorial::OnMouseOver(bool abOver)
 
 void cMainMenuWidget_VRTutorial::OnMouseDown(eMButton aButton)
 {
+  if (aButton != eMButton_Left) return;
+
   mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui("gui_menu_click", false, 1);
 
-  mpInit->mpGame->GetUpdater()->SetContainer("Default");
-  mpInit->mpGame->GetScene()->SetDrawScene(true);
-
-  mpInit->mpMapHandler->Load("level00_00_vr_tutorial.dae", mpInit->msStartLink);
+  mpInit->mpMainMenu->SetActive(false);
+  mpInit->mpMapHandler->Load("level00_00_vr_tutorial.dae", "link01");
 }
 
 //-----------------------------------------------------------------------

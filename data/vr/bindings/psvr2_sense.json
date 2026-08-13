@@ -51,7 +51,7 @@
               "output": "/actions/gameplay/in/quick_light"
             }
           },
-          "mode": "button",
+          "mode": "trigger",
           "path": "/user/hand/left/input/l1"
         },
         {
@@ -87,8 +87,17 @@
               "output": "/actions/gameplay/in/inventory"
             }
           },
-          "mode": "button",
+          "mode": "trigger",
           "path": "/user/hand/right/input/r1"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/holster"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/triangle"
         },
         {
           "inputs": {
@@ -149,7 +158,7 @@
               "output": "/actions/ui/in/close"
             }
           },
-          "mode": "button",
+          "mode": "trigger",
           "path": "/user/hand/right/input/r1"
         },
         {

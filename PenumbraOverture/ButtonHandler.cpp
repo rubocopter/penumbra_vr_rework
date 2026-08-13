@@ -827,7 +827,7 @@ void cButtonHandler::Update(float afTimeStep)
 				{
 					mpPlayer->StopExamine();
 				}
-				if(mpInput->BecameTriggerd("Holster"))
+				if(mpInput->BecameTriggerd("Holster") || mpInit->mpGame->vr_input.WasHolsterPressed())
 				{
 					mpPlayer->StartHolster();
 				}

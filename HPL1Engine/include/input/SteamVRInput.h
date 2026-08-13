@@ -26,6 +26,7 @@ namespace hpl {
 
     bool IsAvailable() const { return mbAvailable; }
     bool WasPausePressed() const { return mbPauseJustPressed; }
+    bool WasHolsterPressed() const { return mbHolsterJustPressed; }
     bool WasUIClosePressed() const { return mbUICloseJustPressed; }
     const tString& GetManifestPath() const { return msManifestPath; }
 
@@ -60,6 +61,7 @@ namespace hpl {
     bool mbUsingActions;
     bool mbFallbackReported;
     bool mbPauseJustPressed;
+    bool mbHolsterJustPressed;
     bool mbUICloseJustPressed;
     tString msManifestPath;
 
@@ -71,6 +73,7 @@ namespace hpl {
     vr::VRActionHandle_t mSprintAction;
     vr::VRActionHandle_t mInteractAction;
     vr::VRActionHandle_t mExamineAction;
+    vr::VRActionHandle_t mHolsterAction;
     vr::VRActionHandle_t mInventoryAction;
     vr::VRActionHandle_t mNotebookAction;
     vr::VRActionHandle_t mQuickLightAction;
