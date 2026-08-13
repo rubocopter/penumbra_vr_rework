@@ -4,11 +4,15 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 
 ## Phase 0 — reproducible baseline
 
-- Build all three native projects with Visual Studio 2022.
-- Remove author-specific paths and keep generated files outside source directories.
-- Produce a deterministic package layout with checksums.
-- Build the same target in GitHub Actions.
-- Confirm that the historical executable starts against an unmodified Steam installation.
+- [x] Build all three native projects with Visual Studio 2022.
+- [x] Remove author-specific paths and keep generated files outside source directories.
+- [x] Produce a deterministic package layout with checksums.
+- [x] Build the same target in GitHub Actions.
+- [x] Confirm that the historical executable starts from a separate Steam-derived installation.
+- [x] Confirm baseline SteamVR operation with PS VR2 on PC.
+- [x] Add and validate Spanish localization for the VR tutorial, menu, and controller notes.
+
+Baseline validation was completed on 13 August 2026. The Release build launched through SteamVR on PS VR2, retained the historical mod's behaviour, and loaded the VR tutorial in Spanish. The normal Steam installation remained untouched. Missing Spanish menu keys in the legacy translation had previously resolved to empty strings, hiding the VR tutorial option; the English and Spanish key sets are now kept in sync by project validation.
 
 ## Phase 1 — runtime and input boundary
 
