@@ -59,6 +59,8 @@ public:
 private:
 	iAction * ActionFromTypeAndVal(const tString& asName,const tString& asType, const tString& asVal);
 	void TypeAndValFromAction(iAction *apAction, tString *apType, tString *apVal);
+	void UpdateVRTurn(const cVRInputState& aInputState, float afTimeStep);
+	void UpdateVRCrouch(const cVRInputState& aInputState);
 	
 	int mlNumOfActions;
 
@@ -71,6 +73,12 @@ private:
 	cPlayer *mpPlayer;
 
 	eButtonHandlerState mState;
+	bool mbSnapTurnReady;
+	bool mbVRCrouchButtonLatched;
+	bool mbVRPhysicalCrouch;
+	bool mbVRCrouchApplied;
+	bool mbVRStandingHeightKnown;
+	float mfVRStandingHeight;
 };
 
 

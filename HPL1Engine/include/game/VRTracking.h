@@ -26,7 +26,9 @@ namespace hpl {
 		cVRTrackingSpace()
 			: mHeadTrackingPose(cMatrixf::Identity),
 			  mPlayerWorldPose(cMatrixf::Identity),
-			  mfHeightCalibration(0.0f)
+			  mfHeightCalibration(0.0f),
+			  mfPostureOffset(0.0f),
+			  mfWorldYaw(0.0f)
 		{
 		}
 
@@ -60,6 +62,56 @@ namespace hpl {
 			return mfHeightCalibration;
 		}
 
+		void SetPostureOffset(float afPostureOffset)
+		{
+			mfPostureOffset = afPostureOffset;
+		}
+
+		float GetPostureOffset() const
+		{
+			return mfPostureOffset;
+		}
+
+		void SetWorldYaw(float afWorldYaw)
+		{
+			mfWorldYaw = cMath::Wrap(afWorldYaw + kPif, 0.0f, k2Pif) - kPif;
+		}
+
+		void AddWorldYaw(float afWorldYawDelta)
+		{
+			SetWorldYaw(mfWorldYaw + afWorldYawDelta);
+		}
+
+		float GetWorldYaw() const
+		{
+			return mfWorldYaw;
+		}
+
+		cMatrixf GetWorldYawRotation() const
+		{
+			return cMath::MatrixRotateY(mfWorldYaw);
+		}
+
+		cVector3f TrackingDirectionToWorld(const cVector3f& aTrackingDirection) const
+		{
+			// Direction vectors must only inherit world orientation. Applying the
+			// full pose transform would incorrectly add player position and height.
+			return cMath::MatrixMul(GetWorldYawRotation(), aTrackingDirection);
+		}
+
+		void RecenterOrientation()
+		{
+			// Align the viewer's current horizontal look direction with Penumbra's
+			// world forward while preserving player position and calibrated height.
+			cVector3f viewForward =
+				cMath::MatrixInverse(GetHeadWorldPose().GetRotation()).GetForward() * -1.0f;
+			viewForward.y = 0.0f;
+			if(viewForward.Length() <= kEpsilonf) return;
+
+			viewForward = cMath::Vector3Normalize(viewForward);
+			AddWorldYaw(atan2(viewForward.x, -viewForward.z));
+		}
+
 		cMatrixf GetTrackingToWorldTransform() const
 		{
 			cMatrixf calibratedHeadPose = mHeadTrackingPose;
@@ -68,11 +120,13 @@ namespace hpl {
 			// Preserve the legacy floor reach adjustment while making height an
 			// explicit concern. World scale remains 1.0.
 			calibratedPosition.x = 0.0f;
-			calibratedPosition.y = (calibratedPosition.y - 0.2f) * 1.065f + mfHeightCalibration;
+			calibratedPosition.y = (calibratedPosition.y - 0.2f) * 1.065f +
+				mfHeightCalibration + mfPostureOffset;
 			calibratedPosition.z = 0.0f;
 			calibratedHeadPose.SetTranslation(calibratedPosition);
 
-			const cMatrixf headWorldPose = cMath::MatrixMul(mPlayerWorldPose, calibratedHeadPose);
+			const cMatrixf rotatedHeadPose = cMath::MatrixMul(GetWorldYawRotation(), calibratedHeadPose);
+			const cMatrixf headWorldPose = cMath::MatrixMul(mPlayerWorldPose, rotatedHeadPose);
 			return cMath::MatrixMul(headWorldPose, cMath::MatrixInverse(mHeadTrackingPose));
 		}
 
@@ -95,6 +149,8 @@ namespace hpl {
 		cMatrixf mHeadTrackingPose;
 		cMatrixf mPlayerWorldPose;
 		float mfHeightCalibration;
+		float mfPostureOffset;
+		float mfWorldYaw;
 	};
 
 }

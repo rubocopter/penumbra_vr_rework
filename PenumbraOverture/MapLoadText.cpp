@@ -21,6 +21,8 @@
 #include "Init.h"
 #include "GraphicsHelper.h"
 #include "ButtonHandler.h"
+#include "MapHandler.h"
+#include "SaveHandler.h"
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
@@ -62,6 +64,10 @@ void cMapLoadText::Reset()
 {
 	mpBack = NULL;
 	mbActive = false;
+	mbLoading = false;
+	mbMapLoadPending = false;
+	mbLoadingFramePresented = false;
+	mbShowContinueText = false;
 	mfAlpha = 0;
 	mfAlphaAdd = 1;
 }
@@ -71,7 +77,8 @@ void cMapLoadText::Reset()
 void cMapLoadText::OnPostSceneDraw()
 {
 	mpInit->mpGraphicsHelper->ClearScreen(cColor(0,0));
-	mpInit->mpGraphicsHelper->DrawTexture(mpBack,0,cVector3f(800,600,0),cColor(1,1));
+	if(mpBack)
+		mpInit->mpGraphicsHelper->DrawTexture(mpBack,0,cVector3f(800,600,0),cColor(1,1));
 }
 
 //-----------------------------------------------------------------------
@@ -79,7 +86,7 @@ void cMapLoadText::OnPostSceneDraw()
 
 void cMapLoadText::OnDraw()
 {
-	DrawText(false);
+	DrawText(mbLoading);
 }
 
 //-----------------------------------------------------------------------
@@ -101,7 +108,7 @@ void cMapLoadText::DrawText(bool abLoading)
 		mpTextFont->Draw(cVector3f(400,550,25),17,cColor(0.75f, 0.75f, 0.75f, 1),
 			eFontAlign_Center,kTranslate("LoadTexts", "Loading").c_str());
 	}
-	else
+	else if(mbShowContinueText)
 	{
 		tWString wsText = kTranslate("LoadTexts", "ClickToContinue");
 
@@ -123,6 +130,15 @@ void cMapLoadText::DrawText(bool abLoading)
 
 void cMapLoadText::Update(float afTimeStep)
 {
+	if(mbMapLoadPending && mbLoadingFramePresented)
+	{
+		mbMapLoadPending = false;
+		if(mpInit->mpSaveHandler->IsGameLoadPending())
+			mpInit->mpSaveHandler->CompletePendingGameLoad();
+		else
+			mpInit->mpMapHandler->CompletePendingMapChange();
+	}
+
 	mfAlpha += mfAlphaAdd*afTimeStep;
 	if(mfAlphaAdd <0)
 	{
@@ -142,6 +158,16 @@ void cMapLoadText::Update(float afTimeStep)
 
 //-----------------------------------------------------------------------
 
+void cMapLoadText::OnPostBufferSwap()
+{
+	if(mbMapLoadPending)
+		mbLoadingFramePresented = true;
+
+	mpInit->mpMapHandler->OnVRFramePresentedAfterLoad();
+}
+
+//-----------------------------------------------------------------------
+
 void cMapLoadText::OnMouseDown(eMButton aButton)
 {
 }
@@ -156,6 +182,7 @@ void cMapLoadText::OnMouseUp(eMButton aButton)
 
 void cMapLoadText::SetActive(bool abX)
 {
+	if(!abX && mbLoading) return;
 	if(mbActive == abX) return;
 
 	mbActive = abX;
@@ -163,19 +190,25 @@ void cMapLoadText::SetActive(bool abX)
 	if(mbActive)
 	{
 		mvRows.clear();
-		mpTextFont->GetWordWrapRows(750,17,15,kTranslate(msTextCat, msTextEntry),&mvRows);
+		mbShowContinueText = msTextCat != "" && msTextEntry != "";
+		if(mbShowContinueText)
+			mpTextFont->GetWordWrapRows(750,17,15,kTranslate(msTextCat, msTextEntry),&mvRows);
 
 		mpInit->mpGame->GetUpdater()->SetContainer("MapLoadText");
 		mpInit->mpGame->GetScene()->SetDrawScene(false);
+		mpInit->mpGame->GetScene()->ResetVRMainUIAnchor();
 		mpInit->mpGame->GetScene()->SetUpdateMap(false);
 		if(mpInit->mbHasHaptics)
 			mpInit->mpGame->GetHaptic()->GetLowLevel()->SetUpdateShapes(false);
 		mpInit->mpButtonHandler->ChangeState(eButtonHandlerState_MapLoadText);
 
-		mpBack = mpInit->mpGame->GetResources()->GetTextureManager()->Create2D("other_load_text_back.jpg",false);
+		mpBack = mbShowContinueText
+			? mpInit->mpGame->GetResources()->GetTextureManager()->Create2D("other_load_text_back.jpg",false)
+			: NULL;
 		
 		mpInit->mpGraphicsHelper->ClearScreen(cColor(0,0));
-		mpInit->mpGraphicsHelper->DrawTexture(mpBack,0,cVector3f(800,600,0),cColor(1,1));
+		if(mpBack)
+			mpInit->mpGraphicsHelper->DrawTexture(mpBack,0,cVector3f(800,600,0),cColor(1,1));
 		DrawText(true);
 		mpDrawer->DrawAll();
 		mpInit->mpGraphicsHelper->SwapBuffers();
@@ -198,6 +231,33 @@ void cMapLoadText::SetActive(bool abX)
 
 //-----------------------------------------------------------------------
 
+void cMapLoadText::BeginMapLoad()
+{
+	mbLoading = true;
+	mbMapLoadPending = true;
+	mbLoadingFramePresented = false;
+}
+
+//-----------------------------------------------------------------------
+
+void cMapLoadText::FinishMapLoad(bool abShowContinueText)
+{
+	mbLoading = false;
+	mbMapLoadPending = false;
+	mbLoadingFramePresented = false;
+	mbShowContinueText = abShowContinueText;
+	if(!abShowContinueText)
+	{
+		// Loading a save resets every updateable, including this one, while its
+		// container remains selected. Restore the active latch so SetActive can
+		// perform the normal transition back to gameplay.
+		if(!mbActive) mbActive = true;
+		SetActive(false);
+	}
+}
+
+//-----------------------------------------------------------------------
+
 void cMapLoadText::OnExit()
 {
 	SetActive(false);
@@ -213,4 +273,3 @@ void cMapLoadText::OnExit()
 
 
 //-----------------------------------------------------------------------
-

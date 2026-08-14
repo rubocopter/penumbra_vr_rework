@@ -146,22 +146,25 @@ bool cRadioHandler::IsActive()
 void cRadioHandler::OnDraw()
 {
 	float fAlpha = mfAlpha;
+	const float fTextScale = mpInit->mVRSettings.GetSubtitleScale();
+	const float fLineHeight = 17.0f * fTextScale;
+	const float fFontSize = 15.0f * fTextScale;
     
 	if(mpInit->mbSubtitles)
 	{
 		if(msCurrentText !=_W(""))
 		{
-			mpFont->DrawWordWrap(cVector3f(25, 500,47),750,16,15,cColor(1,fAlpha),
+			mpFont->DrawWordWrap(cVector3f(40, 470,47),720,fLineHeight,fFontSize,cColor(1,fAlpha),
 								eFontAlign_Left,msCurrentText);
-			mpFont->DrawWordWrap(cVector3f(25, 500,46) + cVector3f(2,2,0),750,16,15,cColor(0,fAlpha),
+			mpFont->DrawWordWrap(cVector3f(40, 470,46) + cVector3f(2,2,0),720,fLineHeight,fFontSize,cColor(0,fAlpha),
 								eFontAlign_Left,msCurrentText);
 		}
 
 		if(msPrevText !=_W("") && msPrevText != msCurrentText && mfAlpha <1)
 		{
-			mpFont->DrawWordWrap(cVector3f(25, 500,47),750,16,15,cColor(1,1-fAlpha),
+			mpFont->DrawWordWrap(cVector3f(40, 470,47),720,fLineHeight,fFontSize,cColor(1,1-fAlpha),
 				eFontAlign_Left,msPrevText);
-			mpFont->DrawWordWrap(cVector3f(25, 500,46) + cVector3f(2,2,0),750,16,15,cColor(0,1-fAlpha),
+			mpFont->DrawWordWrap(cVector3f(40, 470,46) + cVector3f(2,2,0),720,fLineHeight,fFontSize,cColor(0,1-fAlpha),
 				eFontAlign_Left,msPrevText);
 		}
 	}

@@ -174,6 +174,9 @@ namespace hpl {
 	{
 		mpGameSetup = apGameSetup;
 		vr_old_head_tracking_pose = cMatrixf::Identity;
+		pointerDrawStart = cVector3f(0,0,0);
+		pointerDrawEnd = cVector3f(0,0,0);
+		pointerDrawActive = false;
 
 		Log("Creating Engine Modules\n");
 		Log("--------------------------------------------------------\n");

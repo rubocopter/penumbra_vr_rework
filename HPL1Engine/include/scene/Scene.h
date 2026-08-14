@@ -139,6 +139,9 @@ namespace hpl {
 
     cMatrixf GetUIMatrix() { return mVRMenuModelMatrix; }
     cMatrixf GetMainUIMatrix() { return mVRMainMenuModelMatrix; }
+		void SetVRMainUIDistance(float afDistance) { mfVRMainUIDistance = afDistance; }
+		void SetVRMainUIScale(float afScale) { mfVRMainUIScale = afScale; }
+		void ResetVRMainUIAnchor();
 
     void SetVRMenuState(VR_MenuState menuState, cMatrixf mat) {
       mVRMenuState = menuState;
@@ -150,6 +153,10 @@ namespace hpl {
     cMatrixf mVRMenuTransform;
     cMatrixf mVRMenuModelMatrix;
     cMatrixf mVRMainMenuModelMatrix;
+		float mfVRMainUIDistance;
+		float mfVRMainUIScale;
+		bool mbVRMainUIAnchorValid;
+		cMatrixf mVRMainUIAnchor;
 
     cGraphics *mpGraphics;
 		cResources *mpResources;

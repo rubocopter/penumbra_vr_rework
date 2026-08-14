@@ -32,6 +32,7 @@
 #include "PlayerState_WeaponHaptX.h"
 #include "HudModel_Weapon.h"
 #include "HudModel_Throw.h"
+#include "VRHaptics.h"
 
 //////////////////////////////////////////////////////////////////////////
 // BASE ITEM CLASS
@@ -95,14 +96,20 @@ bool cGameItemType_Normal::OnAction(cInventoryItem *apItem, int alActionNum)
 void cGameItemType_Normal::OnUse(cInventoryItem *apItem, iGameEntity* apEntity)
 {
 	bool bUsed = apEntity->OnUseItem(apItem);
-	
-	if(mpInit->mpInventory->CheckUseCallback(apItem->GetName(), apEntity->GetName())==false)
+	bool bCallbackUsed = mpInit->mpInventory->CheckUseCallback(apItem->GetName(), apEntity->GetName());
+
+	if(bCallbackUsed==false)
 	{
 		if(bUsed==false)
 		{
 			tString sEntry = "CannotUseItem" + cString::ToString(cMath::RandRectl(1,5));
 			mpInit->mpGameMessageHandler->Add(kTranslate("Inventory", sEntry));
 		}
+	}
+
+	if(bUsed || bCallbackUsed)
+	{
+		cVRHaptics::Play(mpInit, eVRHapticEvent_Interaction, eVRHapticHand_Right);
 	}
 }
 

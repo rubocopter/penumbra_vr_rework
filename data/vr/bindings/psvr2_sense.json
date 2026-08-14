@@ -25,7 +25,17 @@
         }
       ],
       "skeleton": [],
-      "sources": []
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/create"
+        }
+      ]
     },
     "/actions/gameplay": {
       "chords": [],
@@ -44,6 +54,18 @@
           },
           "mode": "joystick",
           "path": "/user/hand/left/input/left_stick"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/crouch"
+            },
+            "position": {
+              "output": "/actions/gameplay/in/turn"
+            }
+          },
+          "mode": "joystick",
+          "path": "/user/hand/right/input/right_stick"
         },
         {
           "inputs": {
@@ -125,6 +147,15 @@
       "poses": [],
       "skeleton": [],
       "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/select"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/left/input/l2"
+        },
         {
           "inputs": {
             "click": {

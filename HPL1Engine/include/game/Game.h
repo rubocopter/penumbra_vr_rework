@@ -205,6 +205,7 @@ namespace hpl {
 		bool GetLimitFPS(){ return mbLimitFPS;}
 
     cVector3f pointerDrawStart, pointerDrawEnd;
+    bool pointerDrawActive;
     bool mbRenderToMonitor;
 
 	private:

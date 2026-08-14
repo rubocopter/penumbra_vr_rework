@@ -747,9 +747,9 @@ cInventoryContext::cInventoryContext(cInit *apInit)
 
 	mpFont = mpInit->mpGame->GetResources()->GetFontManager()->CreateFontData("verdana.fnt");
 
-	mfRowStart =0;
-	mfRowSize = 15;
-	mfColLength = 100;
+	mfRowStart = 4;
+	mfRowSize = 26;
+	mfColLength = 160;
 
 	mlSelectedRow = -1;
 
@@ -814,10 +814,12 @@ void cInventoryContext::Draw()
 
 	for(int i=0; i< (int)mpActionVec->size(); i++)
 	{
-		cColor Col = mlSelectedRow == i? cColor(0.2f,1.0f,0.2f,mfAlpha) : cColor(0.65f,0.65f,0.65f,fTotalAlpha);
-		
-		//mpFont->Draw(mvPos + cVector3f(2.0f,(float)i*mfRowSize,1),14,Col,
-		//			eFontAlign_Left,(*mpActionVec)[i].c_str());
+		cColor Col = mlSelectedRow == i
+			? cColor(1.0f,0.95f,0.35f,fTotalAlpha)
+			: cColor(0.95f,0.95f,0.95f,fTotalAlpha);
+
+		mpFont->Draw(mvPos + cVector3f(8.0f,mfRowStart + (float)i*mfRowSize + 3.0f,1),18,Col,
+					eFontAlign_Left,(*mpActionVec)[i].c_str());
 	}
 }
 
@@ -825,56 +827,12 @@ void cInventoryContext::Draw()
 
 void cInventoryContext::Update(float afTimeStep)
 {
-  // For VR, use controller as laser pointer thing
-  // Get right hand and see if it's intersecting
-  if (mpInit->mpGame->vr_right_hand.IsPoseValid())
+  cVector2f pointerPos;
+  if(VRHelper::UpdateUIPointer(mpInit->mpGame,
+    mpInit->mpGame->GetScene()->GetUIMatrix(), true,
+    mpInit->mpInventory->GetMousePos(), &pointerPos))
   {
-  auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
-
-  auto worldMat = VRHelper::TrackingToWorldSpace(handMat, mpInit->mpGame);
-
-  auto handPos = worldMat.GetTranslation();
-  auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(worldMat.GetRotation()).GetForward()) * - 1.0f;
-
-  // Trace the complete 800x600 inventory plane. mvPos belongs to the optional
-  // item context menu and must not move the controller pointer's origin.
-  cMatrixf uiMatrix = mpInit->mpGame->GetScene()->GetUIMatrix();
-
-  cVector2f scrSize = cVector2f(800 * 4.0f, 600 * 4.0f);
-
-  float points[] = {
-    0.0f, 0.0f, 0.0f,
-    0.0f, scrSize.y, 0.0f,
-    scrSize.x, 0.0f, 0.0f
-  };
-
-  for (int i = 0; i < 3; ++i) {
-    cVector3f res = cMath::MatrixMul(uiMatrix, cVector3f(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]));
-
-    points[i * 3] = res.x;
-    points[i * 3 + 1] = res.y;
-    points[i * 3 + 2] = res.z;
-  }
-
-  float t, u, v;
-
-  // Draw for hand pointer
-  if (VRHelper::intersect_triangle(&handPos.v[0], &handForward.v[0], &points[0], &points[3], &points[6], &t, &u, &v)) {
-    if (t > 0) {
-      float x = v * scrSize.x;
-      float y = u * scrSize.y;
-
-      if (x <= 800 && y <= 600) {
-        float w = 1.0f - (u + v);
-
-        cVector3f t1 = cVector3f(points[0], points[1], points[2]);
-        cVector3f t2 = cVector3f(points[3], points[4], points[5]);
-        cVector3f t3 = cVector3f(points[6], points[7], points[8]);
-
-        mpInit->mpInventory->SetMousePos(cVector2f(x, y));
-      }
-    }
-  }
+    mpInit->mpInventory->SetMousePos(pointerPos);
   }
 
   //mpInit->mpInventory->SetMousePos(cVector2f(-300.0f, -300.0f));
@@ -953,14 +911,23 @@ void cInventoryContext::OnMouseUp(eMButton aButton)
 void cInventoryContext::Setup(cInventoryItem *apItem, const cVector2f& avPos)
 {
 	mpItem = apItem;
-	mvPos = avPos;
+	mvPos.x = avPos.x;
+	mvPos.y = avPos.y;
 
 	cGameItemType *pItemType = mpInit->mpInventory->GetItemType(apItem->GetItemType());
 	mpActionVec = pItemType->GetActions(apItem->CanBeDropped());
 
 	mvSize = cVector2f(mfColLength, (float)mpActionVec->size()* mfRowSize + 8);
 
+	// Keep the larger VR-friendly popup inside the 800x600 inventory surface.
+	if(mvPos.x + mvSize.x > 792.0f) mvPos.x = 792.0f - mvSize.x;
+	if(mvPos.y + mvSize.y > 592.0f) mvPos.y = 592.0f - mvSize.y;
+	if(mvPos.x < 8.0f) mvPos.x = 8.0f;
+	if(mvPos.y < 8.0f) mvPos.y = 8.0f;
+
 	mRect = cRect2f(mvPos.x, mvPos.y, mvSize.x, mvSize.y);
+	Log(" [VR inventory +%lu ms] context menu opened with %u actions at %.0f, %.0f.\n",
+		GetApplicationTime(), (unsigned int)mpActionVec->size(), mvPos.x, mvPos.y);
 }
 
 
@@ -1164,6 +1131,18 @@ void cInventory::OnDraw()
     mpContext->Draw();
 
 	//////////////////////////
+	// Draw a high-contrast VR reticle over the legacy pointer. The ray and
+	// this marker share the same intersection, so selecting an item no longer
+	// depends on finding the tiny original mouse cursor.
+	if(mpInit->mpGame->pointerDrawActive)
+	{
+		mpFont->Draw(cVector3f(mvMousePos.x + 2,mvMousePos.y + 2,125),32,
+			cColor(0,0,0,mfAlpha),eFontAlign_Center,_W("+"));
+		mpFont->Draw(cVector3f(mvMousePos.x,mvMousePos.y,126),28,
+			cColor(0.25f,0.85f,1.0f,mfAlpha),eFontAlign_Center,_W("+"));
+	}
+
+	//////////////////////////
 	//Draw message
 	if(mfMessageAlpha>0)
 	{
@@ -1250,6 +1229,7 @@ void cInventory::SetActive(bool abX)
 	}
 	else
 	{
+		mpInit->mpGame->pointerDrawActive = false;
 		if(mpInit->mbHasHaptics)
 			mpInit->mpPlayer->GetHapticCamera()->SetActive(true);
 

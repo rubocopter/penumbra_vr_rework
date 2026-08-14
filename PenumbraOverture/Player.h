@@ -72,6 +72,35 @@ class cSavedWorld;
 
 //---------------------------------------------
 
+enum eVRHandIndex
+{
+	eVRHandIndex_Left = 0,
+	eVRHandIndex_Right = 1,
+	eVRHandIndex_Count = 2
+};
+
+struct cVRHandTarget
+{
+	cVRHandTarget()
+		: mpBody(NULL), mvPosition(0, 0, 0), mfDistance(0),
+		  mCrossHairState(eCrossHairState_None) {}
+
+	void Clear()
+	{
+		mpBody = NULL;
+		mvPosition = cVector3f(0, 0, 0);
+		mfDistance = 0;
+		mCrossHairState = eCrossHairState_None;
+	}
+
+	iPhysicsBody *mpBody;
+	cVector3f mvPosition;
+	float mfDistance;
+	eCrossHairState mCrossHairState;
+};
+
+//---------------------------------------------
+
 kSaveData_BaseClass(cPlayer)
 {
 	kSaveData_ClassInit(cPlayer)
@@ -289,6 +318,13 @@ public:
 
   void SetHandCrossHairState(int index, eCrossHairState aState) { mHandCrossHairStates[index] = aState; }
   eCrossHairState GetHandCrossHairState(int index) { return mHandCrossHairStates[index]; }
+	void ClearVRHandTarget(eVRHandIndex aHand);
+	void ClearVRHandTargetBody(iPhysicsBody *apBody);
+	void SetVRHandTarget(eVRHandIndex aHand, iPhysicsBody *apBody,
+		const cVector3f& avPosition, float afDistance, eCrossHairState aCrossHairState);
+	const cVRHandTarget& GetVRHandTarget(eVRHandIndex aHand) const { return mVRHandTargets[aHand]; }
+	void SetVRHeldBody(eVRHandIndex aHand, iPhysicsBody *apBody) { mVRHeldBodies[aHand] = apBody; }
+	iPhysicsBody *GetVRHeldBody(eVRHandIndex aHand) const { return mVRHeldBodies[aHand]; }
 	
 	iPhysicsBody* GetPickedBody();
 	void SetPickedBody(iPhysicsBody* apBody);
@@ -323,6 +359,7 @@ public:
   cPlayerVRPointer* GetVRPointer() { return mpVRPointer; }
 
   cPlayerVRDimmer* GetVRDimmer() { return mpVRDimmer; }
+	iCollideShape *GetVRHandInteractionShape() { return mpVRHandInteractionShape; }
 
 	cPlayerFlare* GetFlare(){ return mpFlare;}
 
@@ -500,6 +537,7 @@ private:
   cPlayerVRPointer *mpVRPointer;
 
   cPlayerVRDimmer *mpVRDimmer;
+	iCollideShape *mpVRHandInteractionShape;
 	
 	iPlayerWeaponCallback *mpWeaponCallback;
 
@@ -513,6 +551,8 @@ private:
 	cVector2f mvCrossHairPos;
 
   eCrossHairState mHandCrossHairStates[2];
+	cVRHandTarget mVRHandTargets[eVRHandIndex_Count];
+	iPhysicsBody *mVRHeldBodies[eVRHandIndex_Count];
 
 	cInventoryItem *mpCurrentItem;
 	cLinearOscillation mItemFlash;

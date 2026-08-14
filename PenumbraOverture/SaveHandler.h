@@ -367,6 +367,8 @@ public:
 
 	void SaveGameToFile(const tWString& asFile);
 	void LoadGameFromFile(const tWString& asFile);
+	void CompletePendingGameLoad();
+	bool IsGameLoadPending() const { return mbGameLoadPending; }
 
 	void AutoSave(const tWString &asDir, int alMaxSaves);
 	void AutoLoad(const tWString &asDir);
@@ -388,6 +390,8 @@ private:
 	
 	cSavedGame* mpSavedGame;
 	tWString msSaveDir;
+	tWString msPendingGameLoad;
+	bool mbGameLoadPending;
 };
 
 

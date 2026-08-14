@@ -2882,7 +2882,7 @@ static float GetMaxRGB(const cColor &aCol)
 void cPlayerHidden::Update(float afTimeStep)
 {
 	iCharacterBody *pCharBody = mpInit->mpPlayer->GetCharacterBody();
-  bool bIsCrouching = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y < 1.5f;
+  bool bIsCrouching = mpInit->mpPlayer->GetMoveState() == ePlayerMoveState_Crouch;
 
 	///////////////////////////////////
 	// Update Hidden effect

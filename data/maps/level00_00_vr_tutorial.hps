@@ -82,7 +82,7 @@ void LockedDoorUnlock01(string asItem, string asEntity)
 {
 	SetDoorLocked("lockeddoor", false);
 	
-	CreateSoundEntityAt("Entity","unlock","unlock1","key_unlock.snt");
+	CreateSoundEntityAt("Entity","lockarea","unlock1","key_unlock.snt");
 	
 	RemoveEntityCallback("PlayerInteract","lockeddoor");
 	

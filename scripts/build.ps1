@@ -38,7 +38,12 @@ $solutionPath = Join-Path $repositoryRoot 'PenumbraVR.sln'
 $msbuildArguments = @(
     $solutionPath,
     '/m',
-    '/t:Build',
+    '/nr:false',
+    # Several game objects are allocated from translation units that only see
+    # their class size through headers. The legacy project does not reliably
+    # invalidate every dependent .obj after those layouts change, which can
+    # mix an old allocation size with a new constructor and corrupt the heap.
+    '/t:Rebuild',
     "/p:Configuration=$Configuration",
     '/p:Platform=Win32',
     '/p:PreferredToolArchitecture=x64',
@@ -46,11 +51,20 @@ $msbuildArguments = @(
     '/verbosity:minimal'
 )
 
-Write-Host "Building Penumbra VR ($Configuration|Win32) with $msbuildPath"
+Write-Host "Rebuilding Penumbra VR ($Configuration|Win32) with $msbuildPath"
 & $msbuildPath $msbuildArguments
 if ($LASTEXITCODE -ne 0) {
     throw "MSBuild failed with exit code $LASTEXITCODE"
 }
+
+$executablePath = Join-Path $repositoryRoot "build\bin\$Configuration\Penumbra_vr.exe"
+$peBytes = [System.IO.File]::ReadAllBytes($executablePath)
+$peHeaderOffset = [System.BitConverter]::ToInt32($peBytes, 0x3c)
+$characteristics = [System.BitConverter]::ToUInt16($peBytes, $peHeaderOffset + 22)
+if (($characteristics -band 0x20) -eq 0) {
+    throw "Built executable is missing IMAGE_FILE_LARGE_ADDRESS_AWARE: $executablePath"
+}
+Write-Host 'Verified Large Address Aware in the executable PE header.' -ForegroundColor Green
 
 if ($Package -or $Deploy) {
     & (Join-Path $PSScriptRoot 'package.ps1') -Configuration $Configuration

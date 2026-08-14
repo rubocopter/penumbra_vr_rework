@@ -86,6 +86,10 @@ namespace hpl {
     mVRMenuTransform = cMatrixf::Identity;
     mVRMenuModelMatrix = cMatrixf::Identity;
     mVRMainMenuModelMatrix = cMatrixf::Identity;
+    mfVRMainUIDistance = 1.75f;
+    mfVRMainUIScale = 1.0f;
+		mbVRMainUIAnchorValid = false;
+		mVRMainUIAnchor = cMatrixf::Identity;
 
 		mpActiveCamera = NULL;
 	}
@@ -296,8 +300,15 @@ namespace hpl {
 
 	void cScene::SetDrawScene(bool abX)
 	{
+		if(mbDrawScene && !abX)
+			ResetVRMainUIAnchor();
 		mbDrawScene = abX;
 		mpGraphics->GetRenderer3D()->GetRenderList()->Clear();
+	}
+
+	void cScene::ResetVRMainUIAnchor()
+	{
+		mbVRMainUIAnchorValid = false;
 	}
 
 	//-----------------------------------------------------------------------
@@ -652,6 +663,17 @@ namespace hpl {
 
             mpGraphics->GetDrawer()->DrawAll(i == 0, true);
 
+			if(gGame->pointerDrawActive)
+			{
+				llg->SetIdentityMatrix(eMatrix_ModelView);
+				llg->SetMatrix(eMatrix_ModelView, cMath::MatrixInverse(worldEyeViewMat));
+				llg->SetDepthTestActive(false);
+				glLineWidth(3.0f);
+				llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd,
+					cColor(0.25f, 0.85f, 1.0f, 0.95f));
+				glLineWidth(1.0f);
+			}
+
             glEnable(GL_CULL_FACE);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -698,6 +720,12 @@ namespace hpl {
 
         cMatrixf proj_mat;
         cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
+		if(!mbVRMainUIAnchorValid)
+		{
+			mVRMainUIAnchor = head_mat;
+			mbVRMainUIAnchorValid = true;
+			Log(" [VR UI] anchored fullscreen surface at the current HMD pose.\n");
+		}
         cMatrixf eye_mat;
         cMatrixf view_mat;
 
@@ -734,19 +762,23 @@ namespace hpl {
         uiViewMat = cMath::MatrixMul(centerTranslationMat, uiViewMat);
 
         // Keep menus and cinematics at a comfortable angular size.
-        auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 650.0f, -1.0f / 650.0f, 1.0f / 650.0f));
+        auto scaleMat = cMath::MatrixScale(cVector3f(
+          mfVRMainUIScale / 650.0f, -mfVRMainUIScale / 650.0f, mfVRMainUIScale / 650.0f));
         uiViewMat = cMath::MatrixMul(scaleMat, uiViewMat);
 
         // Anchor the surface to the current HMD pose instead of the edge of the
         // chaperone area. PS VR2 may report a very small play area, which used
         // to place this plane almost on top of the viewer's face.
-        auto viewDistanceMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -1.75f));
+        auto viewDistanceMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -mfVRMainUIDistance));
         uiViewMat = cMath::MatrixMul(viewDistanceMatrix, uiViewMat);
-        uiViewMat = cMath::MatrixMul(head_mat, uiViewMat);
+		// Keep fullscreen menus and cinematics at a stable room-space pose.
+		// Head tracking remains live through worldEyeViewMat, so the player can
+		// look around the virtual screen naturally.
+        uiViewMat = cMath::MatrixMul(mVRMainUIAnchor, uiViewMat);
 
         mVRMainMenuModelMatrix = uiViewMat;
 
-        // Project to world space
+        // Project the fullscreen UI surface into the current eye.
         llg->SetIdentityMatrix(eMatrix_Projection);
         llg->SetMatrix(eMatrix_Projection, pCamera3D->GetProjectionMatrix());
 
@@ -770,12 +802,20 @@ namespace hpl {
         llg->SetMatrix(eMatrix_Projection, pCamera3D->GetProjectionMatrix());
 
         llg->SetIdentityMatrix(eMatrix_ModelView);
-        llg->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(cMath::MatrixInverse(worldEyeViewMat), uiViewMat));
+        // The controller ray is already in tracking space, unlike the 2D
+        // surface coordinates drawn above.
+        llg->SetMatrix(eMatrix_ModelView, cMath::MatrixInverse(worldEyeViewMat));
 
         llg->PushMatrix(eMatrix_Projection);
         llg->PushMatrix(eMatrix_ModelView);
 
-        llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd, cColor(1.0f, 0.0f, 0.0f, 1.0f));
+        if(gGame->pointerDrawActive)
+		{
+		  glLineWidth(3.0f);
+		  llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd,
+			cColor(0.25f, 0.85f, 1.0f, 0.95f));
+		  glLineWidth(1.0f);
+		}
 
         llg->PopMatrix(eMatrix_Projection);
         llg->PopMatrix(eMatrix_ModelView);

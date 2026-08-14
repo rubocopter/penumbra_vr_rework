@@ -59,6 +59,7 @@ class cMapChanger
 {
 public:
 	bool mbActive;
+	bool mbPrepared;
 	tString msNewMap;
 	tString msPosName;
 	tString msDoneSound;
@@ -160,7 +161,12 @@ public:
 
 	void ChangeMap(const tString &asMap, const tString &asPos, const tString &asStartSound,
 					const tString &asStopSound, float afFadeOutTime, float afFadeInTime,
-					tString asLoadTextCat, tString asLoadTextEntry);
+				tString asLoadTextCat, tString asLoadTextEntry);
+	void BeginInitialMapLoad(const tString &asMap, const tString &asPos);
+	void BeginVRBlockingLoad();
+	void EndVRBlockingLoad();
+	void CompletePendingMapChange();
+	void OnVRFramePresentedAfterLoad();
 
 	void AddSaveData(cSavedWorld* apSavedWorld);
 	void LoadSaveData(cSavedWorld* apSavedWorld);
@@ -170,6 +176,7 @@ public:
 	void OnWorldLoad();
 	void OnStart();
 	void OnPostSceneDraw();
+	void OnPostBufferSwap();
 	void Update(float afTimeStep);
 	void Reset();
 	void OnDraw();
@@ -257,6 +264,7 @@ private:
 	bool mbPreUpdating;
 
 	bool mbDestroyingAll;
+	bool mbVRLoadRevealPending;
 };
 
 

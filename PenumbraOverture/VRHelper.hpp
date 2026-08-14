@@ -75,4 +75,90 @@ namespace VRHelper {
 
     return 1;
   }
+
+  // Projects the best available controller pose onto a complete 800x600 UI
+  // surface. The right hand remains the primary pointer, while the left hand
+  // takes over automatically if SteamVR temporarily loses the right pose.
+  static inline bool TraceUIPointer(cGame* game, const cMatrixf& uiMatrix,
+    bool worldSpace, cVector2f* screenPos, cVector3f* rayStart,
+    cVector3f* rayEnd, bool* usingLeftHand = NULL)
+  {
+    cMatrixf handMatrix;
+    bool leftHand = false;
+
+    if(game->vr_right_hand.IsPoseValid())
+      handMatrix = game->vr_right_hand.GetMatrix();
+    else if(game->vr_left_hand.IsPoseValid())
+    {
+      handMatrix = game->vr_left_hand.GetMatrix();
+      leftHand = true;
+    }
+    else
+      return false;
+
+    if(worldSpace)
+      handMatrix = TrackingToWorldSpace(handMatrix, game);
+
+    cVector3f handPos = handMatrix.GetTranslation();
+    cVector3f handForward = cMath::Vector3Normalize(
+      cMath::MatrixInverse(handMatrix.GetRotation()).GetForward()) * -1.0f;
+
+    cVector3f p00 = cMath::MatrixMul(uiMatrix, cVector3f(0.0f, 0.0f, 0.0f));
+    cVector3f p01 = cMath::MatrixMul(uiMatrix, cVector3f(0.0f, 600.0f, 0.0f));
+    cVector3f p10 = cMath::MatrixMul(uiMatrix, cVector3f(800.0f, 0.0f, 0.0f));
+    cVector3f p11 = cMath::MatrixMul(uiMatrix, cVector3f(800.0f, 600.0f, 0.0f));
+
+    float t = 0.0f;
+    float u = 0.0f;
+    float v = 0.0f;
+    float x = 0.0f;
+    float y = 0.0f;
+
+    if(intersect_triangle(&handPos.v[0], &handForward.v[0],
+      &p00.v[0], &p01.v[0], &p10.v[0], &t, &u, &v) && t > 0.0f)
+    {
+      x = v * 800.0f;
+      y = u * 600.0f;
+    }
+    else if(intersect_triangle(&handPos.v[0], &handForward.v[0],
+      &p11.v[0], &p10.v[0], &p01.v[0], &t, &u, &v) && t > 0.0f)
+    {
+      x = (1.0f - v) * 800.0f;
+      y = (1.0f - u) * 600.0f;
+    }
+    else
+      return false;
+
+    if(screenPos) *screenPos = cVector2f(x, y);
+    if(rayStart) *rayStart = handPos + handForward * 0.03f;
+    if(rayEnd) *rayEnd = handPos + handForward * t;
+    if(usingLeftHand) *usingLeftHand = leftHand;
+    return true;
+  }
+
+  // Applies light smoothing to the screen cursor and publishes a matching
+  // world/tracking-space laser for the stereo renderer.
+  static inline bool UpdateUIPointer(cGame* game, const cMatrixf& uiMatrix,
+    bool worldSpace, const cVector2f& currentPos, cVector2f* newPos,
+    float smoothing = 0.40f)
+  {
+    cVector2f hitPos;
+    cVector3f rayStart;
+    cVector3f rayEnd;
+    if(!TraceUIPointer(game, uiMatrix, worldSpace, &hitPos, &rayStart, &rayEnd))
+    {
+      game->pointerDrawActive = false;
+      return false;
+    }
+
+    hitPos.x = currentPos.x + (hitPos.x - currentPos.x) * smoothing;
+    hitPos.y = currentPos.y + (hitPos.y - currentPos.y) * smoothing;
+
+    game->pointerDrawStart = rayStart;
+    game->pointerDrawEnd = cMath::MatrixMul(uiMatrix,
+      cVector3f(hitPos.x, hitPos.y, 0.0f));
+    game->pointerDrawActive = true;
+    if(newPos) *newPos = hitPos;
+    return true;
+  }
 }

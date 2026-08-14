@@ -120,6 +120,15 @@
             }
           },
           "mode": "trigger",
+          "path": "/user/hand/left/input/trigger"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/select"
+            }
+          },
+          "mode": "trigger",
           "path": "/user/hand/right/input/trigger"
         },
         {

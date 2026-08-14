@@ -60,8 +60,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
     mpPlayer->ChangeMoveState(ePlayerMoveState_Run);
   }
 
-  cVector3f handSize(40.0f, 15.0f, 23.5f);
-  auto collider = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(handSize, NULL);
+  iCollideShape *collider = mpPlayer->GetVRHandInteractionShape();
 
   struct touchedObject {
     iPhysicsBody* physicsBody;
@@ -70,17 +69,19 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
     cCollideData collideData;
   };
 
-  {
+  if (collider != NULL) {
     cMatrixf poseMatrix;
 
-    for (int i = 0; i < 2; ++i) {
-      mpPlayer->SetHandCrossHairState(i, eCrossHairState_None);
+    for (int i = 0; i < eVRHandIndex_Count; ++i) {
+      const eVRHandIndex handIndex = (eVRHandIndex)i;
+      mpPlayer->ClearVRHandTarget(handIndex);
 
       if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
           mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "Hand") {
 
         auto hand = mpInit->mpPlayerHands->GetCurrentModel(i);
-        hand->UpdatePoseMatrix(poseMatrix, 0.0f);
+        if (!hand->UpdatePoseMatrix(poseMatrix, 0.0f))
+          continue;
 
         cVector3f handCenter = poseMatrix.GetTranslation();
 
@@ -220,6 +221,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             }
             else {
               closestTarget = &touchedBody;
+              fClosestDist = touchedBody.planeDistance;
 
               vPickedPos = VRHelper::CollideCenter(touchedBody.collideData.mvContactPoints, touchedBody.collideData.mlNumOfPoints);
               fPickedDist = touchedBody.planeDistance;
@@ -238,12 +240,14 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 
         if (mpPlayer->GetPickedBody())
         {
-          iGameEntity *pEntity = (iGameEntity*)mpPlayer->GetPickedBody()->GetUserData();
+          iPhysicsBody *pPickedBody = mpPlayer->GetPickedBody();
+          iGameEntity *pEntity = (iGameEntity*)pPickedBody->GetUserData();
+          const eCrossHairState handState = pEntity->GetCompletePickCrosshairState(pPickedBody);
 
-          mpPlayer->SetHandCrossHairState(i, eCrossHairState_None);
-          mpPlayer->SetHandCrossHairState(i, pEntity->GetCompletePickCrosshairState(mpPlayer->GetPickedBody()));
-
-          break;
+          mpPlayer->SetVRHandTarget(handIndex, pPickedBody,
+            mpPlayer->GetPickRay()->mvPickedPos,
+            mpPlayer->GetPickRay()->mfPickedDist,
+            handState);
         }
 
         /*
@@ -282,6 +286,18 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
         }
         */
       }
+    }
+
+    // Existing Penumbra entity code still reads the legacy picked-body slot.
+    // Mirror only the right-hand target into it so R2 can never interact with
+    // an object merely touched by the left hand.
+    const cVRHandTarget& rightTarget = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+    mpPlayer->GetPickRay()->Clear();
+    if (rightTarget.mpBody != NULL)
+    {
+      mpPlayer->GetPickRay()->mpPickedBody = rightTarget.mpBody;
+      mpPlayer->GetPickRay()->mvPickedPos = rightTarget.mvPosition;
+      mpPlayer->GetPickRay()->mfPickedDist = rightTarget.mfDistance;
     }
   }
 
@@ -336,7 +352,7 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
     mpLowGfx->SetDepthTestActive(false);
     mpLowGfx->PushMatrix(eMatrix_ModelView);
 
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < eVRHandIndex_Count; ++i) {
       cMatrixf poseMatrix;
 
       if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
@@ -596,7 +612,15 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
       iconMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), iconMat);
 
       // Move to hand's position
-      cMatrixf handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+      TrackedController& trackedHand = i == eVRHandIndex_Left
+        ? mpInit->mpGame->vr_left_hand
+        : mpInit->mpGame->vr_right_hand;
+      if (!trackedHand.IsPoseValid()) {
+        mpLowGfx->PopMatrix(eMatrix_ModelView);
+        mpLowGfx->SetDepthTestActive(true);
+        continue;
+      }
+      cMatrixf handMat = VRHelper::TrackingToWorldSpace(trackedHand.GetMatrix(), mpInit->mpGame);
       iconMat = cMath::MatrixMul(cMath::MatrixTranslate(handMat.GetTranslation()), iconMat);
 
       mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(pCamera3D->GetViewMatrix(), iconMat));
@@ -636,11 +660,26 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
 
 void cPlayerState_Normal_VR::OnStartInteract()
 {
-  if (mpPlayer->GetPickedBody())
+  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+  if (target.mpBody)
   {
-    iGameEntity *pEntity = (iGameEntity*)mpPlayer->GetPickedBody()->GetUserData();
+	Log(" [VR interaction +%lu ms] R2 target '%s', crosshair %d, distance %.2f.\n",
+	  GetApplicationTime(), target.mpBody->GetName().c_str(),
+	  (int)target.mCrossHairState, target.mfDistance);
+
+    // Keep legacy entity callbacks coherent while the interaction states are
+    // migrated incrementally to explicit hand ownership.
+    mpPlayer->GetPickRay()->mpPickedBody = target.mpBody;
+    mpPlayer->GetPickRay()->mvPickedPos = target.mvPosition;
+    mpPlayer->GetPickRay()->mfPickedDist = target.mfDistance;
+    iGameEntity *pEntity = (iGameEntity*)target.mpBody->GetUserData();
 
     pEntity->PlayerInteract();
+  }
+  else
+  {
+	Log(" [VR interaction +%lu ms] R2 pressed with no right-hand target.\n",
+	  GetApplicationTime());
   }
 }
 
@@ -685,6 +724,8 @@ void cPlayerState_Normal_VR::OnStartCrouch()
 {
   if (mpPlayer->GetMoveState() == ePlayerMoveState_Jump)return;
 
+  const ePlayerMoveState previousState = mpPlayer->GetMoveState();
+
   if (mpInit->mpButtonHandler->GetToggleCrouch())
   {
     if (mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
@@ -696,14 +737,23 @@ void cPlayerState_Normal_VR::OnStartCrouch()
   {
     mpPlayer->ChangeMoveState(ePlayerMoveState_Crouch);
   }
-}
 
+  Log(" [VR comfort +%lu ms] crouch pressed; move state %d -> %d.\n",
+	GetApplicationTime(), (int)previousState, (int)mpPlayer->GetMoveState());
+}
 void cPlayerState_Normal_VR::OnStopCrouch()
 {
+  const ePlayerMoveState previousState = mpPlayer->GetMoveState();
   if (mpPlayer->GetMoveState() == ePlayerMoveState_Crouch &&
     mpInit->mpButtonHandler->GetToggleCrouch() == false)
   {
     mpPlayer->ChangeMoveState(ePlayerMoveState_Walk);
+  }
+
+  if(previousState != mpPlayer->GetMoveState())
+  {
+	Log(" [VR comfort +%lu ms] crouch released; move state %d -> %d.\n",
+	  GetApplicationTime(), (int)previousState, (int)mpPlayer->GetMoveState());
   }
 }
 

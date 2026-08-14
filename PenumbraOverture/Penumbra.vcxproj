@@ -61,9 +61,11 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\dependencies\openvr-2.15.6\headers;$(ProjectDir)..\dependencies\include\AL;$(ProjectDir)..\HPL1Engine\include;$(ProjectDir)..\dependencies\include;$(ProjectDir)..\OALWrapper\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
+      <LargeAddressAware>true</LargeAddressAware>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>$(OutDir)Penumbra.pdb</ProgramDatabaseFile>
@@ -81,8 +83,10 @@
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
+      <LargeAddressAware>true</LargeAddressAware>
       <AdditionalDependencies>openvr_api.lib;legacy_stdio_definitions.lib;fltk.lib;wsock32.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>$(ProjectDir)..\dependencies\openvr-2.15.6\lib\win32;$(ProjectDir)..\dependencies\lib\win32;$(ProjectDir)..\build\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -159,6 +163,8 @@
     <ClCompile Include="StdAfx.cpp" />
     <ClCompile Include="TriggerHandler.cpp" />
     <ClCompile Include="Triggers.cpp" />
+    <ClCompile Include="VRHaptics.cpp" />
+    <ClCompile Include="VRSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AttackHandler.h" />
@@ -228,6 +234,8 @@
     <ClInclude Include="TriggerHandler.h" />
     <ClInclude Include="Triggers.h" />
     <ClInclude Include="VRHelper.hpp" />
+    <ClInclude Include="VRHaptics.h" />
+    <ClInclude Include="VRSettings.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\HPL1Engine\HPL.vcxproj">

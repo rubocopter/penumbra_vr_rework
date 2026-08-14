@@ -18,6 +18,7 @@
  */
 #include "StdAfx.h"
 #include "GameItem.h"
+#include "VRHaptics.h"
 
 #include "Init.h"
 #include "Inventory.h"
@@ -238,6 +239,7 @@ void cGameItem::OnPlayerInteract()
 		mpInit->mpInventory->AddItem(this);
 
 		mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui(msPickUpSound,false,1);
+		cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, eVRHapticHand_Right);
 
 		mbDestroyMe = true;
 	//}
