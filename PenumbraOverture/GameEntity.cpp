@@ -129,6 +129,8 @@ iGameEntity::~iGameEntity()
 	{
 		for(size_t i=0; i<mvBodies.size(); ++i)
 		{
+			mpInit->mpPlayer->ClearVRHandTargetBody(mvBodies[i]);
+
 			//Make sure that this body is not picked!
 			if(mpInit->mpPlayer->GetPickedBody() == mvBodies[i])
 				mpInit->mpPlayer->GetPickRay()->mpPickedBody = NULL;

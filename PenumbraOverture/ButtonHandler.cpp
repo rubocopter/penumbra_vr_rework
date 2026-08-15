@@ -31,6 +31,7 @@
 #include "PreMenu.h"
 #include "Credits.h"
 #include "DemoEndText.h"
+#include "VRHaptics.h"
 
 #include "PlayerHelper.h"
 
@@ -131,6 +132,12 @@ cButtonHandler::cButtonHandler(cInit *apInit)  : iUpdateable("ButtonHandler")
 
 	
 	mState = eButtonHandlerState_Game;
+	mbSnapTurnReady = false;
+	mbVRCrouchButtonLatched = false;
+	mbVRPhysicalCrouch = false;
+	mbVRCrouchApplied = false;
+	mbVRStandingHeightKnown = false;
+	mfVRStandingHeight = 0.0f;
 
 	mlNumOfActions =0;
 
@@ -207,11 +214,61 @@ void cButtonHandler::Update(float afTimeStep)
 	static bool bLockState = true;
 
 
-  mpInit->mpGame->vr_right_hand.UpdateButtonState();
-  mpInit->mpGame->vr_left_hand.UpdateButtonState();
+  bool vrUIContext = mState != eButtonHandlerState_Game ||
+    mpInit->mpDeathMenu->IsActive() ||
+    mpPlayer->IsDead() ||
+    mpInit->mpNumericalPanel->IsActive() ||
+    mpInit->mpNotebook->IsActive() ||
+    mpInit->mpInventory->IsActive();
 
-  auto leftHandButtons = mpInit->mpGame->vr_left_hand.GetButtonState();
-  auto rightHandButtons = mpInit->mpGame->vr_right_hand.GetButtonState();
+  const eSteamVRInputContext vrInputContext =
+    vrUIContext ? eSteamVRInputContext_UI : eSteamVRInputContext_Gameplay;
+  bool actionInputActive = mpInit->mpGame->vr_input.Update(
+    vrInputContext,
+    mpInit->mpGame->vr_left_hand,
+    mpInit->mpGame->vr_right_hand);
+
+  if (!actionInputActive) {
+    mpInit->mpGame->vr_right_hand.UpdateButtonState();
+    mpInit->mpGame->vr_left_hand.UpdateButtonState();
+    mpInit->mpGame->vr_input.UpdateLegacyState(
+      vrInputContext,
+      mpInit->mpGame->vr_left_hand,
+      mpInit->mpGame->vr_right_hand);
+  }
+
+  const cVRInputState& vrInput = mpInit->mpGame->vr_input.GetState();
+
+  if(vrInput.recenter.justPressed)
+  {
+    mpInit->mpGame->vr_tracking.RecenterOrientation();
+	if(vrUIContext || !mpInit->mpGame->GetScene()->GetDrawScene())
+		mpInit->mpGame->GetScene()->ResetVRMainUIAnchor();
+    mpInit->mpGame->vr_old_head_tracking_pose =
+      mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
+    Log(" [VR comfort +%lu ms] recentered orientation; world yaw %.1f deg.\n",
+      GetApplicationTime(),
+      cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
+  }
+
+  if(!vrUIContext && mpPlayer->IsActive() && !mpPlayer->GetLookAt()->IsActive())
+  {
+    UpdateVRTurn(vrInput, afTimeStep);
+	UpdateVRCrouch(vrInput);
+  }
+  else
+  {
+    // Returning from a menu or scripted look must require the stick to pass
+    // through centre before snap turning can fire again.
+    mbSnapTurnReady = false;
+  }
+
+  if(actionInputActive && vrUIContext && vrInput.uiSelect.justPressed)
+  {
+    const eVRHapticHand pointerHand = mpInit->mpGame->vr_right_hand.IsPoseValid()
+      ? eVRHapticHand_Right : eVRHapticHand_Left;
+    cVRHaptics::Play(mpInit, eVRHapticEvent_UISelect, pointerHand);
+  }
 	///////////////////////////////////
 	// GLOBAL Key Strokes
 	///////////////////////////////////
@@ -271,11 +328,11 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_PreMenu)
 	{
-		if(	mpInput->BecameTriggerd("Escape")
-      || rightHandButtons.menuJustPressed)
+		if(	mpInput->BecameTriggerd("Escape") || vrInput.uiClose.justPressed
+      || vrInput.uiBack.justPressed)
 			mpInit->mpPreMenu->OnButtonDown();
 		if(mpInput->BecameTriggerd("LeftClick")
-      || rightHandButtons.triggerJustPressed)
+      || vrInput.uiSelect.justPressed)
 			mpInit->mpPreMenu->OnMouseDown(eMButton_Left);
 		if(mpInput->BecameTriggerd("RightClick"))
 			mpInit->mpPreMenu->OnMouseDown(eMButton_Right);
@@ -288,10 +345,12 @@ void cButtonHandler::Update(float afTimeStep)
 		if(	mpInput->BecameTriggerd("Escape") ||
 			mpInput->BecameTriggerd("RightClick") ||
 			mpInput->BecameTriggerd("LeftClick") ||
-      rightHandButtons.triggerJustPressed ||
-      rightHandButtons.menuJustPressed)
+			vrInput.uiClose.justPressed ||
+      vrInput.uiSelect.justPressed ||
+      vrInput.uiBack.justPressed)
 		{
-			mpInit->mpMapLoadText->SetActive(false);
+			if(!mpInit->mpMapLoadText->IsLoading())
+				mpInit->mpMapLoadText->SetActive(false);
 		}
 	}
 	///////////////////////////////////
@@ -299,21 +358,21 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_MainMenu)
 	{
-		if(mpInput->BecameTriggerd("Escape")
-      || rightHandButtons.menuJustPressed)
+		if(mpInput->BecameTriggerd("Escape") || vrInput.uiClose.justPressed
+      || vrInput.uiBack.justPressed)
 		{
 			mpInit->mpMainMenu->Exit();
 		}
 
 		if(	mpInput->BecameTriggerd("RightClick") ||
 			(mpInit->mbHasHaptics && mpInput->BecameTriggerd("MouseClickRight")) ||
-       rightHandButtons.menuJustPressed)
+		   vrInput.uiDrag.justPressed)
 		{
 			mpInit->mpMainMenu->OnMouseDown(eMButton_Right);
 			mpInput->BecameTriggerd("Examine");
 		}
 		if(mpInput->WasTriggerd("RightClick") ||
-      rightHandButtons.menuJustReleased)
+		  vrInput.uiDrag.justReleased)
 		{
 			mpInit->mpMainMenu->OnMouseUp(eMButton_Right);
 		}
@@ -324,18 +383,17 @@ void cButtonHandler::Update(float afTimeStep)
 
 		if(	mpInput->BecameTriggerd("LeftClick") || 
 			(mpInit->mbHasHaptics && mpInput->BecameTriggerd("MouseClick")) ||
-      rightHandButtons.triggerJustPressed)
+      vrInput.uiSelect.justPressed)
 		{
 			mpInit->mpMainMenu->OnMouseDown(eMButton_Left);
 			mpInput->BecameTriggerd("Interact");
 		}
 		if(mpInput->WasTriggerd("LeftClick") ||
-      rightHandButtons.triggerJustReleased)
+      vrInput.uiSelect.justReleased)
 		{
 			mpInit->mpMainMenu->OnMouseUp(eMButton_Left);
 		}
-		if(mpInput->DoubleTriggerd("LeftClick",0.15f) ||
-      rightHandButtons.padJustPressed)
+		if(mpInput->DoubleTriggerd("LeftClick",0.15f))
 		{
 			mpInit->mpMainMenu->OnMouseDoubleClick(eMButton_Left);
 		}
@@ -360,10 +418,9 @@ void cButtonHandler::Update(float afTimeStep)
 	///////////////////////////////////
 	else if(mState == eButtonHandlerState_Intro)
 	{
-		if(mpInput->BecameTriggerd("Escape")
-      || rightHandButtons.gripJustPressed
-      || rightHandButtons.menuJustPressed
-      || rightHandButtons.padJustPressed)
+		if(mpInput->BecameTriggerd("Escape") || vrInput.uiClose.justPressed
+      || vrInput.uiBack.justPressed
+      || vrInput.uiDrag.justPressed)
 		{
 			mpInit->mpIntroStory->Exit();
 		}
@@ -402,9 +459,8 @@ void cButtonHandler::Update(float afTimeStep)
 		// Death menu ////////////////////
 		if(mpInit->mpDeathMenu->IsActive())
 		{
-			if(mpInput->BecameTriggerd("Escape") ||
-        rightHandButtons.menuJustPressed ||
-        rightHandButtons.gripJustPressed)
+			if(mpInput->BecameTriggerd("Escape") || vrInput.uiClose.justPressed ||
+        vrInput.uiBack.justPressed)
 			{
 				mpInit->mpGame->GetUpdater()->Reset();
 				mpInit->mpMainMenu->SetActive(true);
@@ -417,13 +473,13 @@ void cButtonHandler::Update(float afTimeStep)
 			}
 
 			if(mpInput->BecameTriggerd("LeftClick") ||
-        rightHandButtons.triggerJustPressed)
+        vrInput.uiSelect.justPressed)
 			{
 				mpInit->mpDeathMenu->OnMouseDown(eMButton_Left);
 				mpInput->BecameTriggerd("Interact");
 			}
 			if(mpInput->WasTriggerd("LeftClick") ||
-        rightHandButtons.triggerJustReleased)
+        vrInput.uiSelect.justReleased)
 			{
 				mpInit->mpDeathMenu->OnMouseUp(eMButton_Left);
 			}
@@ -443,9 +499,8 @@ void cButtonHandler::Update(float afTimeStep)
 		// Death ////////////////////
 		else if(mpPlayer->IsDead())
 		{
-			if(mpInput->BecameTriggerd("Escape") ||
-        rightHandButtons.menuJustPressed ||
-        rightHandButtons.gripJustPressed)
+			if(mpInput->BecameTriggerd("Escape") || vrInput.uiClose.justPressed ||
+        vrInput.uiBack.justPressed)
 			{
 				mpInit->mpMainMenu->SetActive(true);
 			}
@@ -455,8 +510,7 @@ void cButtonHandler::Update(float afTimeStep)
 		else if(mpInit->mpNumericalPanel->IsActive())
 		{
 			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
-        rightHandButtons.gripJustPressed ||
-        rightHandButtons.menuJustPressed)
+        vrInput.uiClose.justPressed || vrInput.uiBack.justPressed)
 			{
 				mpInit->mpNumericalPanel->OnExit();
 			}
@@ -466,13 +520,13 @@ void cButtonHandler::Update(float afTimeStep)
 			}
 
 			if(mpInput->BecameTriggerd("LeftClick") ||
-        rightHandButtons.triggerJustPressed)
+        vrInput.uiSelect.justPressed)
 			{
 				mpInit->mpNumericalPanel->OnMouseDown(eMButton_Left);
 				mpInput->BecameTriggerd("Interact");
 			}
 			if(mpInput->WasTriggerd("LeftClick") ||
-        rightHandButtons.triggerJustReleased)
+        vrInput.uiSelect.justReleased)
 			{
 				mpInit->mpNumericalPanel->OnMouseUp(eMButton_Left);
 			}
@@ -493,13 +547,13 @@ void cButtonHandler::Update(float afTimeStep)
 		else if(mpInit->mpNotebook->IsActive())
 		{
 			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
-        rightHandButtons.gripJustPressed || leftHandButtons.menuJustPressed)
+        vrInput.uiClose.justPressed)
 			{
 				mpInit->mpNotebook->OnExit();
 			}
 			
 			if(mpInput->BecameTriggerd("LeftClick") ||
-        rightHandButtons.triggerJustPressed)
+        vrInput.uiSelect.justPressed)
 			{
 				mpInit->mpNotebook->OnMouseDown(eMButton_Left);
 
@@ -542,40 +596,48 @@ void cButtonHandler::Update(float afTimeStep)
 			////////////////////////////
 			//Normal Input
 			if(mpInput->BecameTriggerd("Inventory") || mpInput->BecameTriggerd("Escape") ||
-        rightHandButtons.gripJustPressed)
+        vrInput.uiClose.justPressed)
 			{
 				mpInit->mpInventory->OnInventoryDown();
 			}
 			
 			if(mpInput->BecameTriggerd("LeftClick") ||
-        rightHandButtons.padJustPressed)
+        vrInput.uiDrag.justPressed)
 			{
 				mpInit->mpInventory->OnMouseDown(eMButton_Left);
 
 				mpInput->BecameTriggerd("Interact");
 			}
 			
-			if(mpInput->DoubleTriggerd("LeftClick",0.2f) ||
-        rightHandButtons.triggerJustPressed)
+			if(mpInput->DoubleTriggerd("LeftClick",0.2f))
 			{
 				mpInit->mpInventory->OnDoubleClick(eMButton_Left);
 			}
+			if(vrInput.uiSelect.justPressed)
+			{
+				// R2 activates the highlighted context action when one is open;
+				// otherwise it performs the item's default action directly.
+				if(mpInit->mpInventory->GetContext()->IsActive())
+					mpInit->mpInventory->OnMouseDown(eMButton_Left);
+				else
+					mpInit->mpInventory->OnDoubleClick(eMButton_Left);
+			}
 			if(mpInput->WasTriggerd("LeftClick") ||
-        rightHandButtons.padJustReleased)
+        vrInput.uiDrag.justReleased)
 			{
 				mpInit->mpInventory->OnMouseUp(eMButton_Left);
 			}
 
 				
 			if(mpInput->BecameTriggerd("RightClick") ||
-        rightHandButtons.menuJustPressed)
+        vrInput.uiBack.justPressed)
 			{
 				mpInit->mpInventory->OnMouseDown(eMButton_Right);
 				
 				mpInput->BecameTriggerd("Examine");
 			}
 			if(mpInput->WasTriggerd("RightClick") ||
-        rightHandButtons.menuJustReleased)
+        vrInput.uiBack.justReleased)
 			{
 				mpInit->mpInventory->OnMouseUp(eMButton_Right);
 			}
@@ -608,7 +670,7 @@ void cButtonHandler::Update(float afTimeStep)
 		{
 			bPlayerStateIsActive = true;
 
-			if(mpInput->BecameTriggerd("Escape"))
+			if(mpInput->BecameTriggerd("Escape") || vrInput.pause.justPressed)
 			{
 				mpInit->mpMainMenu->SetActive(true);
 			}
@@ -638,13 +700,13 @@ void cButtonHandler::Update(float afTimeStep)
 				if(mpPlayer->IsActive())
 				{
 					if(mpInput->BecameTriggerd("Inventory") ||
-            rightHandButtons.gripJustPressed)
+            vrInput.inventory.justPressed)
 					{
 						mpPlayer->StartInventory();
 					}
 
 					if(mpInput->BecameTriggerd("NoteBook") ||
-             leftHandButtons.menuJustPressed)
+             vrInput.notebook.justPressed)
 					{
 						mpInit->mpNotebook->SetActive(true);
 					}
@@ -664,7 +726,7 @@ void cButtonHandler::Update(float afTimeStep)
 						mpPlayer->StartGlowStickButton();
 					}
 
-          if (leftHandButtons.gripJustPressed) {
+          if (vrInput.quickLight.justPressed) {
             if (mpPlayer->GetGlowStick()->IsActive()) {
               mpPlayer->StartGlowStickButton();
               mpPlayer->StartFlashLightButton();
@@ -678,24 +740,26 @@ void cButtonHandler::Update(float afTimeStep)
 
 					///////////////////////////////////////
 					// Player Movement ////////////////////
-          if (leftHandButtons.touchContact) {
-            cVector3f handForward = cMath::MatrixInverse(mpInit->mpGame->vr_head_view_mat.GetRotation()).GetForward();
-            handForward.y = 0.0f;
-            handForward = cMath::Vector3Normalize(handForward);
+          if (vrInput.moveActive) {
+            const cMatrixf headWorldRotation =
+              mpInit->mpGame->vr_tracking.GetHeadWorldPose().GetRotation();
+            cVector3f headForward = cMath::MatrixInverse(headWorldRotation).GetForward();
+            headForward.y = 0.0f;
+            headForward = cMath::Vector3Normalize(headForward);
 
-            cVector3f handRight = cMath::MatrixInverse(mpInit->mpGame->vr_head_view_mat.GetRotation()).GetRight();
-            handRight.y = 0.0f;
-            handRight = cMath::Vector3Normalize(handRight);
+            cVector3f headRight = cMath::MatrixInverse(headWorldRotation).GetRight();
+            headRight.y = 0.0f;
+            headRight = cMath::Vector3Normalize(headRight);
 
-            mpInit->mpPlayer->vr_moveVec = handForward * -leftHandButtons.touchY;
-            mpInit->mpPlayer->vr_moveVec += handRight * leftHandButtons.touchX;
+            mpInit->mpPlayer->vr_moveVec = headForward * -vrInput.moveY;
+            mpInit->mpPlayer->vr_moveVec += headRight * vrInput.moveX;
           }
 
-          if (leftHandButtons.triggerJustPressed) {
+          if (vrInput.jump.justPressed) {
             mpPlayer->Jump();
           }
 
-          if (leftHandButtons.triggerPressed) {
+          if (vrInput.jump.pressed) {
             mpPlayer->SetJumpButtonDown(true);
           } else {
             mpPlayer->SetJumpButtonDown(false);
@@ -762,11 +826,11 @@ void cButtonHandler::Update(float afTimeStep)
 					}
 					if(GetToggleCrouch())
 					{
-						if(mpInput->WasTriggerd("Crouch"))	mpPlayer->StopCrouch();	
+						if(mpInput->WasTriggerd("Crouch"))	mpPlayer->StopCrouch();
 					}
 					else
 					{
-						if(mpInput->IsTriggerd("Crouch")==false) mpPlayer->StopCrouch();	
+						if(mpInput->IsTriggerd("Crouch")==false) mpPlayer->StopCrouch();
 					}
 
 					if(mpInput->BecameTriggerd("InteractMode"))
@@ -794,16 +858,16 @@ void cButtonHandler::Update(float afTimeStep)
 
 				///////////////////////////////////////
 				// Player Interaction /////////////////
-				if(	mpInput->BecameTriggerd("Interact") || rightHandButtons.triggerJustPressed)
+				if(	mpInput->BecameTriggerd("Interact") || vrInput.interact.justPressed)
 				{
 					mpPlayer->StartInteract();
 					mpInput->BecameTriggerd("LeftClick");
 				}
-				if(	mpInput->WasTriggerd("Interact") || rightHandButtons.triggerJustReleased)
+				if(	mpInput->WasTriggerd("Interact") || vrInput.interact.justReleased)
 				{
 					mpPlayer->StopInteract();
 				}
-				if(	mpInput->BecameTriggerd("Examine") || rightHandButtons.menuJustPressed)
+				if(	mpInput->BecameTriggerd("Examine") || vrInput.examine.justPressed)
 				{
 					mpPlayer->StartExamine();
 				}
@@ -811,7 +875,7 @@ void cButtonHandler::Update(float afTimeStep)
 				{
 					mpPlayer->StopExamine();
 				}
-				if(mpInput->BecameTriggerd("Holster"))
+				if(mpInput->BecameTriggerd("Holster") || vrInput.holster.justPressed)
 				{
 					mpPlayer->StartHolster();
 				}
@@ -839,9 +903,165 @@ void cButtonHandler::Update(float afTimeStep)
 
 //-----------------------------------------------------------------------
 
+void cButtonHandler::UpdateVRTurn(const cVRInputState& aInputState, float afTimeStep)
+{
+	const eVRTurnMode turnMode = mpInit->mVRSettings.GetTurnMode();
+	if(turnMode == eVRTurnMode_Disabled || !aInputState.turnActive)
+	{
+		mbSnapTurnReady = false;
+		return;
+	}
+
+	const float fDeadZone = mpInit->mVRSettings.GetTurnDeadZone();
+	const float fAbsoluteX = std::abs(aInputState.turnX);
+	if(fAbsoluteX <= fDeadZone)
+	{
+		mbSnapTurnReady = true;
+		return;
+	}
+
+	float fTurnAmount = (fAbsoluteX - fDeadZone) / (1.0f - fDeadZone);
+	if(fTurnAmount > 1.0f) fTurnAmount = 1.0f;
+	if(aInputState.turnX < 0.0f) fTurnAmount = -fTurnAmount;
+
+	if(turnMode == eVRTurnMode_Snap)
+	{
+		const float fActivationThreshold = 0.65f;
+		if(!mbSnapTurnReady || std::abs(fTurnAmount) < fActivationThreshold) return;
+
+		const float fDirection = fTurnAmount > 0.0f ? -1.0f : 1.0f;
+		const float fYawDelta = cMath::ToRad(mpInit->mVRSettings.GetSnapTurnAngle()) * fDirection;
+		mpInit->mpGame->vr_tracking.AddWorldYaw(fYawDelta);
+		mbSnapTurnReady = false;
+		Log(" [VR comfort +%lu ms] snap turn %.0f deg; world yaw %.1f deg.\n",
+			GetApplicationTime(), cMath::ToDeg(fYawDelta),
+			cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
+	}
+	else
+	{
+		// Smooth turning may continue while held, but only after the stick has
+		// crossed the dead zone once since entering gameplay.
+		if(!mbSnapTurnReady) return;
+		const float fYawDelta = -fTurnAmount *
+			cMath::ToRad(mpInit->mVRSettings.GetSmoothTurnSpeed()) * afTimeStep;
+		mpInit->mpGame->vr_tracking.AddWorldYaw(fYawDelta);
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
+{
+	const eVRCrouchMode crouchMode = mpInit->mVRSettings.GetCrouchMode();
+	const bool buttonEnabled = crouchMode != eVRCrouchMode_Physical;
+	const bool physicalEnabled = crouchMode != eVRCrouchMode_Button;
+
+	if(buttonEnabled && aInputState.crouch.justPressed)
+	{
+		mbVRCrouchButtonLatched = !mbVRCrouchButtonLatched;
+		Log(" [VR comfort +%lu ms] crouch button latch %s.\n",
+			GetApplicationTime(), mbVRCrouchButtonLatched ? "on" : "off");
+	}
+	else if(!buttonEnabled)
+	{
+		mbVRCrouchButtonLatched = false;
+	}
+
+	if(physicalEnabled)
+	{
+		const float headHeight =
+			mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
+		const bool plausibleHeight = headHeight > 0.60f && headHeight < 2.50f;
+		if(plausibleHeight)
+		{
+			if(!mbVRStandingHeightKnown)
+			{
+				mfVRStandingHeight = headHeight;
+				mbVRStandingHeightKnown = true;
+				Log(" [VR comfort +%lu ms] standing HMD height calibrated at %.2f m.\n",
+					GetApplicationTime(), mfVRStandingHeight);
+			}
+			else if(!mbVRPhysicalCrouch && !mbVRCrouchButtonLatched &&
+				headHeight > mfVRStandingHeight)
+			{
+				// Let an initial low sample settle upwards, but never drift down
+				// into a false standing height while the player is crouching.
+				mfVRStandingHeight = headHeight;
+			}
+
+			const float enterHeight = mfVRStandingHeight -
+				mpInit->mVRSettings.GetPhysicalCrouchDepth();
+			const float exitHeight = enterHeight + 0.08f;
+			const bool wasPhysicalCrouch = mbVRPhysicalCrouch;
+			if(!mbVRPhysicalCrouch && headHeight <= enterHeight)
+				mbVRPhysicalCrouch = true;
+			else if(mbVRPhysicalCrouch && headHeight >= exitHeight)
+				mbVRPhysicalCrouch = false;
+
+			if(wasPhysicalCrouch != mbVRPhysicalCrouch)
+			{
+				Log(" [VR comfort +%lu ms] physical crouch %s at %.2f m "
+					"(standing %.2f m, threshold %.2f m).\n",
+					GetApplicationTime(), mbVRPhysicalCrouch ? "entered" : "left",
+					headHeight, mfVRStandingHeight, enterHeight);
+			}
+		}
+	}
+	else
+	{
+		mbVRPhysicalCrouch = false;
+	}
+
+	bool crouchWanted = false;
+	if(crouchMode == eVRCrouchMode_Physical) crouchWanted = mbVRPhysicalCrouch;
+	else if(crouchMode == eVRCrouchMode_Button) crouchWanted = mbVRCrouchButtonLatched;
+	else crouchWanted = mbVRPhysicalCrouch || mbVRCrouchButtonLatched;
+
+	if(crouchWanted)
+	{
+		if(mpPlayer->GetMoveState() != ePlayerMoveState_Jump &&
+			mpPlayer->GetMoveState() != ePlayerMoveState_Crouch)
+		{
+			const ePlayerMoveState previousState = mpPlayer->GetMoveState();
+			mpPlayer->ChangeMoveState(ePlayerMoveState_Crouch);
+			Log(" [VR comfort +%lu ms] VR crouch applied; move state %d -> %d.\n",
+				GetApplicationTime(), (int)previousState, (int)mpPlayer->GetMoveState());
+		}
+		if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
+			mbVRCrouchApplied = true;
+	}
+	else if(mbVRCrouchApplied)
+	{
+		if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
+		{
+			mpPlayer->ChangeMoveState(ePlayerMoveState_Walk);
+			if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
+				return; // A low ceiling prevented standing; retry next frame.
+		}
+		mbVRCrouchApplied = false;
+		Log(" [VR comfort +%lu ms] VR crouch released.\n", GetApplicationTime());
+	}
+
+	// Physical crouching already moves the user's real viewpoint. A crouch
+	// requested by the button needs the move state's smoothed height offset as
+	// well, otherwise the smaller collider grants clearance without presenting
+	// the player at the corresponding lower eye height.
+	const float postureOffset = mbVRCrouchApplied && !mbVRPhysicalCrouch
+		? mpPlayer->GetHeightAdd() : 0.0f;
+	mpInit->mpGame->vr_tracking.SetPostureOffset(postureOffset);
+}
+
+//-----------------------------------------------------------------------
+
 void cButtonHandler::Reset()
 {
-
+	mbSnapTurnReady = false;
+	mbVRCrouchButtonLatched = false;
+	mbVRPhysicalCrouch = false;
+	mbVRCrouchApplied = false;
+	mbVRStandingHeightKnown = false;
+	mfVRStandingHeight = 0.0f;
+	mpInit->mpGame->vr_tracking.SetPostureOffset(0.0f);
 }
 
 //-----------------------------------------------------------------------

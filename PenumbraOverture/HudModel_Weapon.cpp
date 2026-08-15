@@ -30,6 +30,7 @@
 #include "GlobalInit.h"
 
 #include "VRHelper.hpp"
+#include "VRHaptics.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -585,6 +586,7 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 	collideData.SetMaxSize(1);
 	    
 	bool bHit = false;
+	bool bHapticImpact = false;
 
 	cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
 	iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
@@ -640,6 +642,7 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 
       if (!mbHasHit && mfHitCooldown <= 0.0f) {
         pEnemy->Damage(fDamage, mvAttacks[mlCurrentAttack].mlAttackStrength);
+        bHapticImpact = true;
 
         //Get closest position
         float fClosestDist = 9999.0f;
@@ -739,6 +742,8 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
               pEntity->Damage(fDamage, mvAttacks[mlCurrentAttack].mlAttackStrength);
             }
 
+            bHapticImpact = true;
+
             vClosestHitPos = VRHelper::CollideCenter(collideData.mvContactPoints, collideData.mlNumOfPoints);
             pClosestHitMat = pBody->GetMaterial();
           }
@@ -785,6 +790,11 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 		
 	////////////////////////////////////////////
 	//Check the closest material and play sounds and effects depending on it.
+	if(bHapticImpact)
+	{
+		cVRHaptics::Play(mpInit, eVRHapticEvent_MeleeImpact, eVRHapticHand_Right);
+	}
+
 	if(pClosestHitMat && !mbHasHit && mfHitCooldown <= 0.0f)
 	{
 		bHit = true;

@@ -51,6 +51,7 @@ class cIntroStory;
 class cMainMenu;
 
 #include "GameTypes.h"
+#include "VRSettings.h"
 
 #if defined(WIN32)
 	#define PERSONAL_RELATIVEROOT
@@ -93,6 +94,7 @@ public:
 	void Reset();
 
 	void ResetGame(bool abRunInitScript);
+	void ApplyVRSettings(bool abSave);
 
 	void RunScriptCommand(const tString& asCommand);
 
@@ -106,6 +108,7 @@ public:
 	cConfigFile* mpGameConfig;
 	cGame *mpGame;
 	iScript *mpGlobalScript;
+	cVRSettings mVRSettings;
 
 	iFontData *mpDefaultFont;
 	

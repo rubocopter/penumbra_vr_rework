@@ -334,8 +334,6 @@ cIntroStory::cIntroStory(cInit *apInit)  : iUpdateable("StoryIntro")
 		mvImages[i].mpTexture = NULL;
 	}
 
-	mpBlackTexture = NULL;
-
 	//Load font
 	mpFont = mpInit->mpGame->GetResources()->GetFontManager()->CreateFontData("font_computer.fnt");
 
@@ -388,8 +386,6 @@ void cIntroStory::SetActive(bool abX)
 			mvImages[i].mlstPrevPos.clear();
 		}
 
-		mpBlackTexture = mpTexManager->Create2D("effect_black.bmp",false);
-
 		mfTimerCount = 0.01f;
 		mlNextStop = kIntro_Image00_Start;
 		Update(1);
@@ -411,8 +407,6 @@ void cIntroStory::SetActive(bool abX)
 			mvImages[i].mbActive = false;
 		}
 
-		mpTexManager->Destroy(mpBlackTexture);
-		mpBlackTexture = NULL;
 	}
 }
 
@@ -462,21 +456,23 @@ void cIntroStory::Reset()
 
 void cIntroStory::OnDraw()
 {
-	cVector3f vPos = cVector3f(15,526,10);
-	cVector2f vSize = 16;
+	const float fTextScale = mpInit->mVRSettings.GetSubtitleScale();
+	cVector3f vPos = cVector3f(40,480,10);
+	cVector2f vSize = 16.0f * fTextScale;
 
 	if(msCentreText != _W(""))
 	{
 		float fAlpha = mvImages[5].mfBrightness;
-		mpFont->Draw(	cVector3f(400,300,2),18,cColor(1,1,1,fAlpha),
+		const float fCentreSize = 18.0f * fTextScale;
+		mpFont->Draw(	cVector3f(400,300,2),fCentreSize,cColor(1,1,1,fAlpha),
 						eFontAlign_Center,msCentreText.c_str());
-		mpFont->Draw(	cVector3f(400+1,300+1,1),18,cColor(0,fAlpha),
+		mpFont->Draw(	cVector3f(400+1,300+1,1),fCentreSize,cColor(0,fAlpha),
 						eFontAlign_Center,msCentreText.c_str());
-		mpFont->Draw(	cVector3f(400-1,300-1,1),18,cColor(0,fAlpha),
+		mpFont->Draw(	cVector3f(400-1,300-1,1),fCentreSize,cColor(0,fAlpha),
 						eFontAlign_Center,msCentreText.c_str());
-		mpFont->Draw(	cVector3f(400-1,300+1,1),18,cColor(0,fAlpha),
+		mpFont->Draw(	cVector3f(400-1,300+1,1),fCentreSize,cColor(0,fAlpha),
 			eFontAlign_Center,msCentreText.c_str());
-		mpFont->Draw(	cVector3f(400+1,300-1,1),18,cColor(0,fAlpha),
+		mpFont->Draw(	cVector3f(400+1,300-1,1),fCentreSize,cColor(0,fAlpha),
 			eFontAlign_Center,msCentreText.c_str());
 	}
 	
@@ -485,7 +481,7 @@ void cIntroStory::OnDraw()
 
 	if(mpInit->mbSubtitles)
 	{
-		mpFont->DrawWordWrap(vPos, 760,18,vSize,cColor(1,1,1,1),eFontAlign_Left,msMessage);
+		mpFont->DrawWordWrap(vPos, 720,18.0f*fTextScale,vSize,cColor(1,1,1,1),eFontAlign_Left,msMessage);
 	}
 }
 
@@ -508,8 +504,12 @@ void cIntroStory::OnPostSceneDraw()
 		if(mvImages[i].mbActive) mvImages[i].OnDraw();
 	}
 
-	mpInit->mpGraphicsHelper->DrawTexture(mpBlackTexture,cVector3f(0,0,140),cVector2f(800,75),cColor(1,1));
-	mpInit->mpGraphicsHelper->DrawTexture(mpBlackTexture,cVector3f(0,525,140),cVector2f(800,75),cColor(1,1));
+	// Cinematic subtitles are drawn directly over the image. Opaque letterbox or
+	// subtitle bands obscure too much of the virtual cinema surface in a headset.
+	// cIntroImage draws directly through the low-level renderer, so restore its
+	// state explicitly and independently of whether subtitles are enabled.
+	for(int i=0; i<6; ++i) mpLowGfx->SetTexture(i,NULL);
+	mpLowGfx->SetBlendActive(false);
 
   if (!mpLowGfx->GetVREnabled()) {
     mpLowGfx->PopMatrix(eMatrix_ModelView);
@@ -535,13 +535,7 @@ void cIntroStory::Exit()
 	//mpInit->mpGame->Exit();
 	//return;
 	
-	mpInit->mpGraphicsHelper->DrawLoadingScreen("");
-
-	mpInit->mpGame->GetUpdater()->SetContainer("Default");
-	mpInit->mpGame->GetScene()->SetDrawScene(true);
-	mpInit->mpButtonHandler->ChangeState(mLastButtonState);
-
-	mpInit->mpMapHandler->Load(mpInit->msStartMap,mpInit->msStartLink);
+	mpInit->mpMapHandler->BeginInitialMapLoad(mpInit->msStartMap,mpInit->msStartLink);
 }
 
 //-----------------------------------------------------------------------

@@ -82,6 +82,15 @@ namespace hpl {
 		mbDrawScene = true;
 		mbUpdateMap = true;
 
+    mVRMenuState = MenuState_Facelock;
+    mVRMenuTransform = cMatrixf::Identity;
+    mVRMenuModelMatrix = cMatrixf::Identity;
+    mVRMainMenuModelMatrix = cMatrixf::Identity;
+    mfVRMainUIDistance = 1.75f;
+    mfVRMainUIScale = 1.0f;
+		mbVRMainUIAnchorValid = false;
+		mVRMainUIAnchor = cMatrixf::Identity;
+
 		mpActiveCamera = NULL;
 	}
 
@@ -197,23 +206,7 @@ namespace hpl {
 
   cMatrixf cScene::GetVRWorldSpaceHeadMatrix(const cMatrixf& offset) {
     if (mpActiveCamera->GetType() == eCameraType_3D) {
-      cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
-
-      cMatrixf head_mat = gGame->vr_head_view_mat;
-
-      cVector3f pPos = head_mat.GetTranslation();
-      pPos.x = pPos.z = 0.0f;
-
-      // This has to be done so you can reach into the floor
-      // No longer 1:1 for height, though :c
-      pPos.y -= 0.2f;
-      pPos.y *= 1.065f;
-
-      head_mat.SetTranslation(pPos);
-
-      head_mat = cMath::MatrixMul(head_mat, offset);
-
-      return cMath::MatrixMul(gGame->vr_player_pos, head_mat);
+      return gGame->vr_tracking.GetHeadWorldPose(offset);
     }
 
     return cMatrixf::Identity;
@@ -307,8 +300,15 @@ namespace hpl {
 
 	void cScene::SetDrawScene(bool abX)
 	{
+		if(mbDrawScene && !abX)
+			ResetVRMainUIAnchor();
 		mbDrawScene = abX;
 		mpGraphics->GetRenderer3D()->GetRenderList()->Clear();
+	}
+
+	void cScene::ResetVRMainUIAnchor()
+	{
+		mbVRMainUIAnchorValid = false;
 	}
 
 	//-----------------------------------------------------------------------
@@ -379,7 +379,7 @@ namespace hpl {
           cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
 
           cMatrixf proj_mat;
-          cMatrixf head_mat = gGame->vr_head_view_mat;
+          cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
           cMatrixf eye_mat;
           cMatrixf view_mat;
 
@@ -456,7 +456,7 @@ namespace hpl {
           if (gGame->mbRenderToMonitor)
           {
             cMatrixf proj_mat;
-            cMatrixf head_mat = gGame->vr_head_view_mat;
+            cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
             cMatrixf eye_mat;
             cMatrixf view_mat;
 
@@ -524,6 +524,8 @@ namespace hpl {
 
               // Project to world space
               uiViewMat = cMath::MatrixMul(pCamera3D->GetViewMatrix(), mVRMenuTransform);
+
+              break;
             }
 
             case MenuState_WorldPosition:
@@ -552,7 +554,7 @@ namespace hpl {
 
           for (int i = 0; i < 2; ++i) {
             cMatrixf proj_mat;
-            cMatrixf head_mat = gGame->vr_head_view_mat;
+            cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
             cMatrixf eye_mat;
             cMatrixf view_mat;
 
@@ -638,6 +640,8 @@ namespace hpl {
 
                 // Project to world space
                 uiViewMat = cMath::MatrixMul(pCamera3D->GetViewMatrix(), mVRMenuTransform);
+
+                break;
               }
 
               case MenuState_WorldPosition:
@@ -658,6 +662,17 @@ namespace hpl {
             glDisable(GL_CULL_FACE);
 
             mpGraphics->GetDrawer()->DrawAll(i == 0, true);
+
+			if(gGame->pointerDrawActive)
+			{
+				llg->SetIdentityMatrix(eMatrix_ModelView);
+				llg->SetMatrix(eMatrix_ModelView, cMath::MatrixInverse(worldEyeViewMat));
+				llg->SetDepthTestActive(false);
+				glLineWidth(3.0f);
+				llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd,
+					cColor(0.25f, 0.85f, 1.0f, 0.95f));
+				glLineWidth(1.0f);
+			}
 
             glEnable(GL_CULL_FACE);
 
@@ -704,7 +719,13 @@ namespace hpl {
         cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
 
         cMatrixf proj_mat;
-        cMatrixf head_mat = gGame->vr_head_view_mat;
+        cMatrixf head_mat = gGame->vr_tracking.GetHeadTrackingPose();
+		if(!mbVRMainUIAnchorValid)
+		{
+			mVRMainUIAnchor = head_mat;
+			mbVRMainUIAnchorValid = true;
+			Log(" [VR UI] anchored fullscreen surface at the current HMD pose.\n");
+		}
         cMatrixf eye_mat;
         cMatrixf view_mat;
 
@@ -736,24 +757,28 @@ namespace hpl {
 
         cMatrixf uiViewMat = cMatrixf::Identity;
 
-        // Translate to center of vision
-        auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
+        // Center the 800x600 surface around the viewer.
+        auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -300.0f, 0.0f));
         uiViewMat = cMath::MatrixMul(centerTranslationMat, uiViewMat);
 
-        // Scale it down
-        auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 550.0f, -1.0f / 550.0f, 1.0f / 550.0f));
+        // Keep menus and cinematics at a comfortable angular size.
+        auto scaleMat = cMath::MatrixScale(cVector3f(
+          mfVRMainUIScale / 650.0f, -mfVRMainUIScale / 650.0f, mfVRMainUIScale / 650.0f));
         uiViewMat = cMath::MatrixMul(scaleMat, uiViewMat);
 
-        // Move to face height, edge of play space
-        float xSize, ySize;
-        vr::VRChaperone()->GetPlayAreaSize(&xSize, &ySize);
-
-        auto faceTranslationMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 1.35f, -ySize / 2.0f + 0.25f));
-        uiViewMat = cMath::MatrixMul(faceTranslationMatrix, uiViewMat);
+        // Anchor the surface to the current HMD pose instead of the edge of the
+        // chaperone area. PS VR2 may report a very small play area, which used
+        // to place this plane almost on top of the viewer's face.
+        auto viewDistanceMatrix = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -mfVRMainUIDistance));
+        uiViewMat = cMath::MatrixMul(viewDistanceMatrix, uiViewMat);
+		// Keep fullscreen menus and cinematics at a stable room-space pose.
+		// Head tracking remains live through worldEyeViewMat, so the player can
+		// look around the virtual screen naturally.
+        uiViewMat = cMath::MatrixMul(mVRMainUIAnchor, uiViewMat);
 
         mVRMainMenuModelMatrix = uiViewMat;
 
-        // Project to world space
+        // Project the fullscreen UI surface into the current eye.
         llg->SetIdentityMatrix(eMatrix_Projection);
         llg->SetMatrix(eMatrix_Projection, pCamera3D->GetProjectionMatrix());
 
@@ -777,12 +802,20 @@ namespace hpl {
         llg->SetMatrix(eMatrix_Projection, pCamera3D->GetProjectionMatrix());
 
         llg->SetIdentityMatrix(eMatrix_ModelView);
-        llg->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(cMath::MatrixInverse(worldEyeViewMat), uiViewMat));
+        // The controller ray is already in tracking space, unlike the 2D
+        // surface coordinates drawn above.
+        llg->SetMatrix(eMatrix_ModelView, cMath::MatrixInverse(worldEyeViewMat));
 
         llg->PushMatrix(eMatrix_Projection);
         llg->PushMatrix(eMatrix_ModelView);
 
-        llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd, cColor(1.0f, 0.0f, 0.0f, 1.0f));
+        if(gGame->pointerDrawActive)
+		{
+		  glLineWidth(3.0f);
+		  llg->DrawLine(gGame->pointerDrawStart, gGame->pointerDrawEnd,
+			cColor(0.25f, 0.85f, 1.0f, 0.95f));
+		  glLineWidth(1.0f);
+		}
 
         llg->PopMatrix(eMatrix_Projection);
         llg->PopMatrix(eMatrix_ModelView);
@@ -794,7 +827,7 @@ namespace hpl {
 		}
 
     {
-      vr::Texture_t leftEyeTexture = { (void*)mpGraphics->GetRenderer3D()->leftEyeDesc.m_nRenderTextureId, vr::API_OpenGL, vr::ColorSpace_Gamma };
+      vr::Texture_t leftEyeTexture = { (void*)mpGraphics->GetRenderer3D()->leftEyeDesc.m_nRenderTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
       vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::Eye_Left, &leftEyeTexture);
 
       if (err)
@@ -802,7 +835,7 @@ namespace hpl {
     }
 
     {
-      vr::Texture_t rightEyeTexture = { (void*)mpGraphics->GetRenderer3D()->rightEyeDesc.m_nRenderTextureId, vr::API_OpenGL, vr::ColorSpace_Gamma };
+      vr::Texture_t rightEyeTexture = { (void*)mpGraphics->GetRenderer3D()->rightEyeDesc.m_nRenderTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
       vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture);
 
       if (err)

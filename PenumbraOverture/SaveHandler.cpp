@@ -27,6 +27,7 @@
 #include "GameEntity.h"
 #include "GameMusicHandler.h"
 #include "RadioHandler.h"
+#include "MapLoadText.h"
 
 //////////////////////////////////////////////////////////////////////////
 // SAVED WORLD
@@ -221,6 +222,7 @@ cSavedWorld* cSavedGame::GetSavedWorld(const tString &asName)
 cSaveHandler::cSaveHandler(cInit *apInit)  : iUpdateable("SaveHandler")
 {
 	mpInit = apInit;
+	mbGameLoadPending = false;
 
 	mpSavedGame = hplNew( cSavedGame, () );
 
@@ -538,9 +540,26 @@ void cSaveHandler::SaveGameToFile(const tWString& asFile)
 
 void cSaveHandler::LoadGameFromFile(const tWString& asFile)
 {
-	///////////////////////////////
-	//Draw loading screen.
-	mpInit->mpGraphicsHelper->DrawLoadingScreen("");
+	msPendingGameLoad = asFile;
+	mbGameLoadPending = true;
+	mpInit->mpMapLoadText->SetText("", "");
+	mpInit->mpMapLoadText->SetActive(true);
+	mpInit->mpMapLoadText->BeginMapLoad();
+	Log(" [VR loading +%lu ms] staged saved-game loading frame.\n",
+		GetApplicationTime());
+}
+
+//-----------------------------------------------------------------------
+
+void cSaveHandler::CompletePendingGameLoad()
+{
+	if(!mbGameLoadPending) return;
+
+	const tWString sPendingFile = msPendingGameLoad;
+	mbGameLoadPending = false;
+	mpInit->mpMapHandler->BeginVRBlockingLoad();
+	Log(" [VR loading +%lu ms] saved-game frame presented; beginning synchronous load.\n",
+		GetApplicationTime());
 
 	//1. Reset everything
 	//2. Load all data from file
@@ -559,7 +578,7 @@ void cSaveHandler::LoadGameFromFile(const tWString& asFile)
 	mpInit->mpGame->GetSound()->Update(1/60.0f);
 	
 	cSerializeClass::SetLog(false);
-	tWString sSavePath = msSaveDir + asFile;
+	tWString sSavePath = msSaveDir + sPendingFile;
 	//tString sSaveFile = cString::To8Char(sSavePath);
 	cSerializeClass::LoadFromFile(mpSavedGame,sSavePath);
 	
@@ -628,7 +647,11 @@ void cSaveHandler::LoadGameFromFile(const tWString& asFile)
 	mpInit->mpGame->ResetLogicTimer();
 
 	//Quick fix, make sure player is always active:
-	mpInit->mpPlayer->SetActive(true); 
+	mpInit->mpPlayer->SetActive(true);
+	mpInit->mpMapHandler->EndVRBlockingLoad();
+	mpInit->mpMapLoadText->FinishMapLoad(false);
+	Log(" [VR loading +%lu ms] synchronous saved-game load complete.\n",
+		GetApplicationTime());
 }
 
 //-----------------------------------------------------------------------

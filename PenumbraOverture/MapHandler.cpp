@@ -41,6 +41,7 @@
 #include "GameMessageHandler.h"
 #include "Inventory.h"
 #include "MapLoadText.h"
+#include "openvr.h"
 
 //////////////////////////////////////////////////////////////////////////
 // WORLD CACHE
@@ -291,6 +292,7 @@ cMapHandler::cMapHandler(cInit *apInit) : iUpdateable("MapHandler")
 	mfGameTime =0;
 
 	mbDestroyingAll = false;
+	mbVRLoadRevealPending = false;
 
 	Reset();
 
@@ -644,6 +646,7 @@ void cMapHandler::ChangeMap(const tString &asMap, const tString &asPos, const tS
 	mMapChanger.msDoneSound = asStopSound;
 	mMapChanger.mfFadeInTime = afFadeInTime;
 	mMapChanger.mbActive = true;
+	mMapChanger.mbPrepared = false;
 	mMapChanger.msLoadTextCat = asLoadTextCat;
 	mMapChanger.msLoadTextEntry = asLoadTextEntry;
 
@@ -653,6 +656,48 @@ void cMapHandler::ChangeMap(const tString &asMap, const tString &asPos, const tS
 		mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui(asStartSound,false,1);
 
 	mpInit->mpPlayer->SetActive(false);
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::BeginInitialMapLoad(const tString &asMap, const tString &asPos)
+{
+	mMapChanger.msNewMap = asMap;
+	mMapChanger.msPosName = asPos;
+	mMapChanger.msDoneSound = "";
+	mMapChanger.mfFadeInTime = 0.5f;
+	mMapChanger.msLoadTextCat = "";
+	mMapChanger.msLoadTextEntry = "";
+	mMapChanger.mbActive = true;
+	mMapChanger.mbPrepared = true;
+
+	mpInit->mpPlayer->SetActive(false);
+	mpInit->mpMapLoadText->SetText("", "");
+	mpInit->mpMapLoadText->SetActive(true);
+	mpInit->mpMapLoadText->BeginMapLoad();
+	Log(" [VR loading +%lu ms] staged initial loading frame for '%s'.\n",
+		GetApplicationTime(), asMap.c_str());
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::BeginVRBlockingLoad()
+{
+	if(vr::VRCompositor())
+	{
+		vr::VRCompositor()->FadeGrid(0.0f, false);
+		vr::VRCompositor()->FadeToColor(0.08f, 0.0f, 0.0f, 0.0f, 1.0f, false);
+		vr::VRCompositor()->FadeToColor(0.08f, 0.0f, 0.0f, 0.0f, 1.0f, true);
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::EndVRBlockingLoad()
+{
+	// The fade is released by OnPostBufferSwap only after the newly loaded
+	// state has submitted a frame to SteamVR.
+	mbVRLoadRevealPending = true;
 }
 
 //-----------------------------------------------------------------------
@@ -1397,38 +1442,16 @@ void cMapHandler::Update(float afTimeStep)
 	//LogUpdate("  Map change\n");
 	if(mMapChanger.mbActive && mpInit->mpFadeHandler->IsActive()==false)
 	{
-		mMapChanger.mbActive = false;
-
-		//Log("---------- CHANGING TO MAP: '%s' ------------------\n",mMapChanger.msNewMap.c_str());
-		
-		//Make sure that the graphics are not destroyed at the end of the map so
-		//That the next map doesn't have to reload em.
-		mpInit->mbDestroyGraphics = false;
-
-		//Draw Loading image
-		if(mMapChanger.msLoadTextCat != "")
+		if(!mMapChanger.mbPrepared)
 		{
-			mpInit->mpMapLoadText->SetText(mMapChanger.msLoadTextCat,mMapChanger.msLoadTextEntry);
+			mMapChanger.mbPrepared = true;
+			mpInit->mpMapLoadText->SetText(
+				mMapChanger.msLoadTextCat, mMapChanger.msLoadTextEntry);
 			mpInit->mpMapLoadText->SetActive(true);
+			mpInit->mpMapLoadText->BeginMapLoad();
+			Log(" [VR loading +%lu ms] staged loading frame for '%s'.\n",
+				GetApplicationTime(), mMapChanger.msNewMap.c_str());
 		}
-		else
-		{
-			mpInit->mpGraphicsHelper->DrawLoadingScreen("other_loading.jpg");
-		}
-		
-		//Fade in here so that script will over ride it.
-		mpInit->mpFadeHandler->FadeIn(mMapChanger.mfFadeInTime);
-
-		Load(mMapChanger.msNewMap,mMapChanger.msPosName);
-
-		mpInit->mbDestroyGraphics = true;
-
-		if(mMapChanger.msDoneSound!="")
-			mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui(mMapChanger.msDoneSound,false,1);
-		
-		mpInit->mpPlayer->SetActive(true);
-
-		//Log("Map change over...\n");
 	}
 	
 }
@@ -1442,6 +1465,7 @@ void cMapHandler::Reset()
 #endif
 
 	mMapChanger.mbActive = false;
+	mMapChanger.mbPrepared = false;
 	msCurrentMap = "";
 
 	if(mpInit->mbResetCache) mpWorldCache->DecResources();
@@ -1466,6 +1490,63 @@ void cMapHandler::Reset()
 
 	//Make sure no occulssion queries are left.
 	mpInit->mpGame->GetGraphics()->GetRenderer3D()->GetRenderList()->Clear();
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::CompletePendingMapChange()
+{
+	if(!mMapChanger.mbActive || !mMapChanger.mbPrepared) return;
+
+	const bool showLoadText = mMapChanger.msLoadTextCat != "";
+	Log(" [VR loading +%lu ms] loading frame presented; beginning synchronous map load.\n",
+		GetApplicationTime());
+
+	BeginVRBlockingLoad();
+
+	mpInit->mbDestroyGraphics = false;
+	mpInit->mpFadeHandler->FadeIn(mMapChanger.mfFadeInTime);
+	Load(mMapChanger.msNewMap,mMapChanger.msPosName);
+	mpInit->mbDestroyGraphics = true;
+
+	if(mMapChanger.msDoneSound!="")
+		mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui(mMapChanger.msDoneSound,false,1);
+	mpInit->mpPlayer->SetActive(true);
+
+	mMapChanger.mbActive = false;
+	mMapChanger.mbPrepared = false;
+	// Keep both compositor layers black until a frame from the loaded state has
+	// actually been submitted. Clearing the fade here left a short interval in
+	// which SteamVR could expose its environment between maps.
+	EndVRBlockingLoad();
+	mpInit->mpMapLoadText->FinishMapLoad(showLoadText);
+
+	Log(" [VR loading +%lu ms] synchronous map load complete.\n", GetApplicationTime());
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::OnVRFramePresentedAfterLoad()
+{
+	if(!mbVRLoadRevealPending) return;
+
+	if(vr::VRCompositor())
+	{
+		vr::VRCompositor()->FadeToColor(0.15f, 0.0f, 0.0f, 0.0f, 0.0f, false);
+		vr::VRCompositor()->FadeToColor(0.15f, 0.0f, 0.0f, 0.0f, 0.0f, true);
+		vr::VRCompositor()->FadeGrid(0.0f, false);
+	}
+
+	mbVRLoadRevealPending = false;
+	Log(" [VR loading +%lu ms] first loaded frame presented; compositor fade released.\n",
+		GetApplicationTime());
+}
+
+//-----------------------------------------------------------------------
+
+void cMapHandler::OnPostBufferSwap()
+{
+	OnVRFramePresentedAfterLoad();
 }
 
 //-----------------------------------------------------------------------

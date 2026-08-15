@@ -101,24 +101,27 @@ void cGameMessage::Update(float afTimeStep)
 void cGameMessage::Draw(iFontData *apFont)
 {
 	if(mbActive == false) return;
-	
-	float fSide=30;
+
+	float fSide=40;
+	const float fTextScale = mpMessHandler->mpInit->mVRSettings.GetSubtitleScale();
+	const float fLineHeight = 16.0f * fTextScale;
+	const float fFontSize = 14.0f * fTextScale;
 	if(mpMessHandler->mbBlackText)
 	{
-		apFont->DrawWordWrap(cVector3f(fSide, 300,152),800 - fSide*2,16,14,cColor(0,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,152),800 - fSide*2,fLineHeight,fFontSize,cColor(0,mfFade),
 			eFontAlign_Left,msText);
 	}
 	else
 	{
-		apFont->DrawWordWrap(cVector3f(fSide, 300,152),800 - fSide*2,16,14,cColor(1,1,1,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,152),800 - fSide*2,fLineHeight,fFontSize,cColor(1,1,1,mfFade),
 							eFontAlign_Left,msText);
-		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(1,1,-1),800 - fSide*2,16,14,cColor(0,0,0,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(1,1,-1),800 - fSide*2,fLineHeight,fFontSize,cColor(0,0,0,mfFade),
 							eFontAlign_Left,msText);
-		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(-1,-1,-1),800 - fSide*2,16,14,cColor(0,0,0,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(-1,-1,-1),800 - fSide*2,fLineHeight,fFontSize,cColor(0,0,0,mfFade),
 							eFontAlign_Left,msText);
-		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(1,-1,-1),800 - fSide*2,16,14,cColor(0,0,0,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(1,-1,-1),800 - fSide*2,fLineHeight,fFontSize,cColor(0,0,0,mfFade),
 							eFontAlign_Left,msText);
-		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(-1,1,-1),800 - fSide*2,16,14,cColor(0,0,0,mfFade),
+		apFont->DrawWordWrap(cVector3f(fSide, 300,151) + cVector3f(-1,1,-1),800 - fSide*2,fLineHeight,fFontSize,cColor(0,0,0,mfFade),
 							eFontAlign_Left,msText);
 	}
 }

@@ -1,0 +1,230 @@
+{
+  "action_manifest_version": 0,
+  "alias_info": {},
+  "bindings": {
+    "/actions/global": {
+      "chords": [],
+      "haptics": [
+        {
+          "output": "/actions/global/out/left_haptic",
+          "path": "/user/hand/left/output/haptic"
+        },
+        {
+          "output": "/actions/global/out/right_haptic",
+          "path": "/user/hand/right/output/haptic"
+        }
+      ],
+      "poses": [
+        {
+          "output": "/actions/global/in/left_pose",
+          "path": "/user/hand/left/pose/handgrip"
+        },
+        {
+          "output": "/actions/global/in/right_pose",
+          "path": "/user/hand/right/pose/handgrip"
+        }
+      ],
+      "skeleton": [
+        {
+          "output": "/actions/global/in/left_skeleton",
+          "path": "/user/hand/left/input/skeleton/left"
+        },
+        {
+          "output": "/actions/global/in/right_skeleton",
+          "path": "/user/hand/right/input/skeleton/right"
+        }
+      ],
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/create"
+        }
+      ]
+    },
+    "/actions/gameplay": {
+      "chords": [],
+      "haptics": [],
+      "poses": [],
+      "skeleton": [],
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/sprint"
+            },
+            "position": {
+              "output": "/actions/gameplay/in/move"
+            }
+          },
+          "mode": "joystick",
+          "path": "/user/hand/left/input/left_stick"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/crouch"
+            },
+            "position": {
+              "output": "/actions/gameplay/in/turn"
+            }
+          },
+          "mode": "joystick",
+          "path": "/user/hand/right/input/right_stick"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/quick_light"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/left/input/l1"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/notebook"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/square"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/jump"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/cross"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/interact"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/r2"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/inventory"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/r1"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/holster"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/triangle"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/examine"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/circle"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/gameplay/in/pause"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/options"
+        }
+      ]
+    },
+    "/actions/ui": {
+      "chords": [],
+      "haptics": [],
+      "poses": [],
+      "skeleton": [],
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/select"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/left/input/l2"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/select"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/r2"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/drag"
+            }
+          },
+          "mode": "joystick",
+          "path": "/user/hand/right/input/right_stick"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/back"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/circle"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/close"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/r1"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/close"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/square"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/ui/in/close"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/options"
+        }
+      ]
+    }
+  },
+  "controller_type": "playstation_vr2_sense",
+  "description": "Default PS VR2 Sense bindings for Penumbra: Overture VR Rework",
+  "name": "Penumbra VR - PS VR2 Sense",
+  "options": {},
+  "simulated_actions": []
+}

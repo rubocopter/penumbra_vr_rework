@@ -173,6 +173,10 @@ namespace hpl {
 	void cGame::GameInit(iLowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars)
 	{
 		mpGameSetup = apGameSetup;
+		vr_old_head_tracking_pose = cMatrixf::Identity;
+		pointerDrawStart = cVector3f(0,0,0);
+		pointerDrawEnd = cVector3f(0,0,0);
+		pointerDrawActive = false;
 
 		Log("Creating Engine Modules\n");
 		Log("--------------------------------------------------------\n");
@@ -236,6 +240,7 @@ namespace hpl {
       FatalError("Unable to init OpenVR runtime:\n%s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
     }
 
+    vr_input.Initialize();
     mpGraphics->GetRenderer3D()->CreateVREyeTextures(vr_hmd);
 
 		//Init Sound
@@ -394,6 +399,13 @@ namespace hpl {
         vr::VRCompositor()->WaitGetPoses(vr_rTrackedDevicePose, vr::k_unMaxTrackedDeviceCount, NULL, 0);
         static cMatrixf heightAdd = cMath::MatrixTranslate(cVector3f(0.0f, 0.02f, 0.0f));
 
+        // A controller pose is valid only if it is refreshed this frame. Keeping
+        // the previous matrix is useful for a clean visual recovery, but the
+        // validity bit prevents stale hands from accepting input while the
+        // runtime is reconnecting a controller.
+        vr_left_hand.BeginPoseFrame();
+        vr_right_hand.BeginPoseFrame();
+
         for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice) {
           if (vr_rTrackedDevicePose[nDevice].bPoseIsValid) {
             auto pose_mat = vr_rTrackedDevicePose[nDevice].mDeviceToAbsoluteTracking;
@@ -403,24 +415,25 @@ namespace hpl {
             switch (vr_hmd->GetTrackedDeviceClass(nDevice)) {
             case vr::TrackedDeviceClass_HMD:
             {
-              vr_head_view_mat = cMatrixf::FromSteamVRMatrix34(pose_mat);
-              vr_head_view_mat = cMath::MatrixMul(heightAdd, vr_head_view_mat);
+              vr_tracking.SetHeadTrackingPose(cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)));
               break;
             }
 
             case vr::TrackedDeviceClass_Controller:
             {
               if (nDevice == vr::VRSystem()->GetTrackedDeviceIndexForControllerRole(vr::ETrackedControllerRole::TrackedControllerRole_RightHand)) {
-                vr_right_hand.SetMatrix(cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)));
-                vr_right_hand.SetVelocity(cVector3f(pose_velocity.v[0], pose_velocity.v[1], pose_velocity.v[2]));
-                vr_right_hand.SetAngularVelocity(cVector3f(pose_angular_velocity.v[0], pose_angular_velocity.v[1], pose_angular_velocity.v[2]));
-                vr_right_hand.SetDeviceIndex(nDevice);
+                vr_right_hand.SetPose(
+                  cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)),
+                  cVector3f(pose_velocity.v[0], pose_velocity.v[1], pose_velocity.v[2]),
+                  cVector3f(pose_angular_velocity.v[0], pose_angular_velocity.v[1], pose_angular_velocity.v[2]),
+                  nDevice);
               }
               else if (nDevice == vr::VRSystem()->GetTrackedDeviceIndexForControllerRole(vr::ETrackedControllerRole::TrackedControllerRole_LeftHand)) {
-                vr_left_hand.SetMatrix(cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)));
-                vr_left_hand.SetVelocity(cVector3f(pose_velocity.v[0], pose_velocity.v[1], pose_velocity.v[2]));
-                vr_left_hand.SetAngularVelocity(cVector3f(pose_angular_velocity.v[0], pose_angular_velocity.v[1], pose_angular_velocity.v[2]));
-                vr_left_hand.SetDeviceIndex(nDevice);
+                vr_left_hand.SetPose(
+                  cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(pose_mat)),
+                  cVector3f(pose_velocity.v[0], pose_velocity.v[1], pose_velocity.v[2]),
+                  cVector3f(pose_angular_velocity.v[0], pose_angular_velocity.v[1], pose_angular_velocity.v[2]),
+                  nDevice);
               }
 
               break;
@@ -435,31 +448,22 @@ namespace hpl {
           switch (event.eventType) {
           case vr::VREvent_TrackedDeviceActivated:
           {
-            Log("Device %u attached.\n", event.trackedDeviceIndex);
+            Log(" [VR runtime +%lu ms] device %u attached.\n", GetApplicationTime(), event.trackedDeviceIndex);
           }
           break;
           case vr::VREvent_TrackedDeviceDeactivated:
           {
-            Log("Device %u detached.\n", event.trackedDeviceIndex);
+            Log(" [VR runtime +%lu ms] device %u detached.\n", GetApplicationTime(), event.trackedDeviceIndex);
           }
           break;
           case vr::VREvent_TrackedDeviceUpdated:
           {
-            Log("Device %u updated.\n", event.trackedDeviceIndex);
+            Log(" [VR runtime +%lu ms] device %u updated.\n", GetApplicationTime(), event.trackedDeviceIndex);
           }
           break;
           }
         }
 
-        // Process SteamVR controller state
-        for (vr::TrackedDeviceIndex_t unDevice = 0; unDevice < vr::k_unMaxTrackedDeviceCount; unDevice++)
-        {
-          vr::VRControllerState_t state;
-          if (vr_hmd->GetControllerState(unDevice, &state))
-          {
-            // do wut wit dis
-          }
-        }
       }
 
       //if (!mbGameIsDone)

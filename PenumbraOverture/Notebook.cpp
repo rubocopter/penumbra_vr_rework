@@ -966,6 +966,7 @@ void cNotebook::Update(float afTimeStep)
 
   //////////////////////////////
   //Stick the notebook to the player's left hand
+  if (mpInit->mpGame->vr_left_hand.IsPoseValid())
   {
     auto scene = mpInit->mpGame->GetScene();
 
@@ -973,9 +974,9 @@ void cNotebook::Update(float afTimeStep)
     auto centerPos = pCamera3D->GetPosition();
 
     cMatrixf camInverse = cMath::MatrixInverse(pCamera3D->GetViewMatrix());
-    cVector3f uiPos = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
+    cVector3f uiPos = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
 
-    auto translateMat = VRHelper::ViveToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
+    auto translateMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
     auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 1450.0f, -1.0f / 1450.0f, 1.0f / 1450.0f));
 
     // Move the UI in front of the player's eyes
@@ -1018,52 +1019,12 @@ void cNotebook::Update(float afTimeStep)
 	//Update state machine
 	mStateMachine.Update(afTimeStep);
 
-  // For VR, use controller as laser pointer thing
-  // Get right hand and see if it's intersecting
-  auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
-
-  auto worldMat = VRHelper::ViveToWorldSpace(handMat, mpInit->mpGame);
-
-  auto handPos = worldMat.GetTranslation();
-  auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(worldMat.GetRotation()).GetForward()) * -1.0f;
-
-  // Make traces relative to the inventory's position
-  cMatrixf uiMatrix = mpInit->mpGame->GetScene()->GetUIMatrix();
-
-  cVector2f scrSize = cVector2f(800 * 4.0f, 600 * 4.0f);
-
-  float points[] = {
-    0.0f, 0.0f, 0.0f,
-    0.0f, scrSize.y, 0.0f,
-    scrSize.x, 0.0f, 0.0f
-  };
-
-  for (int i = 0; i < 3; ++i) {
-    cVector3f res = cMath::MatrixMul(uiMatrix, cVector3f(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]));
-
-    points[i * 3] = res.x;
-    points[i * 3 + 1] = res.y;
-    points[i * 3 + 2] = res.z;
-  }
-
-  float t, u, v;
-
-  // Draw for hand pointer
-  if (VRHelper::intersect_triangle(&handPos.v[0], &handForward.v[0], &points[0], &points[3], &points[6], &t, &u, &v)) {
-    if (t > 0) {
-      float x = v * scrSize.x;
-      float y = u * scrSize.y;
-
-      if (x <= 800 && y <= 600) {
-        float w = 1.0f - (u + v);
-
-        cVector3f t1 = cVector3f(points[0], points[1], points[2]);
-        cVector3f t2 = cVector3f(points[3], points[4], points[5]);
-        cVector3f t3 = cVector3f(points[6], points[7], points[8]);
-
-        SetMousePos(cVector2f(x, y));
-      }
-    }
+  cVector2f pointerPos;
+  if(VRHelper::UpdateUIPointer(mpInit->mpGame,
+    mpInit->mpGame->GetScene()->GetUIMatrix(), true,
+    mvMousePos, &pointerPos))
+  {
+    SetMousePos(pointerPos);
   }
 }
 
@@ -1285,6 +1246,7 @@ void cNotebook::SetActive(bool abX)
 	}
 	else
 	{
+    mpInit->mpGame->pointerDrawActive = false;
     auto scene = mpInit->mpGame->GetScene();
     scene->SetVRMenuState(MenuState_Facelock, cMatrixf::Identity);
 

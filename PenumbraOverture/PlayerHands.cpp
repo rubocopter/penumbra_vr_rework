@@ -80,6 +80,9 @@ iHudModel::iHudModel(ePlayerHandType aType)
 {
 	mType = aType;
 	mState = eHudModelState_Idle;
+	mpHandAnimState[0] = NULL;
+	mpHandAnimState[1] = NULL;
+	mbHandRigSetup = false;
 }
 
 //-----------------------------------------------------------------------
@@ -92,9 +95,11 @@ bool iHudModel::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
 
   cMatrixf vr_handMtx;
   if (mlHandIndex == 0) {
+    if (!mpInit->mpGame->vr_left_hand.IsPoseValid()) return false;
     vr_handMtx = mpInit->mpGame->vr_left_hand.GetMatrix();
   }
   else {
+    if (!mpInit->mpGame->vr_right_hand.IsPoseValid()) return false;
     vr_handMtx = mpInit->mpGame->vr_right_hand.GetMatrix();
   }
 
@@ -104,8 +109,7 @@ bool iHudModel::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
 
-  // Subtract Vive-space head position and make relative to world space
-  aPoseMtx = VRHelper::ViveToWorldSpace(aPoseMtx, mpInit->mpGame);
+  aPoseMtx = VRHelper::TrackingToWorldSpace(aPoseMtx, mpInit->mpGame);
 
   return true;
 }
@@ -151,6 +155,112 @@ void iHudModel::LoadEntities()
 	}
 
 	LoadExtraEntites();
+
+	SetupHandAnimation();
+}
+
+//-----------------------------------------------------------------------
+
+void iHudModel::SetupHandAnimation()
+{
+	if(mpEntity == NULL || mbHandRigSetup) return;
+
+	static const char* ksBoneNames[] = {
+		"Middle1","Middle2","Middle3",
+		"Ring1","Ring2","Ring3",
+		"Little1","Little2","Little3",
+		"Index1","Index2","Index3",
+		"Thumb1","Thumb2","Thumb3"
+	};
+	static const int lNumBones = 15;
+
+	//Own rotation per joint in degrees. Grab: middle/ring/little/thumb.
+	//Trigger: index. (Cumulative: Middle/Ring 60/120/165, Little 55/110/150,
+	//Index 55/110/155, Thumb 40/75.)
+	static const float kfGrabAngles[lNumBones] = {
+		60,60,45,	//Middle
+		60,60,45,	//Ring
+		55,55,40,	//Little
+		0,0,0,		//Index
+		40,35,0		//Thumb
+	};
+	static const float kfTriggerAngles[lNumBones] = {
+		0,0,0,		//Middle
+		0,0,0,		//Ring
+		0,0,0,		//Little
+		55,55,45,	//Index
+		0,0,0		//Thumb
+	};
+
+	int lBoneIdx[lNumBones];
+	for(int i=0; i<lNumBones; ++i)
+	{
+		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksBoneNames[i]);
+		if(lBoneIdx[i] < 0)
+		{
+			mbHandRigSetup = true;
+			return;
+		}
+	}
+
+	const bool bLeft = (mlHandIndex == 0);
+	cVector3f vFingerAxis = cVector3f(0,0, bLeft ? 1.0f : -1.0f);
+	cVector3f vThumbAxis = cVector3f(0, 0.8910f, bLeft ? -0.4540f : 0.4540f);
+
+	static const char* ksPoseNames[] = { "HandGrab", "HandTrigger" };
+	static const float* kfPoseAngles[] = { kfGrabAngles, kfTriggerAngles };
+
+	for(int p=0; p<2; ++p)
+	{
+		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[p], "") );
+		pAnim->SetLength(0.001f);
+
+		for(int i=0; i<lNumBones; ++i)
+		{
+			if(kfPoseAngles[p][i] == 0.0f) continue;
+
+			cAnimationTrack *pTrack = pAnim->CreateTrack(ksBoneNames[i], eAnimTransformFlag_Rotate);
+			pTrack->SetNodeIndex(lBoneIdx[i]);
+
+			cKeyFrame *pFrame = pTrack->CreateKeyFrame(0);
+			cVector3f vAxis = (i >= 12) ? vThumbAxis : vFingerAxis;
+			pFrame->rotation = cQuaternion(cMath::ToRad(kfPoseAngles[p][i]), vAxis);
+		}
+
+		mpHandAnimState[p] = mpEntity->AddAnimation(pAnim, ksPoseNames[p], 1.0f);
+		mpHandAnimState[p]->SetActive(true);
+		mpHandAnimState[p]->SetLoop(true);
+		mpHandAnimState[p]->SetPaused(true);
+		mpHandAnimState[p]->SetWeight(0.0f);
+	}
+
+	mbHandRigSetup = true;
+}
+
+//-----------------------------------------------------------------------
+
+void iHudModel::DestroyHandAnimation()
+{
+	mpHandAnimState[0] = NULL;
+	mpHandAnimState[1] = NULL;
+	mbHandRigSetup = false;
+}
+
+//-----------------------------------------------------------------------
+
+void iHudModel::UpdateHandAnimation()
+{
+	if(mpHandAnimState[0] == NULL) return;
+
+	TrackedController &hand = mlHandIndex == 0 ? mpInit->mpGame->vr_left_hand
+											   : mpInit->mpGame->vr_right_hand;
+	const TrackedController::HandSummary &summary = hand.GetHandSummary();
+
+	float fGrip = summary.valid ? summary.grip : 0.0f;
+	float fTrigger = summary.valid ? summary.trigger : 0.0f;
+
+	mpHandAnimState[0]->SetWeight(fGrip);
+	mpHandAnimState[1]->SetWeight(fTrigger);
 }
 
 //-----------------------------------------------------------------------
@@ -199,6 +309,8 @@ void iHudModel::DestroyEntities()
 	mvSoundEntities.clear();
 
 	DestroyExtraEntities();
+
+	DestroyHandAnimation();
 }
 
 //-----------------------------------------------------------------------
@@ -317,6 +429,14 @@ void cPlayerHands::Update(float afTimeStep)
 	{
 		iHudModel *pHudModel = mvCurrentHudModels[i];
     if (pHudModel == NULL) {continue;}
+
+    const bool poseValid = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
+      mpInit->mpGame->vr_right_hand.IsPoseValid();
+    if (!poseValid) {
+      if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(false);
+      continue;
+    }
+    if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(true);
 		
 		cMatrixf mtxPose = cMatrixf::Identity;
 
@@ -416,6 +536,8 @@ void cPlayerHands::Update(float afTimeStep)
 
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
+
+    pHudModel->UpdateHandAnimation();
 	}
 }
 

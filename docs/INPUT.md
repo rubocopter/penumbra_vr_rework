@@ -1,0 +1,362 @@
+# SteamVR input
+
+Penumbra VR uses SteamVR Input actions instead of assuming fixed HTC Vive button IDs and axis numbers. Gameplay and UI have separate action sets, so a physical control can have an appropriate meaning in menus without leaking into movement or interaction. If the action manifest cannot be initialized or no actions are active, the game automatically falls back to the historical OpenVR controller polling path.
+
+Both paths are normalized into the same intent-named runtime state. Gameplay
+therefore consumes actions such as interact, inventory, sprint, or UI select
+without depending on Vive-era button field names.
+
+The action manifest is installed as `vr/actions.json` beside `Penumbra_vr.exe`. Bindings can be inspected and customized through SteamVR's controller binding interface.
+
+## Device-independent control scheme
+
+Gameplay consumes semantic actions rather than PS VR2 or Vive button names.
+Each SteamVR controller profile maps its own physical controls to these intents:
+
+| Intent | Gameplay meaning |
+| --- | --- |
+| Move | Analog locomotion relative to the view |
+| Turn | Disabled, snap, or smooth horizontal turning |
+| Sprint | Run while moving |
+| Crouch | Toggle crouch in Button or Hybrid mode |
+| Quick light | Toggle the currently available light source |
+| Notebook | Open or close the notebook |
+| Holster | Unequip the current tool or weapon so Interact can target the world |
+| Jump | Jump when the current player state permits it |
+| Interact / use | Grab, operate, confirm, or use the equipped tool or item |
+| Inventory | Open or close the inventory |
+| Examine / back | Examine in gameplay; open item actions or navigate back in UI |
+| Pause | Open or close the pause menu |
+| Recenter | Put forward-facing VR content in front of the current horizontal view |
+| UI point | Aim a tracked-controller ray at menus, inventory, and panels |
+| UI select | Activate the pointed control or inventory action |
+| UI alternate | Decrease a VR setting or use the original inventory drag/combine action |
+
+The physical labels below describe the bundled profiles, not universal prompts.
+Custom profiles can remap these actions in SteamVR without changing gameplay
+code.
+
+## PS VR2 Sense defaults
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 | Toggle crouch |
+| L1 | Toggle the current quick light |
+| Square | Notebook |
+| Triangle | Holster the equipped tool or weapon |
+| Cross | Jump |
+| R2 | Interact, or use the equipped tool or weapon |
+| R1 | Inventory |
+| Circle | Examine |
+| Options | Pause menu |
+| Create | Recenter horizontal view |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Aim with the right controller; left if the right pose is unavailable | Move the pointer |
+| R2, or L2 during left-hand fallback | Select; in VR settings, increase or choose the next value; in inventory, perform the default action |
+| R3 | In VR settings, decrease or choose the previous value; in inventory, drag or combine items |
+| Circle | Go back in menus; in inventory, open an item's actions or go back |
+| R1, Square, or Options | Close the current screen |
+
+When a tool such as the hammer is equipped, R2 operates that tool. Press Triangle to holster it before using R2 to interact with doors and other objects again.
+
+To use an inventory item on the world, open the inventory with R1, aim at the
+item with the right controller, and press R2. The inventory closes with the item
+readied; aim at its target from interaction range and press R2 again. R2 also
+selects an action opened with Circle, while R3 remains available for the
+original drag-and-combine interaction.
+
+Input edges are latched when the game switches between gameplay and UI action
+sets. A button that opened a screen must be released and pressed again before
+its UI binding can close that screen.
+
+The main menu, inventory, notebook, and numerical panels use the same tracked
+ray, cyan endpoint reticle, and lightly smoothed cursor. The right hand is the
+primary pointer; if its SteamVR pose is unavailable, the left hand takes over
+and its trigger can select. The original mouse path remains available. Item
+action popups now render their localized action names instead of the empty
+highlighted box left by the historical mod.
+
+These tables document the current PS VR2 and Vive binding profiles; they are
+not intended as universal in-game button names. Player-facing control prompts
+will remain unchanged until the game can resolve labels from the active
+SteamVR controller profile (for example Touch, Index, Vive, or PS VR2) instead
+of hard-coding one headset's layout.
+
+## Hardware validation status
+
+| Profile | Status | Validated behaviour |
+| --- | --- | --- |
+| PS VR2 Sense | Hardware-tested, 14 August 2026 | Gameplay/UI actions, repeated inventory transitions, all crouch modes, snap/smooth turn, recenter, pointer, tutorial/new/continue/load routes, pose loss and reconnection |
+| HTC Vive | Compatibility profile retained | Historical layout is represented in SteamVR Input but this rework has not yet been retested on Vive hardware |
+| Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme with recenter on the left trackpad click |
+| Meta Quest / Oculus Touch | Bundled default profile, not yet hardware-validated | `oculus_touch` profile follows the PS VR2 scheme; recenter is left unassigned for SteamVR mapping |
+| Windows Mixed Reality | Bundled default profile, not yet hardware-validated | `microsoft/motion_controller` profile keeps the WMR trackpads for pause and recenter |
+
+Every bundled profile must cover the mandatory actions (move, interact, and UI
+select) or the project validation fails. Custom bindings created in SteamVR
+replace these defaults per controller type without changing gameplay code.
+
+## Persistent VR settings
+
+Implemented VR comfort values are stored in the normal user `settings.cfg`
+under a dedicated `[VR]` section. On Windows this file is normally at
+`Documents/Penumbra Overture/Episode1/settings.cfg`.
+
+They can be changed in-game under **Options → VR Settings**. Aim at a setting
+with the right controller, press R2 to increase/select the next value, or R3 to
+decrease/select the previous value. Changes apply immediately and are saved at
+once. Circle returns to the previous menu without also changing the highlighted
+value.
+
+| Setting | Default | Valid range | Effect |
+| --- | ---: | ---: | --- |
+| `MoveSpeed` | `1.0` | `0.25`–`3.0` | Multiplies smooth-locomotion speed |
+| `MoveDeadZone` | `0.15` | `0.0`–`0.9` | Radial dead zone, rescaled outside the centre |
+| `HeightOffset` | `0.0` | `-0.5`–`0.5` m | Adds a vertical calibration offset without changing world scale |
+| `TurnMode` | `Snap` | `Disabled`, `Snap`, `Smooth` | Selects physical-only, stepped, or continuous turning |
+| `SnapTurnAngle` | `45` | `15`–`90` degrees | Angle applied for each snap turn |
+| `SmoothTurnSpeed` | `90` | `30`–`360` degrees/s | Maximum continuous turn speed |
+| `TurnDeadZone` | `0.20` | `0.0`–`0.9` | Horizontal right-stick dead zone |
+| `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored main menus and cinematics |
+| `UIScale` | `1.0` | `0.5`–`2.0` | Size multiplier for that frontal UI surface |
+| `CrouchMode` | `Hybrid` | `Physical`, `Button`, `Hybrid` | Chooses body movement, the bound crouch action, or either |
+| `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Headset descent below the standing baseline that enters crouch |
+| `SubtitleScale` | `1.35` | `0.75`–`2.0` | Scales cinematic subtitles, radio text, and gameplay messages |
+
+Out-of-range values are clamped and the effective values are written to the
+game log on startup. Snap turn requires the stick to return through its dead
+zone before another step can fire. Turning is disabled in menus and scripted
+look sequences; Create remains available as a global recenter action. Settings
+for handedness will only be added once its corresponding behaviour exists. UI distance and scale are independent so the
+surface can be moved farther away without forcing it to occupy less of the
+view.
+
+Hybrid crouch is the default. The physical path calibrates a standing HMD
+baseline during gameplay and uses hysteresis to avoid flicker at the threshold;
+the button path latches the semantic crouch action. Both change Penumbra's real
+gameplay collider and stealth/movement state. Button crouch also applies the
+move state's smooth vertical offset to the rendered viewpoint, while physical
+crouch keeps the user's real head displacement. Neither changes world scale,
+and standing is retried safely if a low ceiling blocks the full-height collider.
+
+Fullscreen menus and cinematics are captured at a stable room-space pose when
+opened rather than following every head movement. Recenter places the surface
+in front of the current view again. Synchronous map changes, initial/new-game
+maps, the VR tutorial, and saved-game loads first present a black `Loading...`
+frame and hold both compositor fade layers until a frame from the loaded state
+has actually been presented. All of these routes were exercised on PS VR2
+hardware. Cinematic images and scalable subtitles are rendered without opaque
+letterbox/subtitle bands so the image is not unnecessarily covered in the
+headset.
+
+## Haptic feedback
+
+The SteamVR action path routes semantic feedback to the logical controller
+hands. The initial profiles provide a subtle right-hand pulse for UI selection,
+object pickup/drop, successful item use, and melee impact; quick-light feedback
+is sent to the left hand; damage is sent to both hands. Per-event repeat limits
+filter transient contact jitter without reducing the strength of a valid pulse.
+The game log records each submitted event as
+`[VR haptics +... ms] ... (submitted)` so controller-side testing can distinguish a
+gameplay event that was generated from one that never reached SteamVR.
+
+## Hand pose data (grip / trigger)
+
+The action manifest exposes two skeleton actions, `/actions/global/in/left_skeleton`
+and `/actions/global/in/right_skeleton`, declared against `/skeleton/hand/{left,right}`
+and bound to `/user/hand/{left,right}/input/skeleton/{left,right}` in the PS VR2 Sense,
+Valve Index, and Touch profiles. Every frame the engine asks
+SteamVR for the *device* skeletal summary and turns the per-finger curl values
+(0 = straight, 1 = fully curled) into one normalized pair per hand:
+
+| Value | Source |
+| --- | --- |
+| `trigger` | Curl of the index finger |
+| `grip` | Strongest curl among middle, ring, and pinky |
+
+The summary lives on the tracked-hand state beside the pose (validity,
+velocity, and button data), so gameplay code never touches SteamVR directly.
+
+Start the game and check `hpl.log` for lines like
+`[VR hand +...ms] L grip 0.00 trigger 0.00 (skeleton).`, which are printed for
+each hand every 250 ms while a summary is valid. The expected PS VR2 Sense
+behaviour is:
+
+1. Open hand: grip ≈ 0, trigger ≈ 0.
+2. Squeeze the grip: grip rises while trigger stays ≈ 0.
+3. Pull R2: trigger rises.
+4. Release: both return to 0, identically on the left and right hand.
+
+Controllers without skeletal support (HTC Vive wands, and Windows Mixed
+Reality when it falls back to polling) have no skeleton binding, so their
+summary stays invalid and the hands keep their previous open pose. On the
+legacy polling path the summary is instead derived from the button state:
+grip becomes binary (0/1) while the trigger keeps its analog margin.
+
+The game-side hand animation (Open, Grab, and Trigger poses with blending) is
+the next step and consumes only these two values.
+
+## HTC Vive compatibility defaults
+
+The Vive binding preserves the historical layout:
+
+| Control | Gameplay | Menus and inventory |
+| --- | --- | --- |
+| Left trackpad | Move | — |
+| Right trackpad | Sprint | Drag/combine |
+| Left grip | Quick light | — |
+| Left trigger | Jump | — |
+| Left menu | Notebook | — |
+| Right trigger | Interact/use | Select |
+| Right grip | Inventory | Close |
+| Right menu | Examine | Back |
+
+Turn, button crouch, holster, pause, and recenter were introduced after the
+original Vive layout and are not assigned in the bundled compatibility profile.
+They can be mapped through SteamVR, but a revised Vive default should be tested
+on real hardware before distribution.
+
+## Valve Index defaults
+
+The bundled `knuckles` profile follows the PS VR2 scheme, adapted to the Index
+controllers. The left trackpad click is available as a recenter while the
+system button remains the pause control.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left trigger | Toggle the current quick light |
+| Right A | Jump |
+| Left B | Notebook |
+| Left A | Holster the equipped tool or weapon |
+| Right B | Examine |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Left system | Pause menu |
+| Left trackpad click | Recenter horizontal view |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 | Drag or combine |
+| Right B | Go back; in inventory, open an item's actions |
+| Right grip or Left B | Close the current screen |
+
+## Meta Quest and Oculus Touch defaults
+
+The bundled `oculus_touch` profile covers Quest 2/3/Pro and Rift controllers
+connected through SteamVR Link. There is no spare Create-style button on Touch,
+so the recenter action is left unassigned; it can be mapped through SteamVR.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left grip | Toggle the current quick light |
+| Right A | Jump |
+| Left X | Notebook |
+| Left Y | Holster the equipped tool or weapon |
+| Right B | Examine |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Left system / menu | Pause menu |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 | Drag or combine |
+| Right B | Go back; in inventory, open an item's actions |
+| Right grip or Left X | Close the current screen |
+
+## Windows Mixed Reality defaults
+
+The bundled `microsoft/motion_controller` profile uses the WMR joysticks as the
+primary movement inputs and keeps the trackpads for secondary functions. The
+left trackpad click recenters the view; the right trackpad click pauses.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left grip | Toggle the current quick light |
+| Left trigger | Jump |
+| Left menu | Notebook |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Right menu | Examine |
+| Right trackpad click | Pause menu |
+| Left trackpad click | Recenter horizontal view |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 (right stick click) | Drag or combine |
+| Right menu | Go back; in inventory, open an item's actions |
+| Right grip or Left menu | Close the current screen |
+
+## Runtime diagnostics
+
+On Windows, inspect `Documents/Penumbra Overture/Episode1/hpl.log` after closing the game. It reports one of these paths:
+
+- `SteamVR Input actions are active.` means the action manifest and controller binding are in use.
+- `Falling back to legacy controller polling.` means SteamVR Input could not provide active actions and the historical input path is being used.
+
+Controller poses use the logical left/right SteamVR pose actions, with the
+existing OpenVR tracked-device role loop retained as a compatibility fallback.
+The log reports when each action pose is acquired or lost. While a pose is
+invalid, the stale hand and its UI ray are hidden, spatial selection is blocked,
+and a held interaction is released cleanly. UI pointing falls back to the left
+hand if only the right pose is lost; non-spatial controls such as closing a
+screen remain available.
+
+## PS VR2 Bluetooth stability
+
+PS VR2 Sense controllers communicate with the PC independently over Bluetooth.
+A headset can therefore keep tracking normally while both hands disconnect. If
+SteamVR records `playstation_vr2: Send operation timed out. Closing device`, the
+failure is below the game input layer.
+
+Sony lists specific adapter and placement guidance. In particular, the TP-Link
+UB500/UB5A has a documented PS VR2 compatibility issue and requires TP-Link's
+PS VR2 stability driver rather than relying on an unrelated Windows-supplied
+package. TP-Link's global FAQ, updated on 30 September 2024, links
+`UB500_BT_1.9.1038.3020.zip`. Its signed INF includes the UB500 hardware ID
+`USB\VID_2357&PID_0604` and supersedes the `1.9.1038.3001` package still linked
+by the older Spanish localization of the same FAQ:
+
+- [PlayStation: Bluetooth adapters compatible with PS VR2 on PC](https://www.playstation.com/en-us/support/hardware/pc-ps-vr2-bluetooth/)
+- [TP-Link global: latest UB500/UB5A PS VR2 stability driver](https://www.tp-link.com/en/support/faq/4188/)
+- [TP-Link Spain: older localized version of the same FAQ](https://www.tp-link.com/es/support/faq/4188/)
+
+After changing the driver, restart Windows, pair both Sense controllers again,
+and use **PlayStation VR2 App → Check Bluetooth Connection Quality** before a
+gameplay test. Sony also recommends a USB 2.0 port away from USB 3.0 devices or
+an extension cable with clear line of sight to the controllers.

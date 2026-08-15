@@ -40,6 +40,7 @@ public:
 	void OnPostSceneDraw();
 	
 	void OnDraw();
+	void OnPostBufferSwap();
     
 	void Update(float afTimeStep);
 	
@@ -53,6 +54,9 @@ public:
 
 	void SetActive(bool abX);
 	bool IsActive(){ return mbActive;}
+	bool IsLoading(){ return mbLoading; }
+	void BeginMapLoad();
+	void FinishMapLoad(bool abShowContinueText);
 
 	void OnExit();
 private:
@@ -75,6 +79,10 @@ private:
 	float mfAlphaAdd;
 
 	bool mbActive;
+	bool mbLoading;
+	bool mbMapLoadPending;
+	bool mbLoadingFramePresented;
+	bool mbShowContinueText;
 };
 
 //---------------------------------------------

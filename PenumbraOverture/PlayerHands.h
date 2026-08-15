@@ -117,6 +117,8 @@ public:
     mlHandIndex = handIndex;
   }
 
+  void UpdateHandAnimation();
+
 protected:
 	virtual void ResetExtraData()=0;
 
@@ -124,6 +126,9 @@ protected:
 	virtual void DestroyExtraEntities(){}
 
 	virtual void PostSceneDraw(){}
+
+  void SetupHandAnimation();
+  void DestroyHandAnimation();
 
 	ePlayerHandType mType;
 
@@ -139,6 +144,9 @@ protected:
 	tString msNextModel;
 
   int mlHandIndex;
+
+  cAnimationState *mpHandAnimState[2];
+  bool mbHandRigSetup;
 };
 
 //------------------------------------------------

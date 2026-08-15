@@ -33,6 +33,7 @@
 #include "PlayerState_Misc_VR.h"
 #include "PlayerState_Misc.h"
 #include "PlayerState_Weapon.h"
+#include "VRHaptics.h"
 #include "PlayerState_Weapon_VR.h"
 
 #include "ButtonHandler.h"
@@ -59,6 +60,8 @@
 cPlayer::cPlayer(cInit *apInit)  : iUpdateable("Player")
 {
 	mpInit = apInit;
+	mpVRHandInteractionShape = NULL;
+	mpCharBody = NULL;
 
 	mpScene = apInit->mpGame->GetScene();
 	mpGraphics = apInit->mpGame->GetGraphics();
@@ -689,6 +692,9 @@ void cPlayer::Damage(float afDamage, ePlayerDamageType aType)
 	if(afDamage> 80) fSize = 4.0f;
 	mpDamage->Start(fSize,aType);
 
+	float fHapticStrength = 0.35f + cMath::Min(afDamage, 50.0f) / 50.0f * 0.65f;
+	cVRHaptics::Play(mpInit, eVRHapticEvent_Damage, eVRHapticHand_Both, fHapticStrength);
+
 	AddHealth(-afDamage);
 
 	if(mpInit->mbHasHaptics && aType == ePlayerDamageType_BloodSplash)
@@ -736,6 +742,36 @@ iPhysicsBody* cPlayer::GetPickedBody()
 void cPlayer::SetPickedBody(iPhysicsBody* apBody)
 {
 	mpPickRayCallback->mpPickedBody = apBody;
+}
+
+void cPlayer::ClearVRHandTarget(eVRHandIndex aHand)
+{
+	mVRHandTargets[aHand].Clear();
+	mHandCrossHairStates[aHand] = eCrossHairState_None;
+}
+
+void cPlayer::ClearVRHandTargetBody(iPhysicsBody *apBody)
+{
+	if(apBody == NULL) return;
+
+	for(int i = 0; i < eVRHandIndex_Count; ++i)
+	{
+		if(mVRHandTargets[i].mpBody == apBody)
+			ClearVRHandTarget((eVRHandIndex)i);
+		if(mVRHeldBodies[i] == apBody)
+			mVRHeldBodies[i] = NULL;
+	}
+}
+
+void cPlayer::SetVRHandTarget(eVRHandIndex aHand, iPhysicsBody *apBody,
+	const cVector3f& avPosition, float afDistance, eCrossHairState aCrossHairState)
+{
+	cVRHandTarget& target = mVRHandTargets[aHand];
+	target.mpBody = apBody;
+	target.mvPosition = avPosition;
+	target.mfDistance = afDistance;
+	target.mCrossHairState = aCrossHairState;
+	mHandCrossHairStates[aHand] = aCrossHairState;
 }
 
 //-----------------------------------------------------------------------
@@ -790,9 +826,27 @@ cPlayerExamineRayCallback* cPlayer::GetExamineRay()
 
 void cPlayer::DestroyWorldObjects()
 {
-	//Body
-	if(mpCharBody) mpScene->GetWorld3D()->GetPhysicsWorld()->DestroyCharacterBody(mpCharBody);
-	
+	cWorld3D *pWorld = mpScene != NULL ? mpScene->GetWorld3D() : NULL;
+	iPhysicsWorld *pPhysicsWorld = pWorld != NULL ? pWorld->GetPhysicsWorld() : NULL;
+
+	// Normal map transitions notify the player while the outgoing world is still
+	// valid, so explicitly remove the player-owned objects there. A full updater
+	// Reset follows a different ownership path: MapHandler destroys the complete
+	// world, and Player::Reset only forgets these non-owning handles.
+	if(mpVRHandInteractionShape != NULL)
+	{
+		if(pPhysicsWorld != NULL)
+			pPhysicsWorld->DestroyShape(mpVRHandInteractionShape);
+		mpVRHandInteractionShape = NULL;
+	}
+
+	if(mpCharBody != NULL)
+	{
+		if(pPhysicsWorld != NULL)
+			pPhysicsWorld->DestroyCharacterBody(mpCharBody);
+		mpCharBody = NULL;
+	}
+
 	//mpFlashLight->Destroy();
 	//mpGlowStick->Destroy();
 }
@@ -946,14 +1000,14 @@ void cPlayer::StopRun()
 
 void cPlayer::StartCrouch()
 {
-	// mvStates[mState]->OnStartCrouch();
+	mvStates[mState]->OnStartCrouch();
 }
 
 //-----------------------------------------------------------------------
 
 void cPlayer::StopCrouch()
 {
-	// mvStates[mState]->OnStopCrouch();
+	mvStates[mState]->OnStopCrouch();
 }
 
 //-----------------------------------------------------------------------
@@ -990,6 +1044,7 @@ void cPlayer::StartFlashLightButton()
 	if(mpInit->mpInventory->GetItem("flashlight")!=NULL)
 	{
 		mpFlashLight->SetActive(!mpFlashLight->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
 
 		if(mpFlashLight->IsActive())
 		{
@@ -1005,6 +1060,7 @@ void cPlayer::StartGlowStickButton()
 		mpInit->mpInventory->GetItem("glowst1")!=NULL)
 	{
 		mpGlowStick->SetActive(!mpGlowStick->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
 
 		if(mpGlowStick->IsActive())
 		{
@@ -1024,8 +1080,14 @@ void cPlayer::StartGlowStickButton()
 //-----------------------------------------------------------------------
 
 void cPlayer::OnWorldLoad()
-{	
+{
 	/////////////////////////////////////////////////////////
+	// Both hand queries reuse immutable collision geometry for the lifetime
+	// of this physics world instead of allocating a shape every frame.
+	if(mpVRHandInteractionShape == NULL)
+		mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
+			cVector3f(40.0f, 15.0f, 23.5f), NULL);
+
 	// Create body
 	// mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", mvSize);
   mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", cVector3f(mvSize.x * 0.5, 0.85f, mvSize.z * 0.5));
@@ -1084,6 +1146,12 @@ void cPlayer::OnWorldLoad()
 
 void cPlayer::OnWorldExit()
 {
+	for(int i = 0; i < eVRHandIndex_Count; ++i)
+	{
+		ClearVRHandTarget((eVRHandIndex)i);
+		mVRHeldBodies[i] = NULL;
+	}
+
 	DestroyWorldObjects();
 	
 	mpGroundRayCallback->OnWorldExit();
@@ -1462,10 +1530,11 @@ void cPlayer::Update(float afTimeStep)
       FootStep(0.8f);
     }
 
-    cVector3f headDelta = mpInit->mpGame->vr_head_view_mat.GetTranslation() - mpInit->mpGame->vr_old_head_view_mat.GetTranslation();
+    cVector3f headDelta = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation() - mpInit->mpGame->vr_old_head_tracking_pose.GetTranslation();
     headDelta.y = 0.0f;
+    headDelta = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(headDelta);
 
-    mpInit->mpGame->vr_old_head_view_mat = mpInit->mpGame->vr_head_view_mat;
+    mpInit->mpGame->vr_old_head_tracking_pose = mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
 
     if (headDelta.Length() != 0.0f) {
       vr_headPos += headDelta;
@@ -1476,11 +1545,43 @@ void cPlayer::Update(float afTimeStep)
       if (bodyDelta.Length() > 0.05f)
         bodyDelta = cMath::Vector3Normalize(bodyDelta) * 0.05f;
 
+      const cVector3f physicalMoveStart = mpCharBody->GetPosition();
+      const float requestedMoveLength = bodyDelta.Length();
       mpCharBody->vr_velocity = bodyDelta;
 
       mpCharBody->vr_stepstaticonly = true;
       mpCharBody->Update(afTimeStep);
       mpCharBody->vr_stepstaticonly = false;
+
+      // Do not let the tracking origin accumulate on the far side of solid
+      // geometry when room-scale head movement is rejected by the character
+      // collider. Without this correction a player could lean through a
+      // locked door, then use stick locomotion to pull the body through it.
+      if(requestedMoveLength > 0.0001f)
+      {
+        cVector3f acceptedMove = mpCharBody->GetPosition() - physicalMoveStart;
+        acceptedMove.y = 0.0f;
+        const cVector3f requestedDirection = bodyDelta / requestedMoveLength;
+        float acceptedAlongRequest = cMath::Vector3Dot(acceptedMove, requestedDirection);
+        if(acceptedAlongRequest < 0.0f) acceptedAlongRequest = 0.0f;
+        if(acceptedAlongRequest > requestedMoveLength)
+          acceptedAlongRequest = requestedMoveLength;
+
+        const float rejectedMove = requestedMoveLength - acceptedAlongRequest;
+        if(rejectedMove > 0.002f)
+        {
+          vr_headPos -= requestedDirection * rejectedMove;
+
+          static unsigned long lastHeadCollisionLog = 0;
+          const unsigned long now = GetApplicationTime();
+          if(now - lastHeadCollisionLog > 500)
+          {
+            Log(" [VR collision +%lu ms] blocked %.3f m of physical head movement.\n",
+              now, rejectedMove);
+            lastHeadCollisionLog = now;
+          }
+        }
+      }
     }
 
     // Now add input movement
@@ -1488,10 +1589,13 @@ void cPlayer::Update(float afTimeStep)
       cVector3f startMove = mpCharBody->GetPosition();
 
       if (plstate == ePlayerState_Move || plstate == ePlayerState_Push) {
-        mpCharBody->vr_velocity = vr_moveVec * afTimeStep * 0.5f;
+        mpCharBody->vr_velocity = vr_moveVec * afTimeStep * 0.5f *
+          mpInit->mVRSettings.GetMoveSpeed();
       }
       else {
-        mpCharBody->vr_velocity = vr_moveVec * afTimeStep * 1.5f * (mpInit->mpGame->vr_right_hand.GetButtonState().padPressed ? 1.5f : 1.0f);
+        mpCharBody->vr_velocity = vr_moveVec * afTimeStep * 1.5f *
+          mpInit->mVRSettings.GetMoveSpeed() *
+          (mpInit->mpGame->vr_input.GetState().sprint.pressed ? 1.5f : 1.0f);
       }
 
       mpCharBody->vr_velocity.y = 0.0f;
@@ -1509,23 +1613,24 @@ void cPlayer::Update(float afTimeStep)
 
     vr_headPos.y = mpCharBody->GetFeetPosition().y;
 
-    mpInit->mpGame->vr_player_pos = cMath::MatrixTranslate(vr_headPos);
+    mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
 
     mpCharBody->vr_velocity = cVector3f(0.0f, 0.0f, 0.0f);
   }
   else {
     // Not in a proper "body move". We should still move the head around, but don't move the body.
-    cVector3f headDelta = mpInit->mpGame->vr_head_view_mat.GetTranslation() - mpInit->mpGame->vr_old_head_view_mat.GetTranslation();
+    cVector3f headDelta = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation() - mpInit->mpGame->vr_old_head_tracking_pose.GetTranslation();
     headDelta.y = 0.0f;
+    headDelta = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(headDelta);
 
-    mpInit->mpGame->vr_old_head_view_mat = mpInit->mpGame->vr_head_view_mat;
+    mpInit->mpGame->vr_old_head_tracking_pose = mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
 
     if (headDelta.Length() != 0.0f) {
       vr_headPos += headDelta;
     }
 
     vr_headPos.y = mpCharBody->GetFeetPosition().y;
-    mpInit->mpGame->vr_player_pos = cMath::MatrixTranslate(vr_headPos);
+    mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
   }
 }
 
@@ -1556,7 +1661,13 @@ void cPlayer::Reset()
 	mfHeightAdd =0;
 
 	mfLookSpeed = 1.0f;
+	// A full updater reset is followed by MapHandler::Reset, which owns and
+	// destroys the complete outgoing physics world. Deleting individual objects
+	// here as well corrupts HPL1/Newton's world-owned lists when a new game is
+	// started from an existing session. Forget the handles before that teardown;
+	// OnWorldExit performs explicit destruction only for normal map transitions.
 	mpCharBody = NULL;
+	mpVRHandInteractionShape = NULL;
 	mpWeaponCallback = NULL;
 	mbUpdatingCollisionCallbacks = false;
 
@@ -1580,8 +1691,11 @@ void cPlayer::Reset()
 	//Callbacks
 	STLMapDeleteAll(m_mapCollideCallbacks);
 
-  for (int i = 0; i < 2; ++i)
-    mHandCrossHairStates[i] = eCrossHairState_None;
+  for (int i = 0; i < eVRHandIndex_Count; ++i)
+	{
+		ClearVRHandTarget((eVRHandIndex)i);
+		mVRHeldBodies[i] = NULL;
+	}
 	
 	//Helpers
 	mpDeath->Reset();

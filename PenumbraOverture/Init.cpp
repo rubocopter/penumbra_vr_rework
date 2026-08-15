@@ -315,6 +315,8 @@ bool cInit::Init(tString asCommandLine)
 	}
 #endif
 
+	mVRSettings.Load(mpConfig);
+
 	//Init is not done, so we do not know if it is okay.
 	if (gbUsingUserSettings) {
 		mpConfig->SetBool("Game","LastInitOK",false);
@@ -421,6 +423,7 @@ bool cInit::Init(tString asCommandLine)
 
 	pSetUp = hplNew( cSDLGameSetup, () );
 	mpGame = hplNew( cGame, ( pSetUp,Vars) );
+	ApplyVRSettings(false);
 
   mpGame->mbRenderToMonitor = mpConfig->GetBool("Game", "RenderToMonitor", false);
     
@@ -658,6 +661,25 @@ bool cInit::Init(tString asCommandLine)
 
 //-----------------------------------------------------------------------
 
+void cInit::ApplyVRSettings(bool abSave)
+{
+	if(mpGame != NULL)
+	{
+		mpGame->vr_input.SetMoveDeadZone(mVRSettings.GetMoveDeadZone());
+		mpGame->vr_tracking.SetHeightCalibration(mVRSettings.GetHeightOffset());
+		mpGame->GetScene()->SetVRMainUIDistance(mVRSettings.GetUIDistance());
+		mpGame->GetScene()->SetVRMainUIScale(mVRSettings.GetUIScale());
+	}
+
+	if(abSave && mpConfig != NULL)
+	{
+		mVRSettings.Save(mpConfig);
+		mpConfig->Save();
+	}
+}
+
+//-----------------------------------------------------------------------
+
 void cInit::ResetGame(bool abRunInitScript)
 {
 	mpGame->GetUpdater()->Reset();
@@ -813,6 +835,8 @@ void cInit::Exit()
 	mpConfig->SetBool("Graphics","LimitFPS",mpGame->GetLimitFPS());
 
 	mpConfig->SetInt("Graphics","Shadows",mpGame->GetGraphics()->GetRenderer3D()->GetShowShadows());
+	mpConfig->SetBool("Game", "RenderToMonitor", mpGame->mbRenderToMonitor);
+	mVRSettings.Save(mpConfig);
 		
 	Log(" Exit Effect Handler\n");
 	hplDelete( mpEffectHandler );
@@ -856,8 +880,6 @@ void cInit::Exit()
 
 	mpConfig->SetInt("Physics","PhysicsAccuracy",mPhysicsAccuracy);
 	mpConfig->SetFloat("Physics","UpdatesPerSec",mfPhysicsUpdatesPerSec);
-
-  mpConfig->SetBool("Game", "RenderToMonitor", mpGame->mbRenderToMonitor);
 
 	mpConfig->SetBool("Debug", "LogResources", mbLogResources);
 

@@ -115,8 +115,6 @@ private:
 	cTextureManager *mpTexManager;
 	cSoundHandler *mpSoundHandler;
 
-	iTexture *mpBlackTexture;
-
 	cIntroImage mvImages[INTRO_IMAGE_NUM];
 
 	float mfTimerCount;

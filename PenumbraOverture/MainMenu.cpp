@@ -60,6 +60,7 @@ static eMainMenuState gvMenuBackStates[] = {
 		eMainMenuState_OptionsControls,//eMainMenuState_OptionsKeySetupAction,
 		eMainMenuState_OptionsControls,//eMainMenuState_OptionsKeySetupMisc,
 
+		eMainMenuState_Options,//eMainMenuState_OptionsVRSettings,
 		eMainMenuState_Options,//eMainMenuState_GraphicsRestart,
 
 		eMainMenuState_Start,	//eMainMenuState_FirstStart,
@@ -238,12 +239,12 @@ void cMainMenuWidget_VRTutorial::OnMouseOver(bool abOver)
 
 void cMainMenuWidget_VRTutorial::OnMouseDown(eMButton aButton)
 {
+  if (aButton != eMButton_Left) return;
+
   mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui("gui_menu_click", false, 1);
 
-  mpInit->mpGame->GetUpdater()->SetContainer("Default");
-  mpInit->mpGame->GetScene()->SetDrawScene(true);
-
-  mpInit->mpMapHandler->Load("level00_00_vr_tutorial.dae", mpInit->msStartLink);
+  mpInit->mpMainMenu->SetActive(false);
+  mpInit->mpMapHandler->BeginInitialMapLoad("level00_00_vr_tutorial.dae", "link01");
 }
 
 //-----------------------------------------------------------------------
@@ -737,8 +738,6 @@ cMainMenuWidget_NewGame::cMainMenuWidget_NewGame(cInit *apInit, const cVector3f 
 
 void cMainMenuWidget_NewGame::OnMouseDown(eMButton aButton)
 {
-	mpInit->mpGraphicsHelper->DrawLoadingScreen("");
-	
 	mpInit->mpMainMenu->SetActive(false);
 	mpInit->ResetGame(true);
 
@@ -750,10 +749,7 @@ void cMainMenuWidget_NewGame::OnMouseDown(eMButton aButton)
 	}
 	else
 	{
-		mpInit->mpGame->GetUpdater()->SetContainer("Default");
-		mpInit->mpGame->GetScene()->SetDrawScene(true);
-		
-		mpInit->mpMapHandler->Load(	mpInit->msStartMap,mpInit->msStartLink);
+		mpInit->mpMapHandler->BeginInitialMapLoad(mpInit->msStartMap,mpInit->msStartLink);
 	}
 }
 
@@ -887,7 +883,6 @@ public:
 		tWString sFile = msDir + _W("/") + gvSaveGameFileVec[mlNum][mlSelected];
 
 		mpInit->mpMainMenu->SetActive(false);
-		mpInit->ResetGame(true);
 
 		mpInit->mpSaveHandler->LoadGameFromFile(sFile);
 	}
@@ -919,7 +914,6 @@ public:
 		tWString sFile = msDir + _W("/") + gvSaveGameFileVec[mlNum][lSelected];
 
 		mpInit->mpMainMenu->SetActive(false);
-		mpInit->ResetGame(true);
 
 		mpInit->mpSaveHandler->LoadGameFromFile(sFile);
 	}
@@ -1006,6 +1000,162 @@ cMainMenuWidget_Text *gpWidgetWeightForceScaleText = NULL;
 
 cMainMenuWidget_Text *gpUseTrackpadMovementText = NULL;
 cMainMenuWidget_Text *gpRenderToMonitorText = NULL;
+
+enum eVRMenuSetting
+{
+	eVRMenuSetting_TurnMode,
+	eVRMenuSetting_SnapAngle,
+	eVRMenuSetting_SmoothSpeed,
+	eVRMenuSetting_TurnDeadZone,
+	eVRMenuSetting_MoveSpeed,
+	eVRMenuSetting_MoveDeadZone,
+	eVRMenuSetting_CrouchMode,
+	eVRMenuSetting_PhysicalCrouchDepth,
+	eVRMenuSetting_HeightOffset,
+	eVRMenuSetting_UIDistance,
+	eVRMenuSetting_UIScale,
+	eVRMenuSetting_SubtitleScale,
+	eVRMenuSetting_LastEnum
+};
+
+cMainMenuWidget_Text *gpVRSettingTexts[eVRMenuSetting_LastEnum] = { NULL };
+
+static tWString GetVRSettingText(cInit *mpInit, eVRMenuSetting aSetting)
+{
+	char sValue[64];
+	const cVRSettings& settings = mpInit->mVRSettings;
+
+	switch(aSetting)
+	{
+	case eVRMenuSetting_TurnMode:
+		switch(settings.GetTurnMode())
+		{
+		case eVRTurnMode_Disabled: return kTranslate("MainMenu", "VRDisabled");
+		case eVRTurnMode_Smooth: return kTranslate("MainMenu", "VRSmooth");
+		default: return kTranslate("MainMenu", "VRSnap");
+		}
+	case eVRMenuSetting_SnapAngle:
+		sprintf_s(sValue, sizeof(sValue), "%.0f deg", settings.GetSnapTurnAngle());
+		break;
+	case eVRMenuSetting_SmoothSpeed:
+		sprintf_s(sValue, sizeof(sValue), "%.0f deg/s", settings.GetSmoothTurnSpeed());
+		break;
+	case eVRMenuSetting_TurnDeadZone:
+		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetTurnDeadZone() * 100.0f);
+		break;
+	case eVRMenuSetting_MoveSpeed:
+		sprintf_s(sValue, sizeof(sValue), "%.2fx", settings.GetMoveSpeed());
+		break;
+	case eVRMenuSetting_MoveDeadZone:
+		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetMoveDeadZone() * 100.0f);
+		break;
+	case eVRMenuSetting_CrouchMode:
+		switch(settings.GetCrouchMode())
+		{
+		case eVRCrouchMode_Physical: return kTranslate("MainMenu", "VRPhysical");
+		case eVRCrouchMode_Button: return kTranslate("MainMenu", "VRButton");
+		default: return kTranslate("MainMenu", "VRHybrid");
+		}
+	case eVRMenuSetting_PhysicalCrouchDepth:
+		sprintf_s(sValue, sizeof(sValue), "%.2f m", settings.GetPhysicalCrouchDepth());
+		break;
+	case eVRMenuSetting_HeightOffset:
+		sprintf_s(sValue, sizeof(sValue), "%+.2f m", settings.GetHeightOffset());
+		break;
+	case eVRMenuSetting_UIDistance:
+		sprintf_s(sValue, sizeof(sValue), "%.2f m", settings.GetUIDistance());
+		break;
+	case eVRMenuSetting_UIScale:
+		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetUIScale() * 100.0f);
+		break;
+	case eVRMenuSetting_SubtitleScale:
+		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetSubtitleScale() * 100.0f);
+		break;
+	default:
+		sValue[0] = '\0';
+		break;
+	}
+
+	return cString::To16Char(sValue);
+}
+
+class cMainMenuWidget_VRSetting : public cMainMenuWidget_Button
+{
+public:
+	cMainMenuWidget_VRSetting(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+		cVector2f avFontSize, eFontAlign aAlignment, eVRMenuSetting aSetting)
+		: cMainMenuWidget_Button(apInit, avPos, asText, eMainMenuState_LastEnum, avFontSize, aAlignment),
+		  mSetting(aSetting)
+	{
+		msTip = kTranslate("MainMenu", "TipVRAdjust");
+	}
+
+	void OnMouseDown(eMButton aButton)
+	{
+		const int direction = aButton == eMButton_Left ? 1 : (aButton == eMButton_Right ? -1 : 0);
+		if(direction == 0) return;
+
+		cVRSettings& settings = mpInit->mVRSettings;
+		switch(mSetting)
+		{
+		case eVRMenuSetting_TurnMode:
+		{
+			int mode = (int)settings.GetTurnMode() + direction;
+			if(mode < (int)eVRTurnMode_Disabled) mode = (int)eVRTurnMode_Smooth;
+			if(mode > (int)eVRTurnMode_Smooth) mode = (int)eVRTurnMode_Disabled;
+			settings.SetTurnMode((eVRTurnMode)mode);
+			break;
+		}
+		case eVRMenuSetting_SnapAngle:
+			settings.SetSnapTurnAngle(settings.GetSnapTurnAngle() + 15.0f * direction);
+			break;
+		case eVRMenuSetting_SmoothSpeed:
+			settings.SetSmoothTurnSpeed(settings.GetSmoothTurnSpeed() + 30.0f * direction);
+			break;
+		case eVRMenuSetting_TurnDeadZone:
+			settings.SetTurnDeadZone(settings.GetTurnDeadZone() + 0.05f * direction);
+			break;
+		case eVRMenuSetting_MoveSpeed:
+			settings.SetMoveSpeed(settings.GetMoveSpeed() + 0.25f * direction);
+			break;
+		case eVRMenuSetting_MoveDeadZone:
+			settings.SetMoveDeadZone(settings.GetMoveDeadZone() + 0.05f * direction);
+			break;
+		case eVRMenuSetting_CrouchMode:
+		{
+			int mode = (int)settings.GetCrouchMode() + direction;
+			if(mode < (int)eVRCrouchMode_Physical) mode = (int)eVRCrouchMode_Hybrid;
+			if(mode > (int)eVRCrouchMode_Hybrid) mode = (int)eVRCrouchMode_Physical;
+			settings.SetCrouchMode((eVRCrouchMode)mode);
+			break;
+		}
+		case eVRMenuSetting_PhysicalCrouchDepth:
+			settings.SetPhysicalCrouchDepth(settings.GetPhysicalCrouchDepth() + 0.05f * direction);
+			break;
+		case eVRMenuSetting_HeightOffset:
+			settings.SetHeightOffset(settings.GetHeightOffset() + 0.05f * direction);
+			break;
+		case eVRMenuSetting_UIDistance:
+			settings.SetUIDistance(settings.GetUIDistance() + 0.25f * direction);
+			break;
+		case eVRMenuSetting_UIScale:
+			settings.SetUIScale(settings.GetUIScale() + 0.10f * direction);
+			break;
+		case eVRMenuSetting_SubtitleScale:
+			settings.SetSubtitleScale(settings.GetSubtitleScale() + 0.10f * direction);
+			break;
+		default:
+			return;
+		}
+
+		gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
+		mpInit->ApplyVRSettings(true);
+		Log(" [VR settings +%lu ms] menu setting %d changed.\n", GetApplicationTime(), (int)mSetting);
+	}
+
+private:
+	eVRMenuSetting mSetting;
+};
 
 
 //-----------------------------------------------------------------------
@@ -1151,6 +1301,10 @@ public:
     mpInit->mpGame->mbRenderToMonitor = !mpInit->mpGame->mbRenderToMonitor;
     gpRenderToMonitorText->msText = mpInit->mpGame->mbRenderToMonitor ? kTranslate("MainMenu", "On") :
       kTranslate("MainMenu", "Off");
+	mpInit->mpConfig->SetBool("Game", "RenderToMonitor", mpInit->mpGame->mbRenderToMonitor);
+	mpInit->mpConfig->Save();
+	Log(" [VR settings +%lu ms] monitor mirror %s.\n", GetApplicationTime(),
+		mpInit->mpGame->mbRenderToMonitor ? "enabled" : "disabled");
   }
 };
 
@@ -2298,12 +2452,19 @@ void cMainMenu::OnDraw()
 	}
 
 	////////////////////////////////
-	// Draw mouse
+	// Draw mouse and a larger high-contrast target for motion-controller aim.
 	if(mpCurrentActionText) return;
 	cResourceImage *pImage = mpGfxMouse->GetMaterial()->GetImage(eMaterialTexture_Diffuse);
 	cVector2l vSize = pImage->GetSize();
 	cVector2f vPosAdd(((float)vSize.x) / 2.0f, ((float)vSize.y) / 2.0f);
 	mpDrawer->DrawGfxObject(mpGfxMouse,cVector3f(0,0,40)+(mvMousePos - vPosAdd));
+	if(mpInit->mpGame->pointerDrawActive)
+	{
+		mpTipFont->Draw(cVector3f(mvMousePos.x + 2,mvMousePos.y + 2,148),32,
+			cColor(0,0,0,1),eFontAlign_Center,_W("+"));
+		mpTipFont->Draw(cVector3f(mvMousePos.x,mvMousePos.y,149),28,
+			cColor(0.25f,0.85f,1.0f,1),eFontAlign_Center,_W("+"));
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -2509,51 +2670,12 @@ void cMainMenu::Update(float afTimeStep)
 		}
 	}
 
-  // For VR, use controller as laser pointer thing
-  // Get right hand and see if it's intersecting
-  auto handMat = mpInit->mpGame->vr_right_hand.GetMatrix();
-
-  auto handPos = handMat.GetTranslation();
-  auto handForward = cMath::Vector3Normalize(cMath::MatrixInverse(handMat.GetRotation()).GetForward()) * -1.0f;
-
-  // Make traces relative to the menu's position
-  cMatrixf uiMatrix = mpInit->mpGame->GetScene()->GetMainUIMatrix();
-
-  cVector2f scrSize = cVector2f(800 * 4.0f, 600 * 4.0f);
-
-  float points[] = {
-    0.0f, 0.0f, 0.0f,
-    0.0f, scrSize.y, 0.0f,
-    scrSize.x, 0.0f, 0.0f
-  };
-
-  for (int i = 0; i < 3; ++i) {
-    cVector3f res = cMath::MatrixMul(uiMatrix, cVector3f(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]));
-
-    points[i * 3] = res.x;
-    points[i * 3 + 1] = res.y;
-    points[i * 3 + 2] = res.z;
-  }
-
-  float t, u, v;
-
-  if (VRHelper::intersect_triangle(&handPos.v[0], &handForward.v[0], &points[0], &points[3], &points[6], &t, &u, &v)) {
-    if (t > 0) {
-      float x = v * scrSize.x;
-      float y = u * scrSize.y;
-
-      if (x <= 800 && y <= 600) {
-        float w = 1.0f - (u + v);
-
-        cVector3f t1 = cVector3f(points[0], points[1], points[2]);
-        cVector3f t2 = cVector3f(points[3], points[4], points[5]);
-        cVector3f t3 = cVector3f(points[6], points[7], points[8]);
-
-        mpInit->mpGame->pointerDrawEnd = t1 * w + t2 * u + t3 * v;
-
-        SetMousePos(cVector2f(x, y));
-      }
-    }
+  cVector2f pointerPos;
+  if(VRHelper::UpdateUIPointer(mpInit->mpGame,
+    mpInit->mpGame->GetScene()->GetMainUIMatrix(), false,
+    mvMousePos, &pointerPos))
+  {
+    SetMousePos(pointerPos);
   }
 }
 
@@ -2687,14 +2809,15 @@ void cMainMenu::SetActive(bool abX)
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Pause();
 
 			mbGameActive = true;
+			pSoundHandler->StopAllByName("gui_wind1");
 			pSoundHandler->PlayGui("gui_wind1",true,1);
 		}
 		else
 		{
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Play("music_theme.ogg",1,5.0f,false);
-			
-			if(pSoundHandler->IsPlaying("gui_rain1")==false)
-				pSoundHandler->PlayGui("gui_rain1",true,1);
+
+			pSoundHandler->StopAllByName("gui_rain1");
+			pSoundHandler->PlayGui("gui_rain1",true,1);
 			
 			mbGameActive = false;
 			mbFadeIn = true;
@@ -2728,6 +2851,7 @@ void cMainMenu::SetActive(bool abX)
 	}
 	else
 	{
+		mpInit->mpGame->pointerDrawActive = false;
 		if (!mpInit->mbFullScreen) {
 			mpInit->mpGame->GetInput()->GetLowLevel()->LockInput(true);
 		}
@@ -2739,16 +2863,14 @@ void cMainMenu::SetActive(bool abX)
 		
 		if(mpInit->mpMapHandler->GetCurrentMapName() != "")
 		{
-			if (pSoundHandler->IsPlaying("gui_wind1"))
-				pSoundHandler->Stop("gui_wind1");
+			pSoundHandler->StopAllByName("gui_wind1");
 
 			pSoundHandler->ResumeAll(eSoundDest_World | eSoundDest_Gui);
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Resume();
 		}
 		else
 		{
-			if (pSoundHandler->IsPlaying("gui_rain1"))
-				pSoundHandler->Stop("gui_rain1");
+			pSoundHandler->StopAllByName("gui_rain1");
 			mpInit->mpGame->GetSound()->GetMusicHandler()->Stop(0.3f);
 		}
 
@@ -3213,27 +3335,60 @@ void cMainMenu::CreateWidgets()
   AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
   vPos.y += 37;
 
-  //Buttons
-  // cMainMenuWidget *pVRUseTrackpadMovement = hplNew(cMainMenuWidget_UseTrackpadMovement, (mpInit, vPos, kTranslate("MainMenu", "VRTrackpadMovement"), 20, eFontAlign_Right));
-  // AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRUseTrackpadMovement);
-  // vPos.y += 29;
+  const eVRMenuSetting vVRSettingOrder[] = {
+	eVRMenuSetting_TurnMode,
+	eVRMenuSetting_SnapAngle,
+	eVRMenuSetting_SmoothSpeed,
+	eVRMenuSetting_TurnDeadZone,
+	eVRMenuSetting_MoveSpeed,
+	eVRMenuSetting_MoveDeadZone,
+	eVRMenuSetting_CrouchMode,
+	eVRMenuSetting_PhysicalCrouchDepth,
+	eVRMenuSetting_HeightOffset,
+	eVRMenuSetting_UIDistance,
+	eVRMenuSetting_UIScale,
+	eVRMenuSetting_SubtitleScale
+  };
+  const char *vVRSettingNames[] = {
+	"VRTurnMode",
+	"VRSnapAngle",
+	"VRSmoothSpeed",
+	"VRTurnDeadZone",
+	"VRMoveSpeed",
+	"VRMoveDeadZone",
+	"VRCrouchMode",
+	"VRPhysicalCrouchDepth",
+	"VRHeightOffset",
+	"VRUIDistance",
+	"VRUIScale",
+	"VRSubtitleScale"
+  };
 
-  cMainMenuWidget *pVRRenderToMonitor = hplNew(cMainMenuWidget_RenderToMonitor, (mpInit, vPos, kTranslate("MainMenu", "VRRenderToMonitor"), 20, eFontAlign_Right));
+  for(int i = 0; i < eVRMenuSetting_LastEnum; ++i)
+  {
+	const eVRMenuSetting setting = vVRSettingOrder[i];
+	cMainMenuWidget *pSetting = hplNew(cMainMenuWidget_VRSetting,
+		(mpInit, vPos, kTranslate("MainMenu", vVRSettingNames[i]), 16, eFontAlign_Right, setting));
+	AddWidgetToState(eMainMenuState_OptionsVRSettings, pSetting);
+
+	cVector3f vValuePos(vTextStart.x + 12, vPos.y, vPos.z);
+	gpVRSettingTexts[setting] = hplNew(cMainMenuWidget_Text,
+		(mpInit, vValuePos, GetVRSettingText(mpInit, setting), 16, eFontAlign_Left, pSetting));
+	AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRSettingTexts[setting]);
+	vPos.y += 21;
+  }
+
+  cMainMenuWidget *pVRRenderToMonitor = hplNew(cMainMenuWidget_RenderToMonitor,
+	(mpInit, vPos, kTranslate("MainMenu", "VRRenderToMonitor"), 16, eFontAlign_Right));
   AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRRenderToMonitor);
-  vPos.y += 29;
-
-  AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Button, (mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 25, eFontAlign_Center)));
-
-  vPos = cVector3f(vTextStart.x + 12, vTextStart.y + 37, vTextStart.z);
-
-  sText = mpInit->mpButtonHandler->mbUseTrackpadMovement ? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
-  // gpUseTrackpadMovementText = hplNew(cMainMenuWidget_Text, (mpInit, vPos, sText, 20, eFontAlign_Left, pVRUseTrackpadMovement));
-  // AddWidgetToState(eMainMenuState_OptionsVRSettings, gpUseTrackpadMovementText);
-  // vPos.y += 29;
-
   sText = mpInit->mpGame->mbRenderToMonitor ? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
-  gpRenderToMonitorText = hplNew(cMainMenuWidget_Text, (mpInit, vPos, sText, 20, eFontAlign_Left, pVRRenderToMonitor));
+  gpRenderToMonitorText = hplNew(cMainMenuWidget_Text,
+	(mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z), sText, 16, eFontAlign_Left, pVRRenderToMonitor));
   AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
+	vPos.y += 24;
+
+  AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Button,
+	(mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 20, eFontAlign_Center)));
 
 	///////////////////////////////////
 	// Options Controls

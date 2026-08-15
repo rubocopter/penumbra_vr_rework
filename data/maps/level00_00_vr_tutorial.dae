@@ -89428,7 +89428,7 @@
           </bind_material>
         </instance_geometry>
       </node>
-      <node id="_area_lockarea_lockarea" name="_area_lockarea_lockarea" sid="_area_lockarea_lockarea">
+      <node id="_area_script_lockarea" name="_area_script_lockarea" sid="_area_script_lockarea">
         <translate sid="translate">2.283791 1.290483 10.409181</translate>
         <rotate sid="rotateZ">0 0 1 0</rotate>
         <rotate sid="rotateY">0 1 0 89.999985</rotate>
