@@ -25,6 +25,9 @@ $requiredPaths = @(
     'data\vr\actions.json',
     'data\vr\bindings\psvr2_sense.json',
     'data\vr\bindings\vive_controller.json',
+    'data\vr\bindings\knuckles.json',
+    'data\vr\bindings\oculus_touch.json',
+    'data\vr\bindings\microsoft_motion_controller.json',
     'docs\INPUT_ARCHITECTURE.md',
     'scripts\deploy.ps1'
 )
@@ -400,6 +403,13 @@ if (($actionSetNames | Sort-Object -Unique).Count -ne $actionSetNames.Count) {
     throw 'Duplicate SteamVR action set names were found in data\vr\actions.json.'
 }
 
+foreach ($skeletonAction in @($actionManifest.actions | Where-Object { $_.type -eq 'skeleton' })) {
+    $expectedSkeleton = if ($skeletonAction.name -match '/in/left_') { '/skeleton/hand/left' } else { '/skeleton/hand/right' }
+    if ($skeletonAction.skeleton -ne $expectedSkeleton) {
+        throw "SteamVR action '$($skeletonAction.name)' must declare 'skeleton': '$expectedSkeleton' or SteamVR rejects the whole manifest."
+    }
+}
+
 foreach ($localization in $actionManifest.localization) {
     $localizedNames = @($localization.PSObject.Properties.Name)
     foreach ($requiredName in @($actionSetNames + $actionNames)) {
@@ -429,8 +439,18 @@ foreach ($defaultBinding in $actionManifest.default_bindings) {
         $bindingSet = $bindingSetProperty.Value
         foreach ($directBindingCollection in @('haptics', 'poses', 'skeleton')) {
             foreach ($directBinding in @($bindingSet.$directBindingCollection)) {
-                if ($null -ne $directBinding -and $actionNames -notcontains $directBinding.output) {
+                if ($null -eq $directBinding) {
+                    continue
+                }
+                if ($actionNames -notcontains $directBinding.output) {
                     throw "Unknown SteamVR action '$($directBinding.output)' in $bindingRelativePath."
+                }
+                if ($directBindingCollection -eq 'skeleton') {
+                    $handSuffix = if ($directBinding.output -match '/in/(left|right)_skeleton$') { $Matches[1] } else { '' }
+                    $expectedPath = if ($handSuffix) { "/user/hand/$handSuffix/input/skeleton/$handSuffix" } else { $null }
+                    if ($directBinding.path -ne $expectedPath) {
+                        throw "Invalid SteamVR skeleton device path '$($directBinding.path)' in $bindingRelativePath; expected '$expectedPath'."
+                    }
                 }
             }
         }
@@ -444,6 +464,37 @@ foreach ($defaultBinding in $actionManifest.default_bindings) {
                 if ($actionNames -notcontains $output) {
                     throw "Unknown SteamVR action '$output' in $bindingRelativePath."
                 }
+            }
+        }
+    }
+
+    $boundOutputs = @(
+        @($binding.bindings.PSObject.Properties | ForEach-Object { $_.Value.haptics }) |
+            ForEach-Object { if ($null -ne $_) { $_.output } }
+    ) + @(
+        @($binding.bindings.PSObject.Properties | ForEach-Object { $_.Value.poses }) |
+            ForEach-Object { if ($null -ne $_) { $_.output } }
+    ) + @(
+        @($binding.bindings.PSObject.Properties | ForEach-Object { $_.Value.sources }) |
+            ForEach-Object { if ($null -ne $_ -and $null -ne $_.inputs) { $_.inputs.PSObject.Properties.Value.output } }
+    )
+
+    $mandatoryActions = @($actionManifest.actions | Where-Object {
+        $_.PSObject.Properties.Name -contains 'requirement' -and $_.requirement -eq 'mandatory'
+    } | ForEach-Object { $_.name })
+    foreach ($mandatoryAction in $mandatoryActions) {
+        if ($boundOutputs -notcontains $mandatoryAction) {
+            throw "Mandatory SteamVR action '$mandatoryAction' has no input binding in $bindingRelativePath."
+        }
+    }
+
+    $skeletalControllerTypes = @('playstation_vr2_sense', 'knuckles', 'oculus_touch')
+    if ($defaultBinding.controller_type -in $skeletalControllerTypes) {
+        $skeletonOutputs = @($binding.bindings.PSObject.Properties | ForEach-Object { $_.Value.skeleton } |
+            ForEach-Object { if ($null -ne $_) { $_.output } })
+        foreach ($skeletonAction in @('/actions/global/in/left_skeleton', '/actions/global/in/right_skeleton')) {
+            if ($skeletonOutputs -notcontains $skeletonAction) {
+                throw "Skeletal controller type '$($defaultBinding.controller_type)' must bind '$skeletonAction' in $bindingRelativePath."
             }
         }
     }
