@@ -1913,11 +1913,11 @@ cPlayerVRHand::cPlayerVRHand(cInit *apInit, int index)
 
   if (index == 0) {
     hudModelName = "LeftHand";
-    mpInit->mpPlayerHands->AddModelFromFile("hud_object_hand_left.hud");
+    mpInit->mpPlayerHands->AddModelFromFile("hud_object_hand_left_rig.hud");
   }
   else {
     hudModelName = "Hand";
-    mpInit->mpPlayerHands->AddModelFromFile("hud_object_hand.hud");
+    mpInit->mpPlayerHands->AddModelFromFile("hud_object_hand_rig.hud");
   }
 
   mHandIndex = index;
