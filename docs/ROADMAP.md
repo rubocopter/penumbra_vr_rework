@@ -35,8 +35,7 @@ are now kept in sync by project validation.
 - [x] Keep independent left/right targets and held-body ownership in Penumbra gameplay state.
 - [x] Make R2 consume only the right-hand target and reuse hand-query collision geometry per world.
 - [x] Validate initial damage/melee haptics and repeat limiting on PS VR2 Sense hardware; continue tuning individual profiles.
-- [ ] Add and validate default bindings for additional common SteamVR controllers.
-- [x] Confirm the new action path on PS VR2 hardware.
+- [x] Add and validate default bindings for additional common SteamVR controllers.- [x] Confirm the new action path on PS VR2 hardware.
 - [x] Preserve the existing OpenVR compositor while the input path changes.
 - [x] Persist implemented VR settings separately from legacy desktop controls.
 
@@ -54,6 +53,15 @@ Controller commands now cross the engine/game boundary as semantic state
 (`interact`, `inventory`, `sprint`, `uiSelect`, and related intents). Vive-era
 button fields remain confined to raw legacy polling and are no longer used to
 transport SteamVR actions through gameplay code.
+
+Default bindings now also ship for Valve Index (`knuckles`), Meta Quest and
+Oculus Touch (`oculus_touch`), and Windows Mixed Reality
+(`microsoft/motion_controller`) controllers, following the PS VR2 control
+scheme. Project validation requires every default profile to cover the
+mandatory actions, and `check-project.ps1`/`package.ps1` require all five
+binding files. These new profiles are validated by the project checks and
+SteamVR's own binding UI; hardware testing on Index, Touch, and WMR hardware
+remains outstanding.
 
 ## Phase 2 — PS VR2 and comfort
 
@@ -110,6 +118,20 @@ forward. Menu/inventory pointing, localized action text, room-space UI,
 cinematic image rendering, and staged loading were also exercised. This closes
 the initial PS VR2 modernization milestone; the unchecked items above remain
 future comfort, controller-coverage, and rendering work.
+
+### VR hands — rig and basic animation (15 August 2026)
+
+- [x] Rebuild the HUD hand rigs so each joint pivots at its own mesh position (joints, bind matrices, per-vertex weights).
+- [x] Correct the COLLADA inverse bind matrix layout for both hands (translation into column 3); see `scripts/BINDFIX.md` and `scripts/DIAGNOSIS_FINAL.md`.
+- [x] Verify single-joint, hierarchical (thumb), palm-stability, and full grip/trigger poses against an engine-exact rigid-segment simulation (`scripts/verify_bind_fix.py`).
+- [x] Correct the runtime finger fold direction so both hands curl the fingers toward their own palm.
+- [x] Validate both hands on PS VR2 hardware: fingers pivot at their joints, palm stays stable, thumb follows the hierarchy, grip/trigger keep working, both hands render correctly.
+
+Known residual issues:
+
+- Ring/Middle share one fused tube in the source geometry, so their tips cannot spread independently.
+- The Index has a limited free tube between the palm and its first joint, which restricts its clean bend range.
+- Poses are still basic (grip/trigger blends only); per-finger curl shaping and finer grip profiles are future work.
 
 ## Phase 4 — OpenXR evaluation
 
