@@ -1958,12 +1958,16 @@ void cPlayerVRHand::Destroy()
 
 void cPlayerVRHand::Update(float afTimeStep)
 {
-  if (!mpInit->mpPlayerHands->GetCurrentModel(mHandIndex))
+  iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
+  if (pHandModel)
+  {
+    pHandModel->SetHandIndex(mHandIndex);
+  }
+
+  if (pHandModel == NULL)
   {
     mpInit->mpPlayerHands->SetCurrentModel(mHandIndex, hudModelName);
   }
-
-  mpInit->mpPlayerHands->GetCurrentModel(mHandIndex)->SetHandIndex(mHandIndex);
 }
 
 //-----------------------------------------------------------------------

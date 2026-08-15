@@ -83,6 +83,7 @@ iHudModel::iHudModel(ePlayerHandType aType)
 	mpHandAnimState[0] = NULL;
 	mpHandAnimState[1] = NULL;
 	mbHandRigSetup = false;
+	mlHandIndex = 0;
 }
 
 //-----------------------------------------------------------------------
@@ -198,7 +199,7 @@ void iHudModel::SetupHandAnimation()
 		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksBoneNames[i]);
 		if(lBoneIdx[i] < 0)
 		{
-			mbHandRigSetup = true;
+			mbHandRigSetup = false;
 			return;
 		}
 	}
@@ -728,6 +729,7 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 		}
 		else
 		{
+			pHandModel->SetHandIndex(alNum);
 			pHandModel->LoadEntities();
 			pHandModel->EquipEffect(true);
 
@@ -802,6 +804,7 @@ void cPlayerHands::OnWorldLoad()
 		iHudModel *pHudModel = mvCurrentHudModels[i];
 		if(pHudModel)
 		{
+			pHudModel->SetHandIndex(i);
 			pHudModel->LoadEntities();
 		}
 	}
