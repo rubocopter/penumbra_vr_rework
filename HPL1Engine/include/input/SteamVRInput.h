@@ -75,8 +75,7 @@ namespace hpl {
     bool Initialize();
     bool Update(eSteamVRInputContext context, TrackedController& leftHand, TrackedController& rightHand);
     void UpdateLegacyState(eSteamVRInputContext context,
-      const TrackedController::ButtonState& leftState,
-      const TrackedController::ButtonState& rightState);
+      TrackedController& leftHand, TrackedController& rightHand);
 
     bool IsAvailable() const { return mbAvailable; }
     bool IsUsingActions() const { return mbUsingActions; }
@@ -100,6 +99,9 @@ namespace hpl {
     bool ResolveAction(const char* path, vr::VRActionHandle_t& handle);
     bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
       const char* handName, bool& stateKnown, bool& wasValid);
+    void UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand, const char* handName);
+    void LogHandSummary(const TrackedController& hand, const char* handName, const char* source,
+      unsigned long& lastLogTime);
     cVRButtonState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
     void SuppressDigitalEdges(cVRButtonState& state) const;
@@ -146,6 +148,15 @@ namespace hpl {
     vr::VRActionHandle_t mRightPoseAction;
     vr::VRActionHandle_t mLeftHapticAction;
     vr::VRActionHandle_t mRightHapticAction;
+
+    vr::VRActionHandle_t mLeftSkeletonAction;
+    vr::VRActionHandle_t mRightSkeletonAction;
+    unsigned long mlLastLeftHandSummaryLog;
+    unsigned long mlLastRightHandSummaryLog;
+    unsigned long mlLastSkeletonErrorLog;
+    int mlLastSkeletonErrorCode;
+    int mlLastSkeletonFallbackCode;
+    bool mbSkeletonFallbackReported;
   };
 }
 

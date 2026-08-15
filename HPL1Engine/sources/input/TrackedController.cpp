@@ -50,6 +50,10 @@ void TrackedController::BeginPoseFrame() {
   device_index_ = vr::k_unTrackedDeviceIndexInvalid;
   velocity_ = cVector3f(0.0f);
   angular_velocity_ = cVector3f(0.0f);
+  hand_summary_.valid = false;
+  hand_summary_.grip = 0.0f;
+  hand_summary_.trigger = 0.0f;
+  for (int i = 0; i < vr::VRFinger_Count; ++i) hand_summary_.fingerCurl[i] = 0.0f;
 }
 
 void TrackedController::SetPose(const cMatrixf& matrix, const cVector3f& velocity,
@@ -170,4 +174,41 @@ void TrackedController::SetButtonState(const ButtonState& state) {
 
 TrackedController::ButtonState TrackedController::GetButtonState() {
   return button_state_;
+}
+
+void TrackedController::SetSkeletonSummary(const float fingerCurl[vr::VRFinger_Count]) {
+  hand_summary_.valid = true;
+  hand_summary_.grip = 0.0f;
+  hand_summary_.trigger = 0.0f;
+
+  for (int i = 0; i < vr::VRFinger_Count; ++i) {
+    float value = fingerCurl[i];
+    if (value < 0.0f) value = 0.0f;
+    else if (value > 1.0f) value = 1.0f;
+    hand_summary_.fingerCurl[i] = value;
+
+    if (i == vr::VRFinger_Index) {
+      hand_summary_.trigger = value;
+    }
+    else if (i != vr::VRFinger_Thumb) {
+      if (value > hand_summary_.grip) hand_summary_.grip = value;
+    }
+  }
+}
+void TrackedController::SetLegacySummary(float grip, float trigger) {
+  hand_summary_.valid = true;
+  if (grip < 0.0f) grip = 0.0f;
+  else if (grip > 1.0f) grip = 1.0f;
+  if (trigger < 0.0f) trigger = 0.0f;
+  else if (trigger > 1.0f) trigger = 1.0f;
+  hand_summary_.grip = grip;
+  hand_summary_.trigger = trigger;
+  for (int i = 0; i < vr::VRFinger_Count; ++i) hand_summary_.fingerCurl[i] = 0.0f;
+}
+
+void TrackedController::InvalidateHandSummary() {
+  hand_summary_.valid = false;
+  hand_summary_.grip = 0.0f;
+  hand_summary_.trigger = 0.0f;
+  for (int i = 0; i < vr::VRFinger_Count; ++i) hand_summary_.fingerCurl[i] = 0.0f;
 }

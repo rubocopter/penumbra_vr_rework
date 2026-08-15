@@ -39,7 +39,13 @@ namespace hpl {
       mLeftPoseAction(vr::k_ulInvalidActionHandle),
       mRightPoseAction(vr::k_ulInvalidActionHandle),
       mLeftHapticAction(vr::k_ulInvalidActionHandle),
-      mRightHapticAction(vr::k_ulInvalidActionHandle) {
+      mRightHapticAction(vr::k_ulInvalidActionHandle),
+      mLeftSkeletonAction(vr::k_ulInvalidActionHandle),
+      mRightSkeletonAction(vr::k_ulInvalidActionHandle),
+      mlLastLeftHandSummaryLog(0), mlLastRightHandSummaryLog(0),
+      mlLastSkeletonErrorLog(0),
+      mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
+      mbSkeletonFallbackReported(false) {
   }
 
   bool cSteamVRInput::Initialize() {
@@ -85,6 +91,9 @@ namespace hpl {
     resolved = ResolveAction("/actions/global/out/left_haptic", mLeftHapticAction) && resolved;
     resolved = ResolveAction("/actions/global/out/right_haptic", mRightHapticAction) && resolved;
 
+    resolved = ResolveAction("/actions/global/in/left_skeleton", mLeftSkeletonAction) && resolved;
+    resolved = ResolveAction("/actions/global/in/right_skeleton", mRightSkeletonAction) && resolved;
+
     if (!resolved) {
       Log(" SteamVR Input disabled: the action manifest is incomplete. Falling back to legacy controller polling.\n");
       return false;
@@ -127,6 +136,14 @@ namespace hpl {
     // authoritative controller identity whenever the pose action is active.
     UpdatePoseAction(mLeftPoseAction, leftHand, "left", mbLeftPoseStateKnown, mbLeftPoseWasValid);
     UpdatePoseAction(mRightPoseAction, rightHand, "right", mbRightPoseStateKnown, mbRightPoseWasValid);
+
+    // Per-hand skeletal summary drives future hand-pose animation (open, grab,
+    // trigger). Devices without skeletal support leave the summary invalid and
+    // keep their previous handling; the legacy path fills it from buttons.
+    UpdateSkeletonSummary(mLeftSkeletonAction, leftHand, "left");
+    UpdateSkeletonSummary(mRightSkeletonAction, rightHand, "right");
+    LogHandSummary(leftHand, "L", "skeleton", mlLastLeftHandSummaryLog);
+    LogHandSummary(rightHand, "R", "skeleton", mlLastRightHandSummaryLog);
 
     cVRInputState nextState;
     nextState.source = eVRInputSource_SteamVRActions;
@@ -244,8 +261,27 @@ namespace hpl {
   }
 
   void cSteamVRInput::UpdateLegacyState(eSteamVRInputContext context,
-    const TrackedController::ButtonState& leftState,
-    const TrackedController::ButtonState& rightState) {
+    TrackedController& leftHand, TrackedController& rightHand) {
+    const TrackedController::ButtonState& leftState = leftHand.GetButtonState();
+    const TrackedController::ButtonState& rightState = rightHand.GetButtonState();
+
+    // Skeletal data is not available on the fallback path: grip becomes a
+    // binary 0/1 button value while the trigger keeps its analog margin.
+    if (leftState.valid_) {
+      leftHand.SetLegacySummary(leftState.gripPressed ? 1.0f : 0.0f, leftState.triggerMargin);
+    }
+    else {
+      leftHand.InvalidateHandSummary();
+    }
+    if (rightState.valid_) {
+      rightHand.SetLegacySummary(rightState.gripPressed ? 1.0f : 0.0f, rightState.triggerMargin);
+    }
+    else {
+      rightHand.InvalidateHandSummary();
+    }
+    LogHandSummary(leftHand, "L", "legacy", mlLastLeftHandSummaryLog);
+    LogHandSummary(rightHand, "R", "legacy", mlLastRightHandSummaryLog);
+
     cVRInputState legacyState;
     legacyState.source = eVRInputSource_LegacyOpenVR;
     legacyState.context = context;
@@ -315,6 +351,69 @@ namespace hpl {
     }
 
     mState = legacyState;
+  }
+
+  void cSteamVRInput::UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand,
+    const char* handName) {
+    if (action == vr::k_ulInvalidActionHandle) {
+      hand.InvalidateHandSummary();
+      return;
+    }
+
+    vr::VRSkeletalSummaryData_t summary;
+    memset(&summary, 0, sizeof(summary));
+
+    const vr::EVRInputError error = vr::VRInput()->GetSkeletalSummaryData(
+      action, vr::VRSummaryType_FromDevice, &summary);
+    if (error == vr::VRInputError_None) {
+      mbSkeletonFallbackReported = false;
+      hand.SetSkeletonSummary(summary.flFingerCurl);
+      return;
+    }
+
+    // Some drivers expose the estimated hand pose only through the animation
+    // layer (e.g. controllers without finger tracking). Fall back to it so the
+    // hand summary still follows the physical buttons.
+    vr::VRSkeletalSummaryData_t animationSummary;
+    memset(&animationSummary, 0, sizeof(animationSummary));
+    const vr::EVRInputError animationError = vr::VRInput()->GetSkeletalSummaryData(
+      action, vr::VRSummaryType_FromAnimation, &animationSummary);
+    if (animationError == vr::VRInputError_None) {
+      if (!mbSkeletonFallbackReported || GetApplicationTime() - mlLastSkeletonErrorLog >= 5000) {
+        Log(" [VR input +%lu ms] %s skeleton summary via animation fallback (device error %d).\n",
+          GetApplicationTime(), handName, (int)error);
+        mlLastSkeletonErrorLog = GetApplicationTime();
+        mlLastSkeletonErrorCode = (int)error;
+        mbSkeletonFallbackReported = true;
+      }
+      hand.SetSkeletonSummary(animationSummary.flFingerCurl);
+      return;
+    }
+
+    if (GetApplicationTime() - mlLastSkeletonErrorLog >= 5000 &&
+      ((int)error != mlLastSkeletonErrorCode || (int)animationError != mlLastSkeletonFallbackCode)) {
+      Log(" [VR input +%lu ms] %s skeleton summary unavailable: device error %d, animation error %d.\n",
+        GetApplicationTime(), handName, (int)error, (int)animationError);
+      mlLastSkeletonErrorLog = GetApplicationTime();
+      mlLastSkeletonErrorCode = (int)error;
+      mlLastSkeletonFallbackCode = (int)animationError;
+      mbSkeletonFallbackReported = false;
+    }
+    hand.InvalidateHandSummary();
+  }
+
+  void cSteamVRInput::LogHandSummary(const TrackedController& hand, const char* handName,
+    const char* source, unsigned long& lastLogTime) {
+    const TrackedController::HandSummary& summary = hand.GetHandSummary();
+    if (!summary.valid) {
+      return;
+    }
+    if (GetApplicationTime() - lastLogTime < 250) {
+      return;
+    }
+    lastLogTime = GetApplicationTime();
+    Log(" [VR hand +%lu ms] %s grip %.2f trigger %.2f (%s).\n",
+      GetApplicationTime(), handName, summary.grip, summary.trigger, source);
   }
 
   bool cSteamVRInput::TriggerHaptic(eSteamVRHand hand, float durationSeconds, float frequency, float amplitude) {

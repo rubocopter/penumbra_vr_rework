@@ -233,8 +233,8 @@ void cButtonHandler::Update(float afTimeStep)
     mpInit->mpGame->vr_left_hand.UpdateButtonState();
     mpInit->mpGame->vr_input.UpdateLegacyState(
       vrInputContext,
-      mpInit->mpGame->vr_left_hand.GetButtonState(),
-      mpInit->mpGame->vr_right_hand.GetButtonState());
+      mpInit->mpGame->vr_left_hand,
+      mpInit->mpGame->vr_right_hand);
   }
 
   const cVRInputState& vrInput = mpInit->mpGame->vr_input.GetState();

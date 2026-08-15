@@ -9,6 +9,16 @@
       "type": "pose"
     },
     {
+      "name": "/actions/global/in/left_skeleton",
+      "type": "skeleton",
+      "skeleton": "/skeleton/hand/left"
+    },
+    {
+      "name": "/actions/global/in/right_skeleton",
+      "type": "skeleton",
+      "skeleton": "/skeleton/hand/right"
+    },
+    {
       "name": "/actions/global/in/recenter",
       "type": "boolean"
     },
@@ -110,6 +120,18 @@
     {
       "controller_type": "vive_controller",
       "binding_url": "bindings/vive_controller.json"
+    },
+    {
+      "controller_type": "knuckles",
+      "binding_url": "bindings/knuckles.json"
+    },
+    {
+      "controller_type": "oculus_touch",
+      "binding_url": "bindings/oculus_touch.json"
+    },
+    {
+      "controller_type": "microsoft/motion_controller",
+      "binding_url": "bindings/microsoft_motion_controller.json"
     }
   ],
   "localization": [
@@ -118,6 +140,8 @@
       "/actions/global": "Hands",
       "/actions/global/in/left_pose": "Left hand pose",
       "/actions/global/in/right_pose": "Right hand pose",
+      "/actions/global/in/left_skeleton": "Left hand skeleton",
+      "/actions/global/in/right_skeleton": "Right hand skeleton",
       "/actions/global/in/recenter": "Recenter view",
       "/actions/global/out/left_haptic": "Left hand haptics",
       "/actions/global/out/right_haptic": "Right hand haptics",
@@ -145,6 +169,8 @@
       "/actions/global": "Manos",
       "/actions/global/in/left_pose": "Posición de la mano izquierda",
       "/actions/global/in/right_pose": "Posición de la mano derecha",
+      "/actions/global/in/left_skeleton": "Esqueleto de la mano izquierda",
+      "/actions/global/in/right_skeleton": "Esqueleto de la mano derecha",
       "/actions/global/in/recenter": "Recentrar vista",
       "/actions/global/out/left_haptic": "Vibración de la mano izquierda",
       "/actions/global/out/right_haptic": "Vibración de la mano derecha",

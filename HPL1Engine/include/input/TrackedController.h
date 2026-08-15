@@ -47,6 +47,18 @@ namespace hpl {
       bool valid_;
     };
 
+struct HandSummary {
+      HandSummary()
+        : grip(0.0f), trigger(0.0f), valid(false) {
+        for (int i = 0; i < vr::VRFinger_Count; ++i) fingerCurl[i] = 0.0f;
+      }
+
+      float grip;
+      float trigger;
+      float fingerCurl[vr::VRFinger_Count];
+      bool valid;
+    };
+
     TrackedController();
     ~TrackedController();
 
@@ -73,6 +85,15 @@ namespace hpl {
     void SetButtonState(const ButtonState& state);
     ButtonState GetButtonState();
 
+    // Per-hand skeletal summary. grip/trigger are normalized 0..1 and are
+    // derived from the per-finger curls: trigger follows the index finger while
+    // grip follows the remaining curl (middle, ring, pinky). The raw curls are
+    // retained for future finger-level animation.
+    void SetSkeletonSummary(const float fingerCurl[vr::VRFinger_Count]);
+    void SetLegacySummary(float grip, float trigger);
+    void InvalidateHandSummary();
+    const HandSummary& GetHandSummary() const { return hand_summary_; }
+
   private:
     void InvalidateButtonState();
 
@@ -84,5 +105,6 @@ namespace hpl {
     cMatrixf matrix_;
     cVector3f velocity_;
     cVector3f angular_velocity_;
+    HandSummary hand_summary_;
   };
 }
