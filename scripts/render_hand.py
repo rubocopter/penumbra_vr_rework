@@ -26,7 +26,7 @@ GRIP = {
     'Index1': 0, 'Index2': 0, 'Index3': 0,
     'Thumb1': 40, 'Thumb2': 35, 'Thumb3': 0,
 }
-FINGER_AXIS = np.array([0.0, 0.0, 1.0])     # right hand
+FINGER_AXIS = np.array([0.0, 0.0, -1.0])     # right hand
 THUMB_AXIS = np.array([0.0, 0.8910, 0.4540])  # right hand
 
 
