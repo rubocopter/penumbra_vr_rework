@@ -97,7 +97,13 @@ of hard-coding one headset's layout.
 | --- | --- | --- |
 | PS VR2 Sense | Hardware-tested, 14 August 2026 | Gameplay/UI actions, repeated inventory transitions, all crouch modes, snap/smooth turn, recenter, pointer, tutorial/new/continue/load routes, pose loss and reconnection |
 | HTC Vive | Compatibility profile retained | Historical layout is represented in SteamVR Input but this rework has not yet been retested on Vive hardware |
-| Other SteamVR controllers | Not bundled yet | Create or select a community binding in SteamVR until native Touch/Index profiles are added |
+| Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme with recenter on the left trackpad click |
+| Meta Quest / Oculus Touch | Bundled default profile, not yet hardware-validated | `oculus_touch` profile follows the PS VR2 scheme; recenter is left unassigned for SteamVR mapping |
+| Windows Mixed Reality | Bundled default profile, not yet hardware-validated | `microsoft/motion_controller` profile keeps the WMR trackpads for pause and recenter |
+
+Every bundled profile must cover the mandatory actions (move, interact, and UI
+select) or the project validation fails. Custom bindings created in SteamVR
+replace these defaults per controller type without changing gameplay code.
 
 ## Persistent VR settings
 
@@ -163,6 +169,42 @@ The game log records each submitted event as
 `[VR haptics +... ms] ... (submitted)` so controller-side testing can distinguish a
 gameplay event that was generated from one that never reached SteamVR.
 
+## Hand pose data (grip / trigger)
+
+The action manifest exposes two skeleton actions, `/actions/global/in/left_skeleton`
+and `/actions/global/in/right_skeleton`, declared against `/skeleton/hand/{left,right}`
+and bound to `/user/hand/{left,right}/input/skeleton/{left,right}` in the PS VR2 Sense,
+Valve Index, and Touch profiles. Every frame the engine asks
+SteamVR for the *device* skeletal summary and turns the per-finger curl values
+(0 = straight, 1 = fully curled) into one normalized pair per hand:
+
+| Value | Source |
+| --- | --- |
+| `trigger` | Curl of the index finger |
+| `grip` | Strongest curl among middle, ring, and pinky |
+
+The summary lives on the tracked-hand state beside the pose (validity,
+velocity, and button data), so gameplay code never touches SteamVR directly.
+
+Start the game and check `hpl.log` for lines like
+`[VR hand +...ms] L grip 0.00 trigger 0.00 (skeleton).`, which are printed for
+each hand every 250 ms while a summary is valid. The expected PS VR2 Sense
+behaviour is:
+
+1. Open hand: grip ≈ 0, trigger ≈ 0.
+2. Squeeze the grip: grip rises while trigger stays ≈ 0.
+3. Pull R2: trigger rises.
+4. Release: both return to 0, identically on the left and right hand.
+
+Controllers without skeletal support (HTC Vive wands, and Windows Mixed
+Reality when it falls back to polling) have no skeleton binding, so their
+summary stays invalid and the hands keep their previous open pose. On the
+legacy polling path the summary is instead derived from the button state:
+grip becomes binary (0/1) while the trigger keeps its analog margin.
+
+The game-side hand animation (Open, Grab, and Trigger poses with blending) is
+the next step and consumes only these two values.
+
 ## HTC Vive compatibility defaults
 
 The Vive binding preserves the historical layout:
@@ -182,6 +224,103 @@ Turn, button crouch, holster, pause, and recenter were introduced after the
 original Vive layout and are not assigned in the bundled compatibility profile.
 They can be mapped through SteamVR, but a revised Vive default should be tested
 on real hardware before distribution.
+
+## Valve Index defaults
+
+The bundled `knuckles` profile follows the PS VR2 scheme, adapted to the Index
+controllers. The left trackpad click is available as a recenter while the
+system button remains the pause control.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left trigger | Toggle the current quick light |
+| Right A | Jump |
+| Left B | Notebook |
+| Left A | Holster the equipped tool or weapon |
+| Right B | Examine |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Left system | Pause menu |
+| Left trackpad click | Recenter horizontal view |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 | Drag or combine |
+| Right B | Go back; in inventory, open an item's actions |
+| Right grip or Left B | Close the current screen |
+
+## Meta Quest and Oculus Touch defaults
+
+The bundled `oculus_touch` profile covers Quest 2/3/Pro and Rift controllers
+connected through SteamVR Link. There is no spare Create-style button on Touch,
+so the recenter action is left unassigned; it can be mapped through SteamVR.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left grip | Toggle the current quick light |
+| Right A | Jump |
+| Left X | Notebook |
+| Left Y | Holster the equipped tool or weapon |
+| Right B | Examine |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Left system / menu | Pause menu |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 | Drag or combine |
+| Right B | Go back; in inventory, open an item's actions |
+| Right grip or Left X | Close the current screen |
+
+## Windows Mixed Reality defaults
+
+The bundled `microsoft/motion_controller` profile uses the WMR joysticks as the
+primary movement inputs and keeps the trackpads for secondary functions. The
+left trackpad click recenters the view; the right trackpad click pauses.
+
+### Gameplay
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move |
+| L3 (left stick click) | Sprint |
+| Right stick | Snap or smooth turn |
+| R3 (right stick click) | Toggle crouch |
+| Left grip | Toggle the current quick light |
+| Left trigger | Jump |
+| Left menu | Notebook |
+| Right trigger | Interact, or use the equipped tool or weapon |
+| Right grip | Inventory |
+| Right menu | Examine |
+| Right trackpad click | Pause menu |
+| Left trackpad click | Recenter horizontal view |
+
+### Menus and inventory
+
+| Control | Action |
+| --- | --- |
+| Left or right trigger | Select |
+| R3 (right stick click) | Drag or combine |
+| Right menu | Go back; in inventory, open an item's actions |
+| Right grip or Left menu | Close the current screen |
 
 ## Runtime diagnostics
 
