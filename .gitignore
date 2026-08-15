@@ -7,3 +7,6 @@
 *.user
 *.VC.db
 *.VC.opendb
+
+__pycache__/
+*.pyc
