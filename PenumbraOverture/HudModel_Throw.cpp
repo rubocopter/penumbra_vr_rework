@@ -90,38 +90,6 @@ void cHudModel_Throw::ResetExtraData()
 
 //-----------------------------------------------------------------------
 
-/*
-bool cHudModel_Throw::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
-{
-  auto vr_scaleMtx = cMath::MatrixScale(cVector3f(mfVrScale));
-  auto vr_rotMtx = cMath::MatrixRotate(mvVrRotOffset, eEulerRotationOrder_XYZ);
-
-  aPoseMtx = mpInit->mpGame->vr_right_hand.GetMatrix();
-
-  aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
-  aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
-
-  return true;
-
-  ///*
-	if(mbButtonDown)
-	{
-		mfChargeCount += afTimeStep / mfChargeTime; 
-		if(mfChargeCount > 1) mfChargeCount = 1;
-	}
-	else
-	{
-		mfChargeCount -= afTimeStep*4;
-		if(mfChargeCount < 0) mfChargeCount = 0;
-	}
-	
-	cMatrixf mtxA = mEquipPose.ToMatrix();
-	cMatrixf mtxB = mChargePose.ToMatrix();
-	aPoseMtx = cMath::MatrixSlerp(mfChargeCount,mtxA,mtxB,true);
-
-	return true;
-}
-*/
 
 //-----------------------------------------------------------------------
 

@@ -174,81 +174,6 @@ bool cHudModel_WeaponMelee::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeSte
   return result;
 }
 
-/*
-bool cHudModel_WeaponMelee::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
-{
-	////////////////////////
-	//Idle and waiting for movement
-  auto vr_scaleMtx = cMath::MatrixScale(cVector3f(mfVrScale));
-  auto vr_rotMtx = cMath::MatrixRotate(mvVrRotOffset, eEulerRotationOrder_XYZ);
-
-  aPoseMtx = mpInit->mpGame->vr_right_hand.GetMatrix();
- 
-  aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
-  aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
-
-  return true;
-
-  ///*
-	if(mlAttackState<=1)
-	{
-		return false;
-	}
-	////////////////////
-	//Movement
-	else
-	{
-		aPoseMtx = cMath::MatrixSlerp(mfTime,m_mtxPrevPose,m_mtxNextPose,true);
-		
-		float fMul = 1.0f;
-		//if(mlAttackState == 2 && mpInit->mDifficulty== eGameDifficulty_Easy) fMul = 1.6f;
-
-		mfTime += mfMoveSpeed * afTimeStep * fMul;
-		
-		//Attack
-		if(mlAttackState == 4 &&mfTime >= mvAttacks[mlCurrentAttack].mfTimeOfAttack && mbAttacked==false)
-		{
-			Attack();
-			mbAttacked = true;
-		}
-
-		//Time is up
-		if(mfTime >= 1.0f)
-		{
-			mfTime =1.0f;
-			
-
-			switch(mlAttackState)
-			{
-			case 2:
-				mlAttackState = 3;
-				break;
-			case 4:
-				mlAttackState = 5;
-				mbAttacked = false;
-
-				m_mtxPrevPose = m_mtxNextPose;
-				m_mtxNextPose = mEquipPose.ToMatrix();
-
-				mfMoveSpeed = 2;
-				mfTime =0;
-
-				break;
-			case 5:
-				if(mbButtonDown)	mlAttackState = 1;
-				else				mlAttackState = 0;
-								
-				break;
-			}
-
-		}
-
-		return true;
-	}
-
-	return false;
-}
-  */
 
 //-----------------------------------------------------------------------
 
@@ -467,40 +392,6 @@ void cHudModel_WeaponMelee::DestroyExtraEntities()
 
 void cHudModel_WeaponMelee::PostSceneDraw()
 {
-  /*
-  cVector3f weaponPos = GetEntity()->GetLocalPosition();
-
-	cCamera3D *pCamera = static_cast<cCamera3D*>(mpInit->mpGame->GetScene()->GetCamera());
-	float fAttackRange = mvAttacks[mlCurrentAttack].mfAttackRange;
-	
-	float fDamageRange = mvAttacks[mlCurrentAttack].mfDamageRange;	
-	cVector3f vCenter = weaponPos;
-
-  cMatrixf mtxDamage = cMath::MatrixTranslate(mvVRHBTransOffset);
-  mtxDamage = cMath::MatrixMul(cMath::MatrixMul(cMath::MatrixInverse(cMath::MatrixScale(mpInit->mpPlayerHands->GetCurrentModel(1)->mfVrScale)), GetEntity()->GetLocalMatrix().GetRotation()), mtxDamage);
-	mtxDamage = cMath::MatrixMul(cMath::MatrixTranslate(vCenter), mtxDamage);
-
-	bool bCollide=false;
-	{
-		cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
-		iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
-		
-		bCollide = pPhysicsWorld->CheckShapeWorldCollision(NULL,mpVrCollider,
-															mtxDamage,NULL,false,false,NULL,false);
-	} 
-
-	cMatrixf mtxCollider = cMath::MatrixMul(pCamera->GetViewMatrix(),mtxDamage);
-		
-	mpInit->mpGame->GetGraphics()->GetLowLevel()->SetMatrix(eMatrix_ModelView,mtxCollider);
-
-	
-	if(bCollide)
-		mpInit->mpGame->GetGraphics()->GetLowLevel()->DrawBoxMaxMin(mvVRHBDamageSize*0.5f, mvVRHBDamageSize*-0.5f,
-																cColor(0,1,0,1));
-	else
-		mpInit->mpGame->GetGraphics()->GetLowLevel()->DrawBoxMaxMin(mvVRHBDamageSize*0.5f, mvVRHBDamageSize*-0.5f,
-																cColor(1,0,1,1));
-  */
 }
 
 //-----------------------------------------------------------------------
@@ -755,38 +646,6 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 			bHit = true;
 		}
 	}
-  /*
-	////////////////////////////////////////////
-	//Check with ray and see a closer material can be found.
-	{
-		float fAttackRange = mvAttacks[mlCurrentAttack].mfAttackRange;
-
-		mRayCallback.Reset();
-    cVector3f checkDir = hitboxCenterPos - lastHitboxCenterPos;
-		cVector3f vRayStart = hitboxCenterPos;
-    cVector3f vRayEnd = hitboxCenterPos + checkDir * 0.25f;
-
-		pPhysicsWorld->CastRay(&mRayCallback,vRayStart,vRayEnd,true,true,true,false);
-
-		if(mRayCallback.mpClosestBody)
-		{
-			//Use ray cast to check hit as well
-			//Check first if body has not allready been hit.
-			if(m_setHitBodies.find(mRayCallback.mpClosestBody)==m_setHitBodies.end())
-			{
-				HitBody(mRayCallback.mpClosestBody);
-			}
-
-			float fDist = cMath::Vector3DistSqr(mRayCallback.mvPosition, pCamera->GetPosition());
-			if(fDist < fClosestHitDist)
-			{
-				fClosestHitDist = fDist;
-				vClosestHitPos = mRayCallback.mvPosition;
-				pClosestHitMat = mRayCallback.mpClosestBody->GetMaterial();
-			}
-		}
-	}
-  */
 		
 	////////////////////////////////////////////
 	//Check the closest material and play sounds and effects depending on it.

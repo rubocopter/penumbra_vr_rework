@@ -49,27 +49,6 @@ cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem)
 
 //-----------------------------------------------------------------------
 
-cMatrixf InterpolatePosesToMatrix(float afT, const cHudModelPose& aPoseA, 
-										   const cHudModelPose& aPoseB)
-{
-	cVector3f vPos = aPoseA.mvPos * (1- afT) + aPoseB.mvPos * afT;
-
-	cMatrixf mtxRotA = cMath::MatrixRotate(aPoseA.mvRot,eEulerRotationOrder_XYZ);
-	cMatrixf mtxRotB = cMath::MatrixRotate(aPoseB.mvRot,eEulerRotationOrder_XYZ);
-
-	cQuaternion qA; qA.FromRotationMatrix(mtxRotA);
-	cQuaternion qB; qB.FromRotationMatrix(mtxRotB);
-
-	cQuaternion qFinal = cMath::QuaternionSlerp(afT,qA,qB,true);
-
-	cMatrixf mtxFinal = cMath::MatrixQuaternion(qFinal);
-	mtxFinal.SetTranslation(vPos);
-
-	return mtxFinal;
-}
-
-//-----------------------------------------------------------------------
-
 //////////////////////////////////////////////////////////////////////////
 // HUD MODEL
 //////////////////////////////////////////////////////////////////////////
@@ -367,9 +346,6 @@ cPlayerHands::cPlayerHands(cInit *apInit)  : iUpdateable("FadeHandler")
 
 	mpMeshManager = mpInit->mpGame->GetResources()->GetMeshManager();
 
-	mlMaxPositions = 3;
-	mlMaxRotations = 16;
-
 	mlCurrentModelNum = 2;
 
 	for(int i=0; i< mlCurrentModelNum; ++i)
@@ -412,18 +388,6 @@ void cPlayerHands::OnStart()
 
 void cPlayerHands::Update(float afTimeStep)
 {
-	UpdatePrevPostions();
-	
-	///////////////////////////////////
-	//Get the camera properties
-	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
-	
-	cVector3f vRot = cVector3f(pCam->GetPitch(), pCam->GetYaw(),pCam->GetRoll());
-	cMatrixf mtxSmoothCam = 	cMath::MatrixRotate(vRot * -1.0f, eEulerRotationOrder_YXZ);
-	cVector3f vUp = mtxSmoothCam.GetUp();//pCam->GetUp();
-	cVector3f vRight = mtxSmoothCam.GetRight();//pCam->GetRight();
-	cVector3f vForward = mtxSmoothCam.GetForward()*-1.0f;//pCam->GetForward();
-	
 	/////////////////////////////////////
 	// Update the current model
 	for(int i=0; i< mlCurrentModelNum; ++i)
@@ -450,12 +414,6 @@ void cPlayerHands::Update(float afTimeStep)
 			{
         pHudModel->UpdatePoseMatrix(mtxPose, afTimeStep);
 
-				//if(pHudModel->UpdatePoseMatrix(mtxPose,afTimeStep)==false)
-				//{
-				//	 mtxPose = cMath::MatrixRotate(pHudModel->mEquipPose.mvRot,eEulerRotationOrder_XYZ);
-				//	 mtxPose.SetTranslation(pHudModel->mEquipPose.mvPos);
-				//}
-
 				break;
 			}
 			//Equip
@@ -465,33 +423,11 @@ void cPlayerHands::Update(float afTimeStep)
 
         pHudModel->mState = eHudModelState_Idle;
 
-        /*
-				float fT = cMath::Clamp(pHudModel->mfTime,0,1);
-				mtxPose = InterpolatePosesToMatrix(fT,pHudModel->mUnequipPose,pHudModel->mEquipPose);
-				
-				pHudModel->mfTime += afTimeStep/pHudModel->mfEquipTime;
-				if(pHudModel->mfTime >= 1)
-				{
-					pHudModel->mState = eHudModelState_Idle;
-					pHudModel->mfTime = 1;
-				}
-        */
-
 				break;
 			}
 			//Unequip
 			case eHudModelState_Unequip:
 				{
-          /*
-					float fT = cMath::Clamp(pHudModel->mfTime,0,1);
-					mtxPose = InterpolatePosesToMatrix(fT,pHudModel->mEquipPose,pHudModel->mUnequipPose);
-
-					pHudModel->mfTime += afTimeStep/pHudModel->mfUnequipTime;
-					if(pHudModel->mfTime >= 1)
-					{
-          */
-						//Log("Creating next model and destroying current!\n");
-
             pHudModel->mState = eHudModelState_Idle;
 						pHudModel->mfTime =0;
 						
@@ -506,34 +442,9 @@ void cPlayerHands::Update(float afTimeStep)
 						pHudModel->Reset();
 
 						continue;
-					//}
 					break;
 				}
 		}
-
-		
-		////////////////////
-		//Set rotation
-    /*
-		cMatrixf mtxTransform = cMath::MatrixMul( 
-								cMath::MatrixRotate(mvSmoothCameraRot, eEulerRotationOrder_XYZ),
-								mtxPose.GetRotation()
-											);
-
-		//pHudModel->mpEntity->SetMatrix(mtxRot);
-		
-		/////////////////////////
-		//Set position
-		const cVector3f &vLocalPos = mtxPose.GetTranslation();
-		cVector3f vRealLocalPos =	vUp *		vLocalPos.y + 
-									vRight *	vLocalPos.x +
-									vForward *	vLocalPos.z +
-									cVector3f(0,-mpInit->mpPlayer->GetHeadMove()->GetPos()*0.1f,0);;
-
-		mtxTransform.SetTranslation(pCam->GetPosition() + vRealLocalPos);
-		
-		pHudModel->mpEntity->SetMatrix(mtxTransform);
-    */
 
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
@@ -676,15 +587,12 @@ bool cPlayerHands::AddModelFromFile(const tString &asFile)
 
 void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 {
-	//Log("Setting current %d to '%s'\n",alNum,asName.c_str());
-	
 	//////////////////////////////////////////////
 	//Check so that it is not already equipped
 	if(mvCurrentHudModels[alNum] &&
 		cString::ToLowerCase(asName) == cString::ToLowerCase(mvCurrentHudModels[alNum]->msName) &&
 		mvCurrentHudModels[alNum]->mState == eHudModelState_Idle)
 	{
-		//Log(" model already active!\n");
 		return;
 	}
 	
@@ -715,8 +623,6 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 					mvCurrentHudModels[alNum]->mfTime = 1.0f - mvCurrentHudModels[alNum]->mfTime;
 				}
 				mvCurrentHudModels[alNum]->msNextModel = asName;
-				//Log(" Unequipping %s, time: %f\n",mvCurrentHudModels[alNum]->msName.c_str(),
-				//							mvCurrentHudModels[alNum]->mfTime);
 			}
 			else
 			{
@@ -756,11 +662,6 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 			mvCurrentHudModels[alNum]->mState = eHudModelState_Unequip;
 			mvCurrentHudModels[alNum]->mfTime = 1.0f - mvCurrentHudModels[alNum]->mfTime;
 			mvCurrentHudModels[alNum]->msNextModel = asName;
-			//Log(" Destroying old\n");
-		}
-		else
-		{
-			//Log("No old to destroy!!!\n");
 		}
 	}
 }
@@ -796,9 +697,6 @@ void cPlayerHands::OnWorldExit()
 
 void cPlayerHands::OnWorldLoad()
 {
-	mlstRotations.clear();
-	mlstPositions.clear();
-
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
 		iHudModel *pHudModel = mvCurrentHudModels[i];
@@ -808,56 +706,6 @@ void cPlayerHands::OnWorldLoad()
 			pHudModel->LoadEntities();
 		}
 	}
-}
-
-//-----------------------------------------------------------------------
-
-//////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS
-//////////////////////////////////////////////////////////////////////////
-
-//-----------------------------------------------------------------------
-void cPlayerHands::UpdatePrevPostions()
-{
-	///////////////////////////////////
-	//Get current position
-	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
-	cVector3f vCamRotation(pCam->GetPitch(),pCam->GetYaw(),0);
-	cVector3f vCamPosition = pCam->GetPosition();
-	
-	mlstRotations.push_back(vCamRotation);
-	mlstPositions.push_back(vCamPosition);
-
-	//Delete if there are too many values stored.
-	if((int)mlstPositions.size()> mlMaxPositions) mlstPositions.pop_front();
-	if((int)mlstRotations.size()> mlMaxRotations) mlstRotations.pop_front();
-	
-	///////////////////////////////////////
-	//Get the current camera postion and rotation
-	cVector3f vRotation(0,0,0);
-	cVector3f vPosition(0,0,0);
-	float fRotNum=0;
-	float fPosNum=0;
-
-	float fRotMulStart = 1.0f;
-	float fRotMulEnd = 0.1f;
-	float fSize = (float) mlstRotations.size();
-	//float fD = (fRotMulStart - fRotMulEnd) / fSize;
-	float fMul = 1.0f;//fRotMulEnd;
-
-	for(tVector3fListIt it = mlstRotations.begin(); it != mlstRotations.end(); ++it)
-	{
-		vRotation += *it * fMul; fRotNum+=fMul;
-		//fMul += fD;
-	}
-
-	for(tVector3fListIt it = mlstPositions.begin(); it != mlstPositions.end(); ++it)
-	{
-		vPosition += *it; fPosNum++;
-	}
-
-	mvSmoothCameraPos = vCamPosition;//vPosition / fPosNum;
-	mvSmoothCameraRot = vRotation / fRotNum;
 }
 
 //-----------------------------------------------------------------------

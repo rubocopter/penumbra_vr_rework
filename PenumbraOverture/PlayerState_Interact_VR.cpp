@@ -892,42 +892,6 @@ cPlayerState_Push_VR::cPlayerState_Push_VR(cInit *apInit,cPlayer *apPlayer) : iP
 
 void cPlayerState_Push_VR::OnUpdate(float afTimeStep)
 {	
-  /*
-	//////////////////////////////////////
-	// Check if player is close enough
-	cVector3f vEnd = mpPushBody->GetLocalPosition() + mvRelPickPoint;
-	cVector3f vStart = mpPlayer->GetCamera()->GetPosition();
-
-	float fDistance = cMath::Vector3Dist(vStart,vEnd);
-	if(fDistance > mpPlayer->mfCurrentMaxInteractDist*1.2f)
-	{
-		mpPlayer->ChangeState(mPrevState);
-		return;
-	}
-
-	//////////////////////////////////////
-	// Update player movement
-	cVector3f vPosAdd = mpPushBody->GetLocalPosition() - mvLastBodyPos;
-	//No need for the y value.
-	vPosAdd.y =0;
-
-	iPhysicsWorld *pPhysicsWorld = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
-	cVector3f vPlayerPos = mpPlayer->GetCharacterBody()->GetPosition() + vPosAdd;
-	//mpPlayer->GetCharacterBody()->SetPosition(vPlayerPos,true);
-
-	//Not really needed. character body should fix.
-	cVector3f vNewPos = vPlayerPos;
-	iPhysicsBody *pBody = mpPlayer->GetCharacterBody()->GetBody();
-	pPhysicsWorld->CheckShapeWorldCollision(&vNewPos,pBody->GetShape(), 
-										cMath::MatrixTranslate(vPlayerPos),
-										pBody,false, true, NULL,true);
-	
-	mpPlayer->GetCharacterBody()->SetPosition(vNewPos,true);
-
-
-
-	mvLastBodyPos = mpPushBody->GetLocalPosition();
-  */
 
   auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
 

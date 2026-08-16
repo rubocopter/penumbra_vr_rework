@@ -62,8 +62,6 @@ enum eHudModelState
 
 cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem);
 
-cMatrixf InterpolatePosesToMatrix(float afT, const cHudModelPose& aPoseA, const cHudModelPose& aPoseB);
-
 //------------------------------------------------
 
 class iHudModel
@@ -192,18 +190,8 @@ public:
 	iHudModel* GetCurrentModel(int alNum){ return mvCurrentHudModels[alNum];}
 
 private:
-	void UpdatePrevPostions();
-		
 	cInit *mpInit;
 	cMeshManager *mpMeshManager;
-
-	tVector3fList mlstPositions;
-	tVector3fList mlstRotations;
-	int mlMaxPositions;
-	int mlMaxRotations;
-
-	cVector3f mvSmoothCameraPos;
-	cVector3f mvSmoothCameraRot;
 
 	tHudModelMap m_mapHudModels;
 	iHudModel* mvCurrentHudModels[2];
