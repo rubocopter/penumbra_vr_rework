@@ -1042,12 +1042,13 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 		Log(" [VR comfort +%lu ms] VR crouch released.\n", GetApplicationTime());
 	}
 
-	// Physical crouching already moves the user's real viewpoint. A crouch
-	// requested by the button needs the move state's smoothed height offset as
-	// well, otherwise the smaller collider grants clearance without presenting
-	// the player at the corresponding lower eye height.
+// Physical crouching already moves the user's real viewpoint. A crouch
+	// requested by the button lowers the eye height by the configured crouch
+	// depth. The original game's move state camera drop (GetHeightAdd, about
+	// -0.7 m) is a full crouch, far deeper than intended in VR and a clipping
+	// hazard; the move state is still entered so the smaller collider applies.
 	const float postureOffset = mbVRCrouchApplied && !mbVRPhysicalCrouch
-		? mpPlayer->GetHeightAdd() : 0.0f;
+		? -mpInit->mVRSettings.GetPhysicalCrouchDepth() : 0.0f;
 	mpInit->mpGame->vr_tracking.SetPostureOffset(postureOffset);
 }
 
