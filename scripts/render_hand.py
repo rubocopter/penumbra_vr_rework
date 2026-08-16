@@ -20,13 +20,14 @@ RAD = np.pi / 180.0
 
 # runtime grab angles from PlayerHands.cpp (grip weight = 1)
 GRIP = {
-    'Middle1': 60, 'Middle2': 60, 'Middle3': 45,
-    'Ring1': 60, 'Ring2': 60, 'Ring3': 45,
-    'Little1': 55, 'Little2': 55, 'Little3': 40,
+    'Middle1': 70, 'Middle2': 70, 'Middle3': 50,
+    'Ring1': 70, 'Ring2': 70, 'Ring3': 50,
+    'Little1': 65, 'Little2': 65, 'Little3': 45,
     'Index1': 0, 'Index2': 0, 'Index3': 0,
-    'Thumb1': 40, 'Thumb2': 35, 'Thumb3': 0,
+    'Thumb1': 47, 'Thumb2': 40, 'Thumb3': 0,
 }
 FINGER_AXIS = np.array([0.0, 0.0, -1.0])     # right hand
+PINKY_AXIS = np.array([0.0, -0.2588, -0.9659])  # right hand, tilts toward palm centre
 THUMB_AXIS = np.array([0.0, 0.8910, 0.4540])  # right hand
 
 
@@ -95,11 +96,9 @@ def main():
     radii = fw.measure_radii(pos, joints, joint_pos)
     new_bone = fw.assign(pos, joints, joint_pos, radii)
 
-    # engine: boneWorld = inverse(M) as 4x4 (HPL1 m[] row-major)
-    bind_world = np.array([np.linalg.inv(ibm[i].reshape(4, 4)) for i in range(len(joints))])
-
+    # engine skinning (fixed layout): stored IBM = (I, -meshPos), animated bone
+    # world = (R_accum, meshPos); vertex' = meshPos + R_accum . (v - meshPos)
     parent = {idx['Hand_Root']: None}
-    # hierarchy from the visual scene (pure translate nodes)
     vs = root.find('.//c:visual_scene', fw.NS)
     def walk(node, p):
         name = node.get('name')
@@ -110,41 +109,35 @@ def main():
                 walk(ch, idx.get(name))
     walk(vs, None)
 
-    # bind local = inv(parentWorld) * world
-    def local_from_world(w, p):
-        if p is None:
-            return w
-        return np.linalg.inv(p) @ w
-
-    locs = [local_from_world(bind_world[i], bind_world[parent[i]] if parent[i] is not None else None)
-            for i in range(len(joints))]
-    bind_pos = locs.copy()
-
     def pose(deg_by_joint):
-        ws = []
+        racc = []
         for i in range(len(joints)):
             name = joints[i]
             deg = deg_by_joint.get(name, 0.0)
-            R = rmat(THUMB_AXIS if name.startswith('Thumb') else FINGER_AXIS, deg) if deg else np.eye(3)
-            T = np.eye(4); T[:3, :3] = R
-            T[3, :3] = bind_pos[i][3, :3]
-            if parent[i] is not None:
-                world = ws[parent[i]] @ T
-            else:
-                world = T
-            ws.append(world)
-        return ws
+            R = rmat(PINKY_AXIS if name.startswith('Little') else
+                     THUMB_AXIS if name.startswith('Thumb') else FINGER_AXIS, deg) if deg else np.eye(3)
+            racc.append(R if parent[i] is None else racc[parent[i]] @ R)
+        return racc
 
-    bind_ws = pose({j: 0.0 for j in joints})
-    grip_ws = pose(GRIP)
+    def skinm(racc, pos_of):
+        out = []
+        for i in range(len(joints)):
+            R = racc[i]
+            M = np.eye(4)
+            M[:3, :3] = R
+            M[3, :3] = pos_of[i] - R @ pos_of[i]
+            out.append(M)
+        return out
 
-    skinm = np.array([grip_ws[i] @ np.linalg.inv(bind_ws[i]) for i in range(len(joints))])
-    # weights from vertex_weights (vcount + v pairs: single weight per vertex,
-    # 'joint 0' pairs -> weight value 1.0)
+    racc_bind = pose({j: 0.0 for j in joints})
+    racc_grip = pose(GRIP)
+    ms_grip = skinm(racc_grip, joint_pos)
+
+    # weights: single (joint, weightIdx) pair per vertex, weight value 1.0
     pos_out = np.zeros_like(pos)
     for i, p in enumerate(pos):
         jidx = int(v[2 * i])
-        pos_out[i] = (skinm[jidx] @ np.append(p, 1.0))[:3]
+        pos_out[i] = (ms_grip[jidx] @ np.append(p, 1.0))[:3]
 
     # render
     import matplotlib

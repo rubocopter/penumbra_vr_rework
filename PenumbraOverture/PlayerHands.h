@@ -144,6 +144,7 @@ protected:
   int mlHandIndex;
 
   cAnimationState *mpHandAnimState[2];
+  int mlBoneIdx[15];
   bool mbHandRigSetup;
 };
 

@@ -27,6 +27,22 @@
 
 #include "VRHelper.hpp"
 
+static const char* ksFingerNames[] = {
+	"Middle","Middle","Middle",
+	"Ring","Ring","Ring",
+	"Little","Little","Little",
+	"Index","Index","Index",
+	"Thumb","Thumb","Thumb"
+};
+static const char* ksHandBoneNames[] = {
+	"Middle1","Middle2","Middle3",
+	"Ring1","Ring2","Ring3",
+	"Little1","Little2","Little3",
+	"Index1","Index2","Index3",
+	"Thumb1","Thumb2","Thumb3"
+};
+static const int lHandBoneNum = 15;
+
 //////////////////////////////////////////////////////////////////////////
 // HELP FUNCTIONS
 //////////////////////////////////////////////////////////////////////////
@@ -145,26 +161,27 @@ void iHudModel::SetupHandAnimation()
 {
 	if(mpEntity == NULL || mbHandRigSetup) return;
 
-	static const char* ksBoneNames[] = {
-		"Middle1","Middle2","Middle3",
-		"Ring1","Ring2","Ring3",
-		"Little1","Little2","Little3",
-		"Index1","Index2","Index3",
-		"Thumb1","Thumb2","Thumb3"
-	};
-	static const int lNumBones = 15;
+	const char* sHand = mlHandIndex == 0 ? "left" : "right";
+
+	Log(" [hand-rig] %s: entity has %d bone states\n", sHand, mpEntity->GetBoneStateNum());
+	for(int i=0; i< mpEntity->GetBoneStateNum(); ++i)
+	{
+		cBoneState *pBone = mpEntity->GetBoneState(i);
+		Log(" [hand-rig] %s: boneState[%d]='%s'\n", sHand, i, pBone->GetName());
+	}
 
 	//Own rotation per joint in degrees. Grab: middle/ring/little/thumb.
-	//Trigger: index. (Cumulative: Middle/Ring 60/120/165, Little 55/110/150,
-	//Index 55/110/155, Thumb 40/75.)
-	static const float kfGrabAngles[lNumBones] = {
-		60,60,45,	//Middle
-		60,60,45,	//Ring
-		55,55,40,	//Little
+	//Trigger: index. (Cumulative: Middle/Ring 70/140/190, Little 65/130/175,
+	//Index 55/110/155, Thumb 47/87. The grab angles are the previous values
+	//plus 35% of the difference towards a closed fist.)
+	static const float kfGrabAngles[lHandBoneNum] = {
+		70,70,50,	//Middle
+		70,70,50,	//Ring
+		65,65,45,	//Little
 		0,0,0,		//Index
-		40,35,0		//Thumb
+		47,40,0		//Thumb
 	};
-	static const float kfTriggerAngles[lNumBones] = {
+	static const float kfTriggerAngles[lHandBoneNum] = {
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
@@ -172,12 +189,15 @@ void iHudModel::SetupHandAnimation()
 		0,0,0		//Thumb
 	};
 
-	int lBoneIdx[lNumBones];
-	for(int i=0; i<lNumBones; ++i)
+	int lBoneIdx[lHandBoneNum];
+	for(int i=0; i<lHandBoneNum; ++i)
 	{
-		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksBoneNames[i]);
+		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksHandBoneNames[i]);
+		mlBoneIdx[i] = lBoneIdx[i];
 		if(lBoneIdx[i] < 0)
 		{
+			Log(" [hand-rig] %s: bone resolve FAILED for '%s' (idx=%d)\n",
+				sHand, ksHandBoneNames[i], lBoneIdx[i]);
 			mbHandRigSetup = false;
 			return;
 		}
@@ -186,6 +206,10 @@ void iHudModel::SetupHandAnimation()
 	const bool bLeft = (mlHandIndex == 0);
 	cVector3f vFingerAxis = cVector3f(0,0, bLeft ? 1.0f : -1.0f);
 	cVector3f vThumbAxis = cVector3f(0, 0.8910f, bLeft ? -0.4540f : 0.4540f);
+	//The little finger has its own axis, tilted ~15 deg so it curls slightly
+	//towards the palm centre (the shared finger axis would fold it straight
+	//down, past the ring finger, outside the palm radius).
+	cVector3f vPinkyAxis = cVector3f(0, -0.2588f, bLeft ? 0.9659f : -0.9659f);
 
 	static const char* ksPoseNames[] = { "HandGrab", "HandTrigger" };
 	static const float* kfPoseAngles[] = { kfGrabAngles, kfTriggerAngles };
@@ -195,16 +219,22 @@ void iHudModel::SetupHandAnimation()
 		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[p], "") );
 		pAnim->SetLength(0.001f);
 
-		for(int i=0; i<lNumBones; ++i)
+		for(int i=0; i<lHandBoneNum; ++i)
 		{
 			if(kfPoseAngles[p][i] == 0.0f) continue;
 
-			cAnimationTrack *pTrack = pAnim->CreateTrack(ksBoneNames[i], eAnimTransformFlag_Rotate);
+			cAnimationTrack *pTrack = pAnim->CreateTrack(ksHandBoneNames[i], eAnimTransformFlag_Rotate);
 			pTrack->SetNodeIndex(lBoneIdx[i]);
 
 			cKeyFrame *pFrame = pTrack->CreateKeyFrame(0);
-			cVector3f vAxis = (i >= 12) ? vThumbAxis : vFingerAxis;
+			cVector3f vAxis = (i >= 12) ? vThumbAxis : (i >= 6 && i < 9) ? vPinkyAxis : vFingerAxis;
 			pFrame->rotation = cQuaternion(cMath::ToRad(kfPoseAngles[p][i]), vAxis);
+
+			Log(" [hand-rig] %s: pose=%s finger=%s boneName=%s boneIndex=%d "
+				"axis=(%.4f,%.4f,%.4f) angle=%.1f appliedRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f)\n",
+				sHand, ksPoseNames[p], ksFingerNames[i], ksHandBoneNames[i], lBoneIdx[i],
+				vAxis.x, vAxis.y, vAxis.z, kfPoseAngles[p][i],
+				pFrame->rotation.w, pFrame->rotation.v.x, pFrame->rotation.v.y, pFrame->rotation.v.z);
 		}
 
 		mpHandAnimState[p] = mpEntity->AddAnimation(pAnim, ksPoseNames[p], 1.0f);
@@ -241,6 +271,48 @@ void iHudModel::UpdateHandAnimation()
 
 	mpHandAnimState[0]->SetWeight(fGrip);
 	mpHandAnimState[1]->SetWeight(fTrigger);
+
+	static float sfLastGrip[2] = { -1.0f, -1.0f };
+	static float sfLastTrigger[2] = { -1.0f, -1.0f };
+	static bool sbLogPending[2] = { false, false };
+
+	const char* sHand = mlHandIndex == 0 ? "left" : "right";
+	bool bGripChanged = cMath::Abs(fGrip - sfLastGrip[mlHandIndex]) > 0.02f;
+	bool bTriggerChanged = cMath::Abs(fTrigger - sfLastTrigger[mlHandIndex]) > 0.02f;
+	sfLastGrip[mlHandIndex] = fGrip;
+	sfLastTrigger[mlHandIndex] = fTrigger;
+
+	//Log one frame after a weight change so the engine bone states
+	//already reflect the new weights.
+	if(bGripChanged || bTriggerChanged)
+	{
+		Log(" [hand-rig] %s: grip=%.3f trigger=%.3f\n", sHand, fGrip, fTrigger);
+		sbLogPending[mlHandIndex] = true;
+	}
+	else if(sbLogPending[mlHandIndex])
+	{
+		sbLogPending[mlHandIndex] = false;
+		for(int i=0; i<lHandBoneNum; ++i)
+		{
+			if(mlBoneIdx[i] < 0) continue;
+			cBoneState *pState = mpEntity->GetBoneState(mlBoneIdx[i]);
+			if(pState == NULL) continue;
+
+			cQuaternion qRot;
+			qRot.FromRotationMatrix(pState->GetLocalMatrix().GetRotation());
+
+			float fAngle = cMath::ToDeg(2.0f * acos(cMath::Clamp(qRot.w, -1.0f, 1.0f)));
+			float fSin = sqrtf(1.0f - qRot.w * qRot.w);
+			cVector3f vAxis(0,0,0);
+			if(fSin > 0.0001f) vAxis = qRot.v / fSin;
+
+			float fWeight = (i >= 9 && i < 12) ? fTrigger : fGrip;
+			Log(" [hand-rig] %s: finger=%s boneName=%s boneIndex=%d weight=%.3f "
+				"engineRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f) engineAngle=%.1f engineAxis=(%.4f,%.4f,%.4f)\n",
+				sHand, ksFingerNames[i], ksHandBoneNames[i], mlBoneIdx[i], fWeight,
+				qRot.w, qRot.v.x, qRot.v.y, qRot.v.z, fAngle, vAxis.x, vAxis.y, vAxis.z);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------

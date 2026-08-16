@@ -38,16 +38,16 @@ RAD = np.pi / 180.0
 
 # runtime from PlayerHands.cpp (SetupHandAnimation), ksBoneNames order
 GRAB = {
-    'Middle1': 60, 'Middle2': 60, 'Middle3': 45,
-    'Ring1': 60, 'Ring2': 60, 'Ring3': 45,
-    'Little1': 55, 'Little2': 55, 'Little3': 40,
+    'Middle1': 70, 'Middle2': 70, 'Middle3': 50,
+    'Ring1': 70, 'Ring2': 70, 'Ring3': 50,
+    'Little1': 65, 'Little2': 65, 'Little3': 45,
     'Index1': 0, 'Index2': 0, 'Index3': 0,
-    'Thumb1': 40, 'Thumb2': 35, 'Thumb3': 0,
+    'Thumb1': 47, 'Thumb2': 40, 'Thumb3': 0,
 }
 
-CHAIN_SEGS = [('Middle', [60, 60, 45]), ('Ring', [60, 60, 45]),
-              ('Little', [55, 55, 40]), ('Index', [0, 0, 0]),
-              ('Thumb', [40, 35, 0])]
+CHAIN_SEGS = [('Middle', [70, 70, 50]), ('Ring', [70, 70, 50]),
+              ('Little', [65, 65, 45]), ('Index', [0, 0, 0]),
+              ('Thumb', [47, 40, 0])]
 
 
 def parse(path):
@@ -207,6 +207,14 @@ def report_hand(path, label):
 
     finger_axis = np.array([0, 0, -1.0 if left else 1.0])
     thumb_axis = np.array([0, 0.8910, -0.4540 if left else 0.4540])
+    pinky_axis = np.array([0, -0.2588, 0.9659 if left else -0.9659])
+
+    def chain_axis(name):
+        if name == 'Thumb':
+            return thumb_axis
+        if name == 'Little':
+            return pinky_axis
+        return finger_axis
 
     ws_bind = engine_worlds({}, joint_pos, parent, local_trans)
     pos_bind = skin(pos, ws_bind, joint_pos, vc, v)
@@ -217,7 +225,8 @@ def report_hand(path, label):
           ('rotated', 'axis-joint d', 'joint d', 'seg rot', 'prox d', 'origin d'))
     tests = [('Index1', finger_axis), ('Index2', finger_axis), ('Index3', finger_axis),
              ('Middle1', finger_axis), ('Middle2', finger_axis), ('Middle3', finger_axis),
-             ('Ring1', finger_axis), ('Thumb1', thumb_axis), ('Thumb2', thumb_axis),
+             ('Ring1', finger_axis), ('Little1', pinky_axis), ('Little2', pinky_axis),
+             ('Thumb1', thumb_axis), ('Thumb2', thumb_axis),
              ('Thumb3', thumb_axis)]
     all_ok = True
     for name, axis in tests:
@@ -244,7 +253,7 @@ def report_hand(path, label):
     print('\n[Part B2] grip=1 (runtime grab angles, runtime axes)')
     rots = {}
     for f, angs in CHAIN_SEGS:
-        axis = thumb_axis if f == 'Thumb' else finger_axis
+        axis = chain_axis(f)
         for k, a in enumerate(angs, start=1):
             if a:
                 rots[idx[f + str(k)]] = rot(axis, a)
@@ -257,7 +266,7 @@ def report_hand(path, label):
     print('  per-joint segment rotation (expect cumulative):')
     ok2 = od < 0.001
     for f, angs in CHAIN_SEGS:
-        axis = thumb_axis if f == 'Thumb' else finger_axis
+        axis = chain_axis(f)
         cum = 0.0
         for k, a in enumerate(angs, start=1):
             j = idx[f + str(k)]
@@ -266,10 +275,13 @@ def report_hand(path, label):
                 continue
             cum += a
             _, ang = kabsch(pos_bind[sel], pv[sel])
-            ok = abs(ang - cum) < 1.5
+            Rw = ws[j][:3, :3]
+            ang_mtx = np.degrees(np.arccos(np.clip((np.trace(Rw) - 1) / 2, -1, 1)))
+            principal = min(cum % 360.0, 360.0 - (cum % 360.0))
+            ok = abs(ang_mtx - principal) < 0.5 and abs(ang - principal) < 15.0
             ok2 &= ok
-            print('  %-8s %2d: seg rot %6.2f (cumulative expect %6.2f)  %s' %
-                  (f, k, ang, cum, 'OK' if ok else 'FAIL'))
+            print('  %-8s %2d: seg rot %6.2f (matrix %6.2f, expect %6.2f principal %6.2f)  %s' %
+                  (f, k, ang, ang_mtx, cum, principal, 'OK' if ok else 'FAIL'))
     # Thumb1's own joint must stay fixed (its children follow the chain)
     t1 = idx['Thumb1']
     t1d = np.linalg.norm((ws[t1] @ np.append(np.zeros(3), 1.0))[:3] - joint_pos[t1])

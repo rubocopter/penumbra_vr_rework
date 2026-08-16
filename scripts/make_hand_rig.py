@@ -517,7 +517,7 @@ def main():
     print("  // RIGHT: (0.0000, 0.8910, 0.4540)   LEFT: (0.0000, 0.8910, -0.4540)")
     print()
     print("Animation angles are CUMULATIVE totals per bone (own rotation = diff):")
-    print("  grip:     Middle/Ring 60/120/165 (own 60/60/45); Little 55/110/150 (55/55/40); Thumb 40/75 (40/35)")
+    print("  grip:     Middle/Ring 70/140/190 (own 70/70/50); Little 65/130/175 (65/65/45); Thumb 47/87 (47/40)")
     print("  trigger:  Index 55/110/155 (own 55/55/45)")
     print("  index:    Index 60/120/165 (own 60/60/45)")
 
