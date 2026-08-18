@@ -429,7 +429,6 @@ public:
 
 	//Haptic
 	bool mbGrabbingMoveBody;
-	bool mbProxyTouching;
 	float mfHapticTorqueMul;
 
 	bool mbDamageFromPos;

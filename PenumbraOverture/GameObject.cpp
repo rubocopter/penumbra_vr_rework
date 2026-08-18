@@ -478,13 +478,7 @@ cGameObject::~cGameObject(void)
 
 void cGameObject::OnPlayerPick()
 {
-	if(	mvCallbackScripts[eGameEntityScriptType_PlayerInteract] && 
-		// mpInit->mpPlayer->GetPickedDist() < mfMaxInteractDist && 
-		mpInit->mpPlayer->mbProxyTouching)
-	{
-		mpInit->mpPlayer->SetCrossHairState(eCrossHairState_Active);
-	}
-	else if(mInteractMode == eObjectInteractMode_Static && msDescription==_W(""))
+	if(mInteractMode == eObjectInteractMode_Static && msDescription==_W(""))
 	{
 		if(mpInit->mpPlayer->GetState() == ePlayerState_InteractMode)
 			mpInit->mpPlayer->SetCrossHairState(eCrossHairState_Inactive);
@@ -510,7 +504,7 @@ void cGameObject::OnPlayerInteract()
 		return;
 	}
 
-	if(mpInit->mbHasHaptics && mpInit->mpPlayer->mbProxyTouching==false) return;
+	if(mpInit->mbHasHaptics) return;
 
 	switch(mInteractMode)
 	{

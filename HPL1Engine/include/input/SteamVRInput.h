@@ -17,12 +17,6 @@ namespace hpl {
     eSteamVRHand_Right
   };
 
-  enum eVRInputSource {
-    eVRInputSource_None,
-    eVRInputSource_SteamVRActions,
-    eVRInputSource_LegacyOpenVR
-  };
-
   struct cVRButtonState {
     cVRButtonState() : active(false), pressed(false), justPressed(false), justReleased(false) {}
 
@@ -37,12 +31,8 @@ namespace hpl {
   // historical OpenVR polling fallback.
   struct cVRInputState {
     cVRInputState()
-      : source(eVRInputSource_None), context(eSteamVRInputContext_Gameplay),
-        moveActive(false), moveX(0.0f), moveY(0.0f),
+      : moveActive(false), moveX(0.0f), moveY(0.0f),
         turnActive(false), turnX(0.0f) {}
-
-    eVRInputSource source;
-    eSteamVRInputContext context;
 
     bool moveActive;
     float moveX;
@@ -78,11 +68,8 @@ namespace hpl {
       TrackedController& leftHand, TrackedController& rightHand);
 
     bool IsAvailable() const { return mbAvailable; }
-    bool IsUsingActions() const { return mbUsingActions; }
     const cVRInputState& GetState() const { return mState; }
-    const tString& GetManifestPath() const { return msManifestPath; }
     void SetMoveDeadZone(float deadZone);
-    float GetMoveDeadZone() const { return mfMoveDeadZone; }
 
     bool TriggerHaptic(eSteamVRHand hand, float durationSeconds, float frequency, float amplitude);
 
@@ -100,8 +87,6 @@ namespace hpl {
     bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
       const char* handName, bool& stateKnown, bool& wasValid);
     void UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand, const char* handName);
-    void LogHandSummary(const TrackedController& hand, const char* handName, const char* source,
-      unsigned long& lastLogTime);
     cVRButtonState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
     void SuppressDigitalEdges(cVRButtonState& state) const;
@@ -151,8 +136,6 @@ namespace hpl {
 
     vr::VRActionHandle_t mLeftSkeletonAction;
     vr::VRActionHandle_t mRightSkeletonAction;
-    unsigned long mlLastLeftHandSummaryLog;
-    unsigned long mlLastRightHandSummaryLog;
     unsigned long mlLastSkeletonErrorLog;
     int mlLastSkeletonErrorCode;
     int mlLastSkeletonFallbackCode;

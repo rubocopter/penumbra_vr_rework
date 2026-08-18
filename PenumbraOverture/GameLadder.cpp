@@ -22,7 +22,7 @@
 #include "Init.h"
 #include "MapHandler.h"
 #include "Player.h"
-#include "PlayerState_Misc.h"
+#include "PlayerState_Misc_VR.h"
 
 #include "GlobalInit.h"
 
@@ -149,7 +149,7 @@ void cGameLadder::OnPlayerInteract()
 
 		///////////////////////////////
 		//Set state
-		cPlayerState_Climb* pState = static_cast<cPlayerState_Climb*>(mpInit->mpPlayer->GetStateData(ePlayerState_Climb));
+		cPlayerState_Climb_VR* pState = static_cast<cPlayerState_Climb_VR*>(mpInit->mpPlayer->GetStateData(ePlayerState_Climb));
 		pState->mpLadder = this;
 		pState->mvStartPosition = mtxPos.GetTranslation();
 

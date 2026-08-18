@@ -384,8 +384,8 @@ void iGameEntity::PlayerInteract()
 	//////////////////////
 	// Script stuff
 	//if(GetPickedDistance() <= mfMaxInteractDist &&
-  if (
-		(mpInit->mbHasHaptics==false || mpInit->mpPlayer->mbProxyTouching || 
+if (
+		(mpInit->mbHasHaptics==false || 
 		 mType == eGameEntityType_Area))
 	{
 		cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();

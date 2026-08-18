@@ -344,74 +344,10 @@ void iHudModel::UpdateHandAnimation()
 					(vTip - vHand).x, (vTip - vHand).y, (vTip - vHand).z, fGrip);
 			}
 		}
-
-		//Temporary tip probe (right hand): where the Middle3/Ring3 fingertips
-		//land during the grab pose, measured from a distal mesh-tip proxy.
-		//Logging only; remove once the grab re-tuning is done.
-		if(mlHandIndex == 1)
-		{
-			const int lPalmIdx = mpEntity->GetBoneStateIndex("Palm");
-			cBoneState *pPalm = (lPalmIdx >= 0) ? mpEntity->GetBoneState(lPalmIdx) : NULL;
-			cVector3f vPalmPos = pPalm ? pPalm->GetWorldMatrix().GetTranslation() : cVector3f(0, 0, 0);
-
-			//Distal tip offsets in the tip bone's local frame (right-hand model
-			//hud_object_hand_rig.dae, bind pose, model units): the farthest bind
-			//vertex weighted to the tip bone, projected onto the distal segment
-			//axis (Middle2->Middle3 / Ring2->Ring3). The bone bind rotations are
-			//identity, so the local offset equals the model-space offset from the
-			//joint to the fingertip.
-			static const cVector3f kfMiddleTipOffset(0.794f, 0.016f, -0.180f);
-			static const cVector3f kfRingTipOffset(0.949f, -0.025f, 0.162f);
-
-			for(int t=0; t<2; ++t)
-			{
-				const int lIdx0 = (t == 0) ? mlBoneIdx[0] : mlBoneIdx[3];
-				const int lIdx1 = (t == 0) ? mlBoneIdx[1] : mlBoneIdx[4];
-				const int lIdx2 = (t == 0) ? mlBoneIdx[2] : mlBoneIdx[5];
-				const char* sFinger = (t == 0) ? "Middle" : "Ring";
-				if(lIdx2 < 0) continue;
-
-				cBoneState *pTip = mpEntity->GetBoneState(lIdx2);
-				if(pTip == NULL) continue;
-
-				const cMatrixf mTipWorld = pTip->GetWorldMatrix();
-				const cVector3f vJointWorld = mTipWorld.GetTranslation();
-				const cVector3f vTipWorld = cMath::MatrixMul(mTipWorld,
-					(t == 0) ? kfMiddleTipOffset : kfRingTipOffset);
-				cVector3f vTipPalmLocal = cVector3f(0, 0, 0);
-				if(pPalm)
-				{
-					vTipPalmLocal = cMath::MatrixMul(cMath::MatrixInverse(pPalm->GetWorldMatrix()), vTipWorld);
-				}
-
-				float fAngles[3] = { 0.0f, 0.0f, 0.0f };
-				const int lJoints[3] = { lIdx0, lIdx1, lIdx2 };
-				for(int j=0; j<3; ++j)
-				{
-					if(lJoints[j] < 0) continue;
-					cBoneState *pJoint = mpEntity->GetBoneState(lJoints[j]);
-					if(pJoint == NULL) continue;
-					cQuaternion qRot;
-					qRot.FromRotationMatrix(pJoint->GetLocalMatrix().GetRotation());
-					fAngles[j] = cMath::ToDeg(2.0f * acos(cMath::Clamp(qRot.w, -1.0f, 1.0f)));
-				}
-
-				Log(" [hand-rig] %s: tipProbe finger=%s boneName=%s boneIndex=%d "
-					"grip=%.3f angles=(%.1f,%.1f,%.1f) "
-					"jointWorld=(%.3f,%.3f,%.3f) tipWorld=(%.3f,%.3f,%.3f) "
-					"tipPalmLocal=(%.3f,%.3f,%.3f) oldJointDistance=%.3f\n",
-					sHand, sFinger, ksHandBoneNames[(t == 0) ? 2 : 5], lIdx2, fGrip,
-					fAngles[0], fAngles[1], fAngles[2],
-					vJointWorld.x, vJointWorld.y, vJointWorld.z,
-					vTipWorld.x, vTipWorld.y, vTipWorld.z,
-					vTipPalmLocal.x, vTipPalmLocal.y, vTipPalmLocal.z,
-					pPalm ? (vJointWorld - vPalmPos).Length() : -1.0f);
-			}
-		}
 	}
 }
 
-//-----------------------------------------------------------------------
+	//-----------------------------------------------------------------------
 
 void iHudModel::SetVisible(bool visible) {
   mpEntity->SetVisible(visible);

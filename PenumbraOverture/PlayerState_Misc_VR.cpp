@@ -336,7 +336,7 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
       auto ofs = crosshairMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
       tVertexVec vtx;
-      vtx.reserve(4);
+      vtx.resize(4);
 
       cColor color(1.0f, 1.0f);
 

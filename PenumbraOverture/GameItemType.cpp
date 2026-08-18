@@ -28,8 +28,7 @@
 #include "Notebook.h"
 #include "GameItem.h"
 
-#include "PlayerState_Weapon.h"
-#include "PlayerState_WeaponHaptX.h"
+#include "PlayerState_Weapon_VR.h"
 #include "HudModel_Weapon.h"
 #include "HudModel_Throw.h"
 #include "VRHaptics.h"
@@ -387,85 +386,11 @@ bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum
 			
 			cHudModel_WeaponMelee *pMeleeHud =  static_cast<cHudModel_WeaponMelee*>(pHudModel);
 
-			cPlayerState_WeaponMelee *pMeleeState = static_cast<cPlayerState_WeaponMelee*>(pState);
+			cPlayerState_WeaponMelee_VR *pMeleeState = static_cast<cPlayerState_WeaponMelee_VR*>(pState);
 			pMeleeState->SetHudWeapon(pMeleeHud);
 			
 			//change state to melee
 			mpInit->mpPlayer->ChangeState(ePlayerState_WeaponMelee);
-		}
-	}
-
-	return true;
-}
-
-
-//-----------------------------------------------------------------------
-
-//////////////////////////////////////////////////////////////////////////
-// WEAPON MELEE HAPTX 
-//////////////////////////////////////////////////////////////////////////
-
-//-----------------------------------------------------------------------
-
-cGameItemType_WeaponMeleeHaptX::cGameItemType_WeaponMeleeHaptX(cInit *apInit)
-: cGameItemType(apInit)
-{
-	mvActions.resize(1);
-	mvActions[0] = kTranslate("Inventory", "Equip");
-
-	mvNonDropActions.resize(1);
-	mvNonDropActions[0] = kTranslate("Inventory", "Equip");
-}
-
-//-----------------------------------------------------------------------
-
-bool cGameItemType_WeaponMeleeHaptX::OnAction(cInventoryItem *apItem, int alActionNum)
-{
-	//////////////
-	//Equip
-	if(alActionNum == 0)
-	{
-		//Make sure the model is loaded
-		if(mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName())==NULL)
-			mpInit->mpPlayerHands->AddModelFromFile(apItem->GetHudModelFile());
-
-		iHudModel *pHudModel = mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName());
-		if(pHudModel==NULL){
-			Error("Hud model with name '%s' does not exist!\n",apItem->GetHudModelName().c_str());
-			return true;
-		}
-		cHudModel_WeaponMelee *pMeleeHud =  static_cast<cHudModel_WeaponMelee*>(pHudModel);
-
-		
-		iPlayerState *pState = mpInit->mpPlayer->GetStateData(ePlayerState_WeaponMelee);
-		cPlayerState_WeaponMeleeHaptX *pMeleeState = static_cast<cPlayerState_WeaponMeleeHaptX*>(pState);
-
-
-		if(mpInit->mpPlayer->GetState() == ePlayerState_WeaponMelee && pMeleeState->GetHudWeapon() == pMeleeHud)
-		{
-			mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
-			//pMeleeState->SetHudWeapon(NULL);
-		}
-		else
-		{				
-			if(mpInit->mbHasHaptics==false) mpInit->mpPlayerHands->SetCurrentModel(1, apItem->GetHudModelName());
-
-			if(mpInit->mpPlayer->GetState() == ePlayerState_WeaponMelee)
-			{
-				mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
-			}
-
-			//////////////////////////
-			//Set up the melee state
-			iPlayerState *pState = mpInit->mpPlayer->GetStateData(ePlayerState_WeaponMelee);
-
-			cPlayerState_WeaponMeleeHaptX *pMeleeState = static_cast<cPlayerState_WeaponMeleeHaptX*>(pState);
-			pMeleeState->SetHudWeapon(pMeleeHud);
-			
-			//change state to melee
-			mpInit->mpPlayer->ChangeState(ePlayerState_WeaponMelee);
-
-			mpInit->mpInventory->SetActive(false);
 		}
 	}
 
@@ -523,7 +448,7 @@ bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 			//////////////////////////
 			//Set up the throw state
 			iPlayerState *pState = mpInit->mpPlayer->GetStateData(ePlayerState_Throw);
-			cPlayerState_Throw *pThrowState = static_cast<cPlayerState_Throw*>(pState);
+			cPlayerState_Throw_VR *pThrowState = static_cast<cPlayerState_Throw_VR*>(pState);
 
 			cHudModel_Throw *pHud =  static_cast<cHudModel_Throw*>(pHudModel);
 			pHud->SetItem(apItem);

@@ -538,12 +538,6 @@ namespace hpl {
 				
 				fNumOfTimes++;
 			}
-
-			//if(cMemoryManager::GetLogCreation())
-			//{
-				//cMemoryManager::SetLogCreation(false);
-				//Log("----\nCreations made: %d\n------\n",cMemoryManager::GetCreationCount());
-			//}
 		}
 		Log("--------------------------------------------------------\n\n");
 	

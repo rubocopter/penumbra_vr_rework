@@ -1,7 +1,5 @@
 #pragma once
 
-#pragma once
-
 #include "math/Math.h"
 #include "openvr.h"
 
@@ -9,9 +7,9 @@ namespace hpl {
   class TrackedController {
   public:
     struct ButtonState {
-      ButtonState(bool valid = false)
+ButtonState(bool valid = false)
         : touchX(0.0f), touchY(0.0f),
-          touchContact(false), touchJustContacted(false), touchJustReleased(false),
+          touchContact(false),
           padPressed(false), padJustPressed(false), padJustReleased(false),
           gripPressed(false), gripJustPressed(false), gripJustReleased(false),
           triggerMargin(0.0f), triggerPressed(false), triggerJustPressed(false), triggerJustReleased(false),
@@ -23,8 +21,6 @@ namespace hpl {
       float touchY;
 
       bool touchContact;
-      bool touchJustContacted;
-      bool touchJustReleased;
 
       bool padPressed;
       bool padJustPressed;
@@ -63,7 +59,6 @@ struct HandSummary {
     ~TrackedController();
 
     void SetMatrix(const cMatrixf& matrix);
-    cMatrixf GetLastMatrix();
     cMatrixf GetMatrix();
 
     void SetVelocity(const cVector3f& velocity);
@@ -82,7 +77,6 @@ struct HandSummary {
     vr::TrackedDeviceIndex_t GetDeviceIndex() const { return device_index_; }
 
     void UpdateButtonState();
-    void SetButtonState(const ButtonState& state);
     ButtonState GetButtonState();
 
     // Per-hand skeletal summary. grip/trigger are normalized 0..1 and are
@@ -97,11 +91,9 @@ struct HandSummary {
   private:
     void InvalidateButtonState();
 
-    uint32_t last_packet_;
     ButtonState button_state_;
     vr::TrackedDeviceIndex_t device_index_;
     bool pose_valid_;
-    cMatrixf last_matrix_;
     cMatrixf matrix_;
     cVector3f velocity_;
     cVector3f angular_velocity_;

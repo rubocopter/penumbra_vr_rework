@@ -24,15 +24,8 @@
 #include "MapHandler.h"
 #include "PlayerMoveStates.h"
 
-#include "PlayerState_InteractHaptX.h"
-#include "PlayerState_MiscHaptX.h"
-#include "PlayerState_WeaponHaptX.h"
-
 #include "PlayerState_Interact_VR.h"
-#include "PlayerState_Interact.h"
 #include "PlayerState_Misc_VR.h"
-#include "PlayerState_Misc.h"
-#include "PlayerState_Weapon.h"
 #include "VRHaptics.h"
 #include "PlayerState_Weapon_VR.h"
 
@@ -1988,7 +1981,7 @@ void cPlayer::OnPostSceneDraw()
     auto ofs = crosshairMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
     tVertexVec vtx;
-    vtx.reserve(4);
+    vtx.resize(4);
 
     cColor color(1.0f, 1.0f);
 

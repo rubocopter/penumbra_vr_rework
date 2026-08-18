@@ -42,7 +42,6 @@ namespace hpl {
       mRightHapticAction(vr::k_ulInvalidActionHandle),
       mLeftSkeletonAction(vr::k_ulInvalidActionHandle),
       mRightSkeletonAction(vr::k_ulInvalidActionHandle),
-      mlLastLeftHandSummaryLog(0), mlLastRightHandSummaryLog(0),
       mlLastSkeletonErrorLog(0),
       mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
       mbSkeletonFallbackReported(false) {
@@ -142,12 +141,8 @@ namespace hpl {
     // keep their previous handling; the legacy path fills it from buttons.
     UpdateSkeletonSummary(mLeftSkeletonAction, leftHand, "left");
     UpdateSkeletonSummary(mRightSkeletonAction, rightHand, "right");
-    LogHandSummary(leftHand, "L", "skeleton", mlLastLeftHandSummaryLog);
-    LogHandSummary(rightHand, "R", "skeleton", mlLastRightHandSummaryLog);
 
     cVRInputState nextState;
-    nextState.source = eVRInputSource_SteamVRActions;
-    nextState.context = context;
     nextState.recenter = ReadDigital(mRecenterAction);
     if (suppressContextEdges) SuppressDigitalEdges(nextState.recenter);
     bool anyActionActive = false;
@@ -198,12 +193,6 @@ namespace hpl {
         SuppressDigitalEdges(nextState.pause);
       }
 
-      if (nextState.interact.justPressed) Log(" [VR input +%lu ms] action: interact pressed.\n", GetApplicationTime());
-      if (nextState.interact.justReleased) Log(" [VR input +%lu ms] action: interact released.\n", GetApplicationTime());
-      if (nextState.inventory.justPressed) Log(" [VR input +%lu ms] action: inventory pressed.\n", GetApplicationTime());
-      if (nextState.holster.justPressed) Log(" [VR input +%lu ms] action: holster pressed.\n", GetApplicationTime());
-      if (nextState.crouch.justPressed) Log(" [VR input +%lu ms] action: crouch pressed.\n", GetApplicationTime());
-
       anyActionActive = anyActionActive || nextState.sprint.active || nextState.interact.active ||
         nextState.examine.active || nextState.holster.active || nextState.inventory.active ||
         nextState.notebook.active || nextState.quickLight.active || nextState.jump.active ||
@@ -232,9 +221,6 @@ namespace hpl {
         SuppressDigitalEdges(nextState.uiBack);
         SuppressDigitalEdges(nextState.uiClose);
       }
-
-      if (nextState.uiSelect.justPressed) Log(" [VR input +%lu ms] action: UI select pressed.\n", GetApplicationTime());
-      if (nextState.uiClose.justPressed) Log(" [VR input +%lu ms] action: UI close pressed.\n", GetApplicationTime());
 
       anyActionActive = nextState.uiSelect.active || nextState.uiDrag.active ||
         nextState.uiBack.active || nextState.uiClose.active;
@@ -279,12 +265,8 @@ namespace hpl {
     else {
       rightHand.InvalidateHandSummary();
     }
-    LogHandSummary(leftHand, "L", "legacy", mlLastLeftHandSummaryLog);
-    LogHandSummary(rightHand, "R", "legacy", mlLastRightHandSummaryLog);
 
     cVRInputState legacyState;
-    legacyState.source = eVRInputSource_LegacyOpenVR;
-    legacyState.context = context;
 
     if (context == eSteamVRInputContext_Gameplay) {
       legacyState.moveActive = leftState.touchContact;
@@ -400,20 +382,6 @@ namespace hpl {
       mbSkeletonFallbackReported = false;
     }
     hand.InvalidateHandSummary();
-  }
-
-  void cSteamVRInput::LogHandSummary(const TrackedController& hand, const char* handName,
-    const char* source, unsigned long& lastLogTime) {
-    const TrackedController::HandSummary& summary = hand.GetHandSummary();
-    if (!summary.valid) {
-      return;
-    }
-    if (GetApplicationTime() - lastLogTime < 250) {
-      return;
-    }
-    lastLogTime = GetApplicationTime();
-    Log(" [VR hand +%lu ms] %s grip %.2f trigger %.2f (%s).\n",
-      GetApplicationTime(), handName, summary.grip, summary.trigger, source);
   }
 
   bool cSteamVRInput::TriggerHaptic(eSteamVRHand hand, float durationSeconds, float frequency, float amplitude) {

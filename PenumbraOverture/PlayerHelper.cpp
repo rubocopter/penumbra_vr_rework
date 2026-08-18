@@ -1955,101 +1955,16 @@ void cPlayerVRTeleport::Destroy()
 
 void cPlayerVRTeleport::Update(float afTimeStep)
 {
-  return;
-
-  mvDrawPoints.clear();
-
-  auto plstate = mpInit->mpPlayer->GetState();
-
-  if ((plstate == ePlayerState_Normal ||
-      plstate == ePlayerState_Grab ||
-      plstate == ePlayerState_Throw ||
-      plstate == ePlayerState_WeaponMelee) &&
-      !mpInit->mpPlayer->GetLookAt()->IsActive() &&
-      !mpInit->mpInventory->IsActive()) {
-
-    for (int i = 0; i < 2; ++i) {
-      if (mlTeleportHandIndex != -1 && mlTeleportHandIndex != i)
-        continue;
-
-      auto hand = i == 0 ? mpInit->mpGame->vr_left_hand : mpInit->mpGame->vr_right_hand;
-
-      auto state = hand.GetButtonState();
-
-      if (state.padPressed) {
-        mlTeleportHandIndex = i;
-
-        //mpMarkerEntity->SetVisible(true);
-
-        // Solve parabola
-        auto scene = mpInit->mpGame->GetScene();
-        auto physicsWorld = scene->GetWorld3D()->GetPhysicsWorld();
-
-        auto handWorldMat = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
-
-        cVector3f start = handWorldMat.GetTranslation();
-        cVector3f current = start;
-
-        cVector3f delta = cMath::MatrixInverse(hand.GetMatrix()).GetForward() * -0.5f + cVector3f(0.0f, -0.0375f, 0.0f);
-
-        mvDrawPoints.clear();
-        for (int i = 0; i < 42; ++i) {
-          cVector3f next = current + delta;
-
-          mbHit = false;
-          mbCanTeleport = false;
-
-          physicsWorld->CastRay(this, current, next, true, true, true);
-
-          if (mbHit) {
-            mvDrawPoints.push_back(mvHitPos);
-
-            break;
-          }
-          else {
-            mvDrawPoints.push_back(cVector3f(current));
-          }
-
-          current = next;
-
-          delta += cVector3f(0.0f, -0.01f, 0.0f);
-        }
-      }
-
-      if (!state.padPressed) {
-        mlTeleportHandIndex = -1;
-
-        if (mbCanTeleport) {
-          mbCanTeleport = false;
-
-          mpInit->mpPlayer->GetCharacterBody()->SetFeetPosition(mvHitPos);
-          teleportBlackFrames = 40;
-
-          mpInit->mpPlayer->FootStep(1.0f);
-        }
-      }
-    }
-  } else {
-    mbHit = false;
-    mbCanTeleport = false;
-  }
 }
 
 //-----------------------------------------------------------------------
 
 bool cPlayerVRTeleport::OnIntersect(iPhysicsBody *pBody, cPhysicsRayParams *apParams)
 {
-  if (pBody->IsCharacter() || !pBody->GetCollide()) return true;
-
-  mbHit = true;
-  mbCanTeleport = true;
-  mvHitPos = apParams->mvPoint;
-
-  return false;
+  return true;
 }
 
 //-----------------------------------------------------------------------
-
 
 void cPlayerVRTeleport::OnPostSceneDraw()
 {

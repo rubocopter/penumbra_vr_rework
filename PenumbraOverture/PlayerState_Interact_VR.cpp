@@ -1170,11 +1170,6 @@ void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 
 void cPlayerState_Push_VR::OnPostSceneDraw()
 {
-	return;
-	cVector3f vPos = cMath::MatrixMul(	mpPushBody->GetLocalMatrix(), 
-										mvLocalPickPoint);
-
-	mpInit->mpGame->GetGraphics()->GetLowLevel()->DrawSphere(vPos,0.3f,cColor(1,0,1));
 }
 
 //-----------------------------------------------------------------------
