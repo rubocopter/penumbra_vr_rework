@@ -4,37 +4,140 @@ Community-maintained continuation of [veryjos/penumbra_vr](https://github.com/ve
 
 This fork is unofficial and is not affiliated with Frictional Games, Valve, or Sony Interactive Entertainment. It does not include the commercial game. You must own Penumbra: Overture to use it.
 
+## What this project is
+
+Penumbra: Overture VR Rework is a modernization of the experimental VR port of
+Penumbra: Overture originally published as [veryjos/penumbra_vr](https://github.com/veryjos/penumbra_vr).
+That mod added head and hand tracking for the HTC Vive on top of the HPL1
+engine. This rework rebuilds the port incrementally on a device-independent
+SteamVR Input baseline: a single tracking-to-world boundary, semantic input
+actions with a legacy OpenVR fallback, persistent VR comfort settings,
+room-anchored UI, staged loading, and rigged animated hands. It is not a
+rewrite: the engine remains Win32 because of its legacy binary dependencies and
+rendering keeps the established OpenVR compositor path.
+
 ## Project status
 
-The `modernization` branch provides a working SteamVR baseline built around
-OpenVR 2.15.6 and device-independent SteamVR Input actions. It includes a
-native PS VR2 Sense profile, preserves the historical HTC Vive profile, and
-falls back to legacy OpenVR polling when action input is unavailable. Rendering
-continues to use the established OpenVR compositor path, and the engine remains
-Win32 because of its legacy binary dependencies.
+The active development branch is `development`. It is an alpha/development
+build: the game is playable, but it is not a stable release and may contain
+bugs.
 
-The current milestone adds configurable snap/smooth turning and locomotion,
-physical/button/hybrid crouch with matching camera height, orientation
-recentering, room-anchored fullscreen UI, scalable text, controller-ray menu
-and inventory input, localized inventory actions, semantic haptics,
-compositor-safe loading transitions, and room-scale collision correction. It
-also fixes held-door collision bypasses and several teardown/input lifecycle
-problems inherited from the experimental port. The executable is Large Address
-Aware and every automated build performs a full solution rebuild to prevent
-ABI-stale objects in the legacy project.
+PS VR2 (SteamVR on PC) is the primary development platform. The bundled
+bindings for other controllers (HTC Vive, Valve Index, Meta Quest/Oculus
+Touch, Windows Mixed Reality) are included as default profiles but have not
+been hardware-tested by this project.
 
-Steam launch, tutorial, new game, continue, saved-game loading, repeated
-inventory use, all crouch modes, menu transitions, controller reconnection, and
-locked-door collision were validated on PS VR2 hardware on 14 August 2026.
-Other SteamVR devices still need hardware-specific testing. Native OpenXR and
-additional controller profiles remain later milestones. See [controller
-bindings and VR settings](docs/INPUT.md) for the complete current layout.
+Implemented so far:
 
-See [the modernization roadmap](docs/ROADMAP.md) for the planned stages and
+- Device-independent SteamVR Input actions (gameplay, UI, and global action
+  sets) with automatic fallback to the historical OpenVR polling path.
+- A single rigid TrackingToWorld transform for the HMD, both hands, held
+  objects, and world-space UI; orientation recentering; snap/smooth/disabled
+  turning through world yaw.
+- Persistent VR comfort settings in the `[VR]` section of `settings.cfg`,
+  editable in-game under **Options → VR Settings** (movement speed and dead
+  zone, height offset, turning, UI distance and scale, crouch mode and depth,
+  subtitle scale).
+- Physical, button, and hybrid crouch that drive the real gameplay collider.
+  Button crouch lowers the rendered viewpoint by the configured crouch depth;
+  physical crouch calibrates a standing HMD height with a plausibility band.
+- Room-anchored fullscreen menus and cinematics with scalable text and no
+  opaque letterbox/subtitle bands; compositor-safe black loading frames for
+  map changes, new game, tutorial, and saved-game routes.
+- Controller-ray menu and inventory pointing (right hand, with left-hand
+  fallback when the right pose is lost), restored inventory action popups, and
+  localized inventory actions.
+- Semantic haptics routed through intent-named profiles with per-event repeat
+  limits.
+- Room-scale collision reconciliation that keeps HPL1's native character
+  collision while manipulating swing doors in VR, and fixes the held-door
+  collision bypass of the original port.
+- Rigged HUD hand models animated from the SteamVR skeletal summary (grip and
+  trigger finger curls). This is the most recently worked-on area and remains
+  experimental (see below).
+- A reversible installer/deployer that merges the mod into the Steam
+  installation, backs up replaced files, and can restore them.
+
+The executable is Large Address Aware, and every automated build performs a
+full solution rebuild to prevent ABI-stale objects in the legacy project.
+
+Still experimental or not yet validated:
+
+- **VR hands**: animation and tracking have received recent work and remain a
+  likely area of change. Known limitations: the ring and middle fingers share
+  a fused mesh tube, the index finger has a limited free tube, and the poses
+  are basic grip/trigger blends.
+- **Crouch and calibration**: the physical-crouch standing-height calibration
+  and the button-crouch view offset were changed after the last full hardware
+  validation and have not had a complete milestone retest.
+- Controller profiles other than PS VR2 Sense are untested on hardware. Native
+  OpenXR remains future work.
+
+## Current state
+
+As of the latest commits on `development` (August 2026):
+
+- The full content of the commercial game remains playable in VR; the entry
+  routes (tutorial, new game, continue, explicit save loading) were exercised
+  on PS VR2 hardware on 14 August 2026.
+- The hand rig work is in an "experimental final" state: bind matrices,
+  weights, fold direction, and per-joint angles were reworked between 15 and
+  18 August 2026 and are intentionally frozen for now, but this is the area
+  most likely to change next.
+- Physical crouch now calibrates the standing HMD height during gameplay and
+  rejects implausible samples (outside 0.90–2.20 m), fixing a wrong baseline
+  that could be captured after loading a save; button crouch lowers the view
+  by the configured crouch depth instead of the deeper original move-state
+  offset.
+- These recent changes have not been through a full recorded hardware
+  validation pass like the 14 August milestone.
+
+## Validation
+
+Hardware testing so far has been done on PS VR2 Sense controllers through
+SteamVR on PC. Keep the following in mind:
+
+- The 14 August 2026 milestone validated Steam launch, tutorial, new game,
+  continue, saved-game loading, repeated inventory use, all crouch modes, menu
+  transitions, controller reconnection, and locked-door collision on hardware.
+- The hand rig was validated on hardware on 15 August 2026 (both hands render,
+  fingers pivot at their joints); the bind-layout and weight fixes were also
+  verified with an engine-exact simulation (`scripts/verify_bind_fix.py`).
+- Code has changed after both dates (hand tuning, crouch depth, standing-height
+  calibration). A past validation is not a guarantee that the current build
+  behaves identically. Other SteamVR devices still need hardware-specific
+  testing.
+
+Regression checklist for a future release (PS VR2, SteamVR):
+
+1. Startup: Steam launch, the VR tutorial as the initial map, main menu visible
+   in room space, recenter works.
+2. New game, continue, and save/load routes complete without freezing and show
+   the black loading frame.
+3. Inventory: open, point, select an action, use an item on the world,
+   drag/combine; popup text is readable.
+4. VR hands: both hands render, fingers curl with grip and trigger, the thumb
+   follows its hierarchy, no joint collapse at the wrist.
+5. Recenter: horizontal orientation aligns in front of the view.
+6. Crouch: physical, button, and hybrid modes enter and leave crouch; button
+   crouch does not clip the camera; the standing height calibrates within the
+   plausible band and recovers after a save load.
+7. Map transitions: door and level changes hold the compositor fade and reveal
+   the new map.
+8. Controller disconnect/reconnect: a lost hand hides and releases held input,
+   the other hand keeps pointing, and SteamVR reacquires the pose.
+9. Doors: held swing doors keep their collision (no walking through while
+   leaning), ordinary walls block movement.
+10. Log checks: `hpl.log` reports the active input path (`SteamVR Input actions
+    are active.` or `Falling back to legacy controller polling.`) and no
+    repeated `[VR ...]` warnings.
+
+See [the development roadmap](docs/ROADMAP.md) for the planned stages and
 [the VR architecture](docs/VR_ARCHITECTURE.md) for the tracking, world-space,
 height, hand-state, and gameplay boundaries. The current boundary between
 SteamVR, HPL1 input, and Penumbra gameplay is mapped in
-[the input architecture](docs/INPUT_ARCHITECTURE.md).
+[the input architecture](docs/INPUT_ARCHITECTURE.md), and [controller bindings
+and VR settings](docs/INPUT.md) describe the complete current layout.
 
 ## Install a packaged build
 
