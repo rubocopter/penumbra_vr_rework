@@ -21,15 +21,15 @@ RAD = np.pi / 180.0
 
 # runtime grab angles from PlayerHands.cpp (grip weight = 1)
 GRIP = {
-    'Middle1': 70, 'Middle2': 70, 'Middle3': 50,
-    'Ring1': 70, 'Ring2': 70, 'Ring3': 50,
-    'Little1': 65, 'Little2': 65, 'Little3': 45,
+    'Middle1': 17, 'Middle2': 17, 'Middle3': 10,
+    'Ring1': 17, 'Ring2': 17, 'Ring3': 10,
+    'Little1': 30, 'Little2': 30, 'Little3': 20,
     'Index1': 0, 'Index2': 0, 'Index3': 0,
-    'Thumb1': 47, 'Thumb2': 40, 'Thumb3': 0,
+    'Thumb1': 130, 'Thumb2': 90, 'Thumb3': 0,
 }
 FINGER_AXIS = np.array([0.0, 0.0, -1.0])        # right hand
-PINKY_AXIS = np.array([0.0, -0.2588, -0.9659])  # right hand, tilts toward palm centre
-THUMB_AXIS = np.array([0.0, 0.8910, 0.4540])    # right hand
+PINKY_AXIS = np.array([0.0, -0.8660, -0.5000])  # right hand, curls into the palm
+THUMB_AXIS = np.array([0.065, 0.9970, -0.0460])  # right hand, plane through chain and palm centre
 
 
 def rmat(axis, deg):
@@ -71,6 +71,7 @@ def parse(path):
 
     idx = {n: i for i, n in enumerate(joints)}
     joint_pos = np.zeros((len(joints), 3))
+    local_trans = np.zeros((len(joints), 3))
     vs_el = root.find('.//c:visual_scene', fw.NS)
     def walk(node, p, acc):
         name = node.get('name')
@@ -79,12 +80,13 @@ def parse(path):
         acc2 = local if p is None else acc + local
         if name in idx:
             joint_pos[idx[name]] = acc2
+            local_trans[idx[name]] = local
             p = idx[name]
         for ch in list(node):
             if ch.tag == fw.TNS + 'node':
                 walk(ch, p, acc2)
     walk(vs_el, None, np.zeros(3))
-    return tree, root, pos, joints, joint_pos, vc, v, ibm
+    return tree, root, pos, joints, joint_pos, local_trans, vc, v, ibm
 
 
 def axis_for(name):
@@ -96,7 +98,7 @@ def axis_for(name):
 
 
 def main():
-    tree, root, pos, joints, joint_pos, vc, v, ibm = parse(PATH)
+    tree, root, pos, joints, joint_pos, local_trans, vc, v, ibm = parse(PATH)
     idx = {n: i for i, n in enumerate(joints)}
     n = len(joints)
 
@@ -121,36 +123,26 @@ def main():
             for i in range(n)]
     bind_pos = locs
 
-    # engine skinning (fixed layout): inv(ibm) = (I, joint world pos); the
-    # animated bone world = (R_accum, pos) with R_accum = accumulated track
-    # rotations; vertex' = pos_i + R_accum_i . (v - pos_i), weighted
+    # engine skinning (verified model, Node3D::UpdateMatrix + skin):
+    # local = (R_anim, local_trans); world = parent * local (accumulated);
+    # vertex' = world_j . (v - joint_pos_j)
     def pose(deg_by_joint):
-        racc = []
+        ws = []
         for i in range(n):
             name = joints[i]
             deg = deg_by_joint.get(name, 0.0)
             R = rmat(axis_for(name), deg) if deg else np.eye(3)
-            racc.append(R if parent[i] is None else racc[parent[i]] @ R)
-        return racc
+            L = np.eye(4)
+            L[:3, :3] = R
+            L[:3, 3] = local_trans[i]
+            ws.append(L if parent[i] is None else ws[parent[i]] @ L)
+        return ws
 
-    racc_bind = pose({j: 0.0 for j in joints})
-    racc_grip = pose(GRIP)
-
-    def skinm(racc):
-        out = []
-        for i in range(n):
-            R = racc[i]
-            M = np.eye(4)
-            M[:3, :3] = R
-            M[3, :3] = joint_pos[i] - R @ joint_pos[i]
-            out.append(M)
-        return out
-
-    def skinned(ms, verts):
+    def skinned(ws, verts):
         out = np.zeros_like(verts)
         for i, p in enumerate(verts):
             jidx = int(v[2 * i])
-            out[i] = (ms[jidx] @ np.append(p, 1.0))[:3]
+            out[i] = (ws[jidx] @ np.append(p - joint_pos[jidx], 1.0))[:3]
         return out
 
     print('=== segment directions vs assigned axis (right hand) ===')
@@ -210,8 +202,8 @@ def main():
                  np.round(w[:3, 3], 4), np.round(joint_pos[bi], 4)))
 
     # vertex displacement evidence (engine-exact skinning)
-    ms = skinm(racc_grip)
-    pos_out = skinned(ms, pos)
+    ws_grip = pose(GRIP)
+    pos_out = skinned(ws_grip, pos)
 
     def verts_of(bones):
         bs = {idx[b] for b in bones}

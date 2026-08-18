@@ -1047,9 +1047,30 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 	// depth. The original game's move state camera drop (GetHeightAdd, about
 	// -0.7 m) is a full crouch, far deeper than intended in VR and a clipping
 	// hazard; the move state is still entered so the smaller collider applies.
-	const float postureOffset = mbVRCrouchApplied && !mbVRPhysicalCrouch
+const float postureOffset = mbVRCrouchApplied && !mbVRPhysicalCrouch
 		? -mpInit->mVRSettings.GetPhysicalCrouchDepth() : 0.0f;
 	mpInit->mpGame->vr_tracking.SetPostureOffset(postureOffset);
+
+	// Temporary crouch diagnostic; remove once the crouch investigation closes.
+	if(mbVRCrouchApplied || mbVRPhysicalCrouch || mbVRCrouchButtonLatched)
+	{
+		static unsigned long lLastCrouchDebugTime = 0;
+		const unsigned long lNow = GetApplicationTime();
+		if(lNow - lLastCrouchDebugTime >= 1000)
+		{
+			lLastCrouchDebugTime = lNow;
+			const float fRawHmd = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
+			Log(" [VR crouch-debug +%lu ms] rawHmd=%.3f standing=%.3f physDelta=%.3f "
+				"buttonLatched=%d physCrouch=%d applied=%d posture=%.3f "
+				"trackingOriginY=%.3f feetY=%.3f headWorldY=%.3f\n",
+				lNow, fRawHmd, mfVRStandingHeight, mfVRStandingHeight - fRawHmd,
+				(int)mbVRCrouchButtonLatched, (int)mbVRPhysicalCrouch, (int)mbVRCrouchApplied,
+				postureOffset,
+				mpInit->mpGame->vr_tracking.GetPlayerWorldPose().GetTranslation().y,
+				mpPlayer->GetCharacterBody()->GetFeetPosition().y,
+				mpInit->mpGame->vr_tracking.GetHeadWorldPose().GetTranslation().y);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------

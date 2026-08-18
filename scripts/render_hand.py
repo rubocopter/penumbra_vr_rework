@@ -20,15 +20,15 @@ RAD = np.pi / 180.0
 
 # runtime grab angles from PlayerHands.cpp (grip weight = 1)
 GRIP = {
-    'Middle1': 70, 'Middle2': 70, 'Middle3': 50,
-    'Ring1': 70, 'Ring2': 70, 'Ring3': 50,
-    'Little1': 65, 'Little2': 65, 'Little3': 45,
+    'Middle1': 70, 'Middle2': 70, 'Middle3': 35,
+    'Ring1': 70, 'Ring2': 70, 'Ring3': 35,
+    'Little1': 55, 'Little2': 55, 'Little3': 40,
     'Index1': 0, 'Index2': 0, 'Index3': 0,
-    'Thumb1': 47, 'Thumb2': 40, 'Thumb3': 0,
+    'Thumb1': 130, 'Thumb2': 90, 'Thumb3': 0,
 }
 FINGER_AXIS = np.array([0.0, 0.0, -1.0])     # right hand
-PINKY_AXIS = np.array([0.0, -0.2588, -0.9659])  # right hand, tilts toward palm centre
-THUMB_AXIS = np.array([0.0, 0.8910, 0.4540])  # right hand
+PINKY_AXIS = np.array([0.0, -0.8660, -0.5000])  # right hand, curls into the palm
+THUMB_AXIS = np.array([0.0, 0.9820, 0.1870])  # right hand, fold plane contains the palm
 
 
 def rmat(axis, deg):
@@ -74,6 +74,7 @@ def parse(path):
     # -ibm[:,12:15] would read 0 now; the scene is the authoritative meshPos)
     idx = {n: i for i, n in enumerate(joints)}
     joint_pos = np.zeros((len(joints), 3))
+    local_trans = np.zeros((len(joints), 3))
     vs = root.find('.//c:visual_scene', fw.NS)
     def walk(node, p, acc):
         name = node.get('name')
@@ -82,16 +83,17 @@ def parse(path):
         acc2 = local if p is None else acc + local
         if name in idx:
             joint_pos[idx[name]] = acc2
+            local_trans[idx[name]] = local
             p = idx[name]
         for ch in list(node):
             if ch.tag == fw.TNS + 'node':
                 walk(ch, p, acc2)
     walk(vs, None, np.zeros(3))
-    return tree, root, pos, joints, joint_pos, vw, vc_el, v_el, vc, v, ibm
+    return tree, root, pos, joints, joint_pos, local_trans, vw, vc_el, v_el, vc, v, ibm
 
 
 def main():
-    tree, root, pos, joints, joint_pos, vw, vc_el, v_el, vc, v, ibm = parse(PATH)
+    tree, root, pos, joints, joint_pos, local_trans, vw, vc_el, v_el, vc, v, ibm = parse(PATH)
     idx = {n: i for i, n in enumerate(joints)}
     radii = fw.measure_radii(pos, joints, joint_pos)
     new_bone = fw.assign(pos, joints, joint_pos, radii)
@@ -109,35 +111,26 @@ def main():
                 walk(ch, idx.get(name))
     walk(vs, None)
 
-    def pose(deg_by_joint):
-        racc = []
+    def pose(deg_by_joint, local_trans):
+        ws = []
         for i in range(len(joints)):
             name = joints[i]
             deg = deg_by_joint.get(name, 0.0)
             R = rmat(PINKY_AXIS if name.startswith('Little') else
                      THUMB_AXIS if name.startswith('Thumb') else FINGER_AXIS, deg) if deg else np.eye(3)
-            racc.append(R if parent[i] is None else racc[parent[i]] @ R)
-        return racc
+            L = np.eye(4)
+            L[:3, :3] = R
+            L[:3, 3] = local_trans[i]
+            ws.append(L if parent[i] is None else ws[parent[i]] @ L)
+        return ws
 
-    def skinm(racc, pos_of):
-        out = []
-        for i in range(len(joints)):
-            R = racc[i]
-            M = np.eye(4)
-            M[:3, :3] = R
-            M[3, :3] = pos_of[i] - R @ pos_of[i]
-            out.append(M)
-        return out
-
-    racc_bind = pose({j: 0.0 for j in joints})
-    racc_grip = pose(GRIP)
-    ms_grip = skinm(racc_grip, joint_pos)
+    ws_grip = pose(GRIP, local_trans)
 
     # weights: single (joint, weightIdx) pair per vertex, weight value 1.0
     pos_out = np.zeros_like(pos)
     for i, p in enumerate(pos):
         jidx = int(v[2 * i])
-        pos_out[i] = (ms_grip[jidx] @ np.append(p, 1.0))[:3]
+        pos_out[i] = (ws_grip[jidx] @ np.append(p - joint_pos[jidx], 1.0))[:3]
 
     # render
     import matplotlib

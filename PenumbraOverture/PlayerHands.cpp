@@ -171,23 +171,35 @@ void iHudModel::SetupHandAnimation()
 	}
 
 	//Own rotation per joint in degrees. Grab: middle/ring/little/thumb.
-	//Trigger: index. (Cumulative: Middle/Ring 70/140/190, Little 65/130/175,
-	//Index 55/110/155, Thumb 47/87. The grab angles are the previous values
-	//plus 35% of the difference towards a closed fist.)
+	//Trigger: index. (Cumulative: Middle/Ring 70/140/175, Little 55/110/150,
+	//Index 55/110/155, Thumb 130/220. The grab angles were re-tuned for the
+	//grip=1 fold capped so the fingertips stay near the palm zone instead of
+	//~10 units below it (VR probe 2026-08-17: y=-10.2 at grip 0.7 with
+	//70/70/35; 17/17/10 gives y~-3.5, near the inner palm face at y~-2.2).
+	//M1/M2 are the long segments (6.75/4.54 u) and drive the drop; M3's lever
+	//is 0.81 u. Little reduced from 55/55/40 to 30/30/20: with 55/55/40 its
+	//tip crossed the ring base line (z=-0.93) into the ring zone by grip
+	//~0.55; 30/30/20 keeps it in the pinky zone (z>=-1.3 at grip 0.7) with a
+	//shallow curl toward the palm edge.
 	static const float kfGrabAngles[lHandBoneNum] = {
-		70,70,50,	//Middle
-		70,70,50,	//Ring
-		65,65,45,	//Little
+		17,17,10,	//Middle
+		17,17,10,	//Ring
+		30,30,20,	//Little
 		0,0,0,		//Index
-		47,40,0		//Thumb
+		130,90,0	//Thumb
 	};
 	static const float kfTriggerAngles[lHandBoneNum] = {
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
-		55,55,45,	//Index
+		17,17,10,	//Index
 		0,0,0		//Thumb
 	};
+	//Index trigger folded with the same 17/17/10 discipline as the grab
+	//fingers: the old 55/55/45 (155 deg) plunged the tip ~7 units below the
+	//palm face at real grips (y=-7.1 at grip 0.7; face at its z is -2.6).
+	//Its (0,0,-1) axis is already within 1.9 deg of the anatomical vertical
+	//axis of the index chain, so only the amount changed.
 
 	int lBoneIdx[lHandBoneNum];
 	for(int i=0; i<lHandBoneNum; ++i)
@@ -205,11 +217,17 @@ void iHudModel::SetupHandAnimation()
 
 	const bool bLeft = (mlHandIndex == 0);
 	cVector3f vFingerAxis = cVector3f(0,0, bLeft ? 1.0f : -1.0f);
-	cVector3f vThumbAxis = cVector3f(0, 0.8910f, bLeft ? -0.4540f : 0.4540f);
-	//The little finger has its own axis, tilted ~15 deg so it curls slightly
-	//towards the palm centre (the shared finger axis would fold it straight
-	//down, past the ring finger, outside the palm radius).
-	cVector3f vPinkyAxis = cVector3f(0, -0.2588f, bLeft ? 0.9659f : -0.9659f);
+	//Thumb axis derived from the bind geometry (plane through the thumb chain
+	//and the palm centre): the old (0,0.982,0.187) folded in a nearly
+	//horizontal plane, sweeping the short 3.5 u chain backwards at the hand
+	//edge (tip y ~ -1.0, visually barely moving despite the 130/90 rotations);
+	//the new plane sweeps the tip across toward the index at the palm's height
+	//(y ~ -1.8). The chain is still too short to reach the palm flesh (model
+	//limitation, not an angle issue). The little finger curls into the palm
+	//with a 60 deg tilt (a plain finger axis would fold it straight down,
+	//beside the ring finger, outside the palm).
+	cVector3f vThumbAxis = cVector3f(0.065f, 0.9970f, bLeft ? 0.0460f : -0.0460f);
+	cVector3f vPinkyAxis = cVector3f(0, -0.8660f, bLeft ? 0.5000f : -0.5000f);
 
 	static const char* ksPoseNames[] = { "HandGrab", "HandTrigger" };
 	static const float* kfPoseAngles[] = { kfGrabAngles, kfTriggerAngles };
@@ -311,6 +329,84 @@ void iHudModel::UpdateHandAnimation()
 				"engineRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f) engineAngle=%.1f engineAxis=(%.4f,%.4f,%.4f)\n",
 				sHand, ksFingerNames[i], ksHandBoneNames[i], mlBoneIdx[i], fWeight,
 				qRot.w, qRot.v.x, qRot.v.y, qRot.v.z, fAngle, vAxis.x, vAxis.y, vAxis.z);
+		}
+
+		//Thumb probe: where the thumb tip ends up relative to the hand origin.
+		if(mlBoneIdx[14] >= 0)
+		{
+			cBoneState *pThumb = mpEntity->GetBoneState(mlBoneIdx[14]);
+			if(pThumb)
+			{
+				cVector3f vTip = pThumb->GetWorldMatrix().GetTranslation();
+				cVector3f vHand = mpEntity->GetWorldMatrix().GetTranslation();
+				Log(" [hand-rig] %s: thumbTip world=(%.3f,%.3f,%.3f) relHand=(%.3f,%.3f,%.3f) grip=%.3f\n",
+					sHand, vTip.x, vTip.y, vTip.z,
+					(vTip - vHand).x, (vTip - vHand).y, (vTip - vHand).z, fGrip);
+			}
+		}
+
+		//Temporary tip probe (right hand): where the Middle3/Ring3 fingertips
+		//land during the grab pose, measured from a distal mesh-tip proxy.
+		//Logging only; remove once the grab re-tuning is done.
+		if(mlHandIndex == 1)
+		{
+			const int lPalmIdx = mpEntity->GetBoneStateIndex("Palm");
+			cBoneState *pPalm = (lPalmIdx >= 0) ? mpEntity->GetBoneState(lPalmIdx) : NULL;
+			cVector3f vPalmPos = pPalm ? pPalm->GetWorldMatrix().GetTranslation() : cVector3f(0, 0, 0);
+
+			//Distal tip offsets in the tip bone's local frame (right-hand model
+			//hud_object_hand_rig.dae, bind pose, model units): the farthest bind
+			//vertex weighted to the tip bone, projected onto the distal segment
+			//axis (Middle2->Middle3 / Ring2->Ring3). The bone bind rotations are
+			//identity, so the local offset equals the model-space offset from the
+			//joint to the fingertip.
+			static const cVector3f kfMiddleTipOffset(0.794f, 0.016f, -0.180f);
+			static const cVector3f kfRingTipOffset(0.949f, -0.025f, 0.162f);
+
+			for(int t=0; t<2; ++t)
+			{
+				const int lIdx0 = (t == 0) ? mlBoneIdx[0] : mlBoneIdx[3];
+				const int lIdx1 = (t == 0) ? mlBoneIdx[1] : mlBoneIdx[4];
+				const int lIdx2 = (t == 0) ? mlBoneIdx[2] : mlBoneIdx[5];
+				const char* sFinger = (t == 0) ? "Middle" : "Ring";
+				if(lIdx2 < 0) continue;
+
+				cBoneState *pTip = mpEntity->GetBoneState(lIdx2);
+				if(pTip == NULL) continue;
+
+				const cMatrixf mTipWorld = pTip->GetWorldMatrix();
+				const cVector3f vJointWorld = mTipWorld.GetTranslation();
+				const cVector3f vTipWorld = cMath::MatrixMul(mTipWorld,
+					(t == 0) ? kfMiddleTipOffset : kfRingTipOffset);
+				cVector3f vTipPalmLocal = cVector3f(0, 0, 0);
+				if(pPalm)
+				{
+					vTipPalmLocal = cMath::MatrixMul(cMath::MatrixInverse(pPalm->GetWorldMatrix()), vTipWorld);
+				}
+
+				float fAngles[3] = { 0.0f, 0.0f, 0.0f };
+				const int lJoints[3] = { lIdx0, lIdx1, lIdx2 };
+				for(int j=0; j<3; ++j)
+				{
+					if(lJoints[j] < 0) continue;
+					cBoneState *pJoint = mpEntity->GetBoneState(lJoints[j]);
+					if(pJoint == NULL) continue;
+					cQuaternion qRot;
+					qRot.FromRotationMatrix(pJoint->GetLocalMatrix().GetRotation());
+					fAngles[j] = cMath::ToDeg(2.0f * acos(cMath::Clamp(qRot.w, -1.0f, 1.0f)));
+				}
+
+				Log(" [hand-rig] %s: tipProbe finger=%s boneName=%s boneIndex=%d "
+					"grip=%.3f angles=(%.1f,%.1f,%.1f) "
+					"jointWorld=(%.3f,%.3f,%.3f) tipWorld=(%.3f,%.3f,%.3f) "
+					"tipPalmLocal=(%.3f,%.3f,%.3f) oldJointDistance=%.3f\n",
+					sHand, sFinger, ksHandBoneNames[(t == 0) ? 2 : 5], lIdx2, fGrip,
+					fAngles[0], fAngles[1], fAngles[2],
+					vJointWorld.x, vJointWorld.y, vJointWorld.z,
+					vTipWorld.x, vTipWorld.y, vTipWorld.z,
+					vTipPalmLocal.x, vTipPalmLocal.y, vTipPalmLocal.z,
+					pPalm ? (vJointWorld - vPalmPos).Length() : -1.0f);
+			}
 		}
 	}
 }

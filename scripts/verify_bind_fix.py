@@ -45,9 +45,9 @@ GRAB = {
     'Thumb1': 47, 'Thumb2': 40, 'Thumb3': 0,
 }
 
-CHAIN_SEGS = [('Middle', [70, 70, 50]), ('Ring', [70, 70, 50]),
-              ('Little', [65, 65, 45]), ('Index', [0, 0, 0]),
-              ('Thumb', [47, 40, 0])]
+CHAIN_SEGS = [('Middle', [70, 70, 35]), ('Ring', [70, 70, 35]),
+              ('Little', [55, 55, 40]), ('Index', [0, 0, 0]),
+              ('Thumb', [130, 90, 0])]
 
 
 def parse(path):
@@ -206,8 +206,8 @@ def report_hand(path, label):
     seg_of = {name: [idx[b] for b in (f + '1', f + '2', f + '3')] for f, _ in CHAIN_SEGS}
 
     finger_axis = np.array([0, 0, -1.0 if left else 1.0])
-    thumb_axis = np.array([0, 0.8910, -0.4540 if left else 0.4540])
-    pinky_axis = np.array([0, -0.2588, 0.9659 if left else -0.9659])
+    thumb_axis = np.array([0, 0.9820, -0.1870 if left else 0.1870])
+    pinky_axis = np.array([0, -0.8660, 0.5000 if left else -0.5000])
 
     def chain_axis(name):
         if name == 'Thumb':
