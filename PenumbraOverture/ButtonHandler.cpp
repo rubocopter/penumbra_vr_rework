@@ -971,7 +971,7 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 	{
 		const float headHeight =
 			mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
-		const bool plausibleHeight = headHeight > 0.60f && headHeight < 2.50f;
+		const bool plausibleHeight = headHeight > 0.90f && headHeight < 2.20f;
 		if(plausibleHeight)
 		{
 			if(!mbVRStandingHeightKnown)
@@ -1002,8 +1002,20 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 			{
 				Log(" [VR comfort +%lu ms] physical crouch %s at %.2f m "
 					"(standing %.2f m, threshold %.2f m).\n",
-					GetApplicationTime(), mbVRPhysicalCrouch ? "entered" : "left",
-					headHeight, mfVRStandingHeight, enterHeight);
+GetApplicationTime(), mbVRPhysicalCrouch ? "entered" : "left",
+				headHeight, mfVRStandingHeight, enterHeight);
+			}
+		}
+		else if(!mbVRStandingHeightKnown)
+		{
+			static unsigned long lLastCalibRejectLog = 0;
+			const unsigned long lNow = GetApplicationTime();
+			if(lNow - lLastCalibRejectLog >= 1000)
+			{
+				lLastCalibRejectLog = lNow;
+				Log(" [VR comfort +%lu ms] WARNING: standing HMD height calibration "
+					"rejected; rawHmd=%.3f outside plausible range (0.90, 2.20) m.\n",
+					lNow, headHeight);
 			}
 		}
 	}
