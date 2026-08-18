@@ -1000,7 +1000,7 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 
 			if(wasPhysicalCrouch != mbVRPhysicalCrouch)
 			{
-Log(" [VR comfort +%lu ms] physical crouch %s at %.2f m "
+				Log(" [VR comfort +%lu ms] physical crouch %s at %.2f m "
 					"(standing %.2f m, threshold %.2f m).\n",
 					GetApplicationTime(), mbVRPhysicalCrouch ? "entered" : "left",
 					headHeight, mfVRStandingHeight, enterHeight);
