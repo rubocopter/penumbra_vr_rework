@@ -6,7 +6,9 @@ The rework is developed on the `development` branch. The hardware validation
 dates below describe when each milestone was exercised on PS VR2; the code has
 changed after some of them (notably the crouch and hand work of 16–18 August
 2026), so a dated validation describes the milestone build, not a guarantee
-about the current one.
+about the current one. The crouch and height changes have since been
+revalidated and are confirmed correct; the hand fold state is frozen as an
+experimental final and currently shows incorrect visual behaviours.
 
 ## Phase 0 — reproducible baseline
 
@@ -87,7 +89,7 @@ remains outstanding.
 - [x] Validate physical-only and button-only crouch on PS VR2 hardware.
 - [ ] Validate low-ceiling recovery on hardware.
 - [x] Lower the rendered viewpoint by the configured crouch depth (0.25 m by default) when button crouch changes the gameplay collider, instead of the deeper original move-state offset; applied through the TrackingToWorld posture offset (changed 16 August 2026, after the hardware milestone).
-- [x] Calibrate a standing HMD height for physical crouch with a plausibility band (0.90–2.20 m) so an out-of-range sample (for example after loading a save) cannot become the baseline (18 August 2026; not hardware-retested after the change).
+- [x] Calibrate a standing HMD height for physical crouch with a plausibility band (0.90–2.20 m) so an out-of-range sample (for example after loading a save) cannot become the baseline (18 August 2026; revalidated on hardware afterwards).
 - Add configurable handedness and explicit seated/standing calibration.
 - Add and tune controller rumble for interaction, impact, damage, and weapon events where supported on PC.
 - [x] Restore the inventory action popup and add a visible tracked-controller ray and reticle.
@@ -138,7 +140,8 @@ future comfort, controller-coverage, and rendering work.
 - [x] Fix the flare `.hud` so the flare renders at the right VR scale/orientation.
 
 Status: the hand animation work is frozen as an experimental state, not a
-finished feature. The final angle set (18 August) has no recorded full
+finished feature, and the current fold state still shows incorrect visual
+behaviours. The final angle set (18 August) has no recorded full
 hardware-validation pass after the retuning; revalidation is expected whenever
 this area is touched again.
 

@@ -64,12 +64,10 @@ full solution rebuild to prevent ABI-stale objects in the legacy project.
 Still experimental or not yet validated:
 
 - **VR hands**: animation and tracking have received recent work and remain a
-  likely area of change. Known limitations: the ring and middle fingers share
-  a fused mesh tube, the index finger has a limited free tube, and the poses
-  are basic grip/trigger blends.
-- **Crouch and calibration**: the physical-crouch standing-height calibration
-  and the button-crouch view offset were changed after the last full hardware
-  validation and have not had a complete milestone retest.
+  likely area of change. The current fold state is frozen as an experimental
+  final and still shows incorrect visual behaviours. Known limitations: the
+  ring and middle fingers share a fused mesh tube, the index finger has a
+  limited free tube, and the poses are basic grip/trigger blends.
 - Controller profiles other than PS VR2 Sense are untested on hardware. Native
   OpenXR remains future work.
 
@@ -83,14 +81,14 @@ As of the latest commits on `development` (August 2026):
 - The hand rig work is in an "experimental final" state: bind matrices,
   weights, fold direction, and per-joint angles were reworked between 15 and
   18 August 2026 and are intentionally frozen for now, but this is the area
-  most likely to change next.
+  most likely to change next and the current fold state still shows incorrect
+  visual behaviours.
 - Physical crouch now calibrates the standing HMD height during gameplay and
   rejects implausible samples (outside 0.90–2.20 m), fixing a wrong baseline
   that could be captured after loading a save; button crouch lowers the view
   by the configured crouch depth instead of the deeper original move-state
-  offset.
-- These recent changes have not been through a full recorded hardware
-  validation pass like the 14 August milestone.
+  offset. The crouch and height system has been revalidated and is confirmed
+  correct.
 
 ## Validation
 
@@ -103,10 +101,12 @@ SteamVR on PC. Keep the following in mind:
 - The hand rig was validated on hardware on 15 August 2026 (both hands render,
   fingers pivot at their joints); the bind-layout and weight fixes were also
   verified with an engine-exact simulation (`scripts/verify_bind_fix.py`).
-- Code has changed after both dates (hand tuning, crouch depth, standing-height
-  calibration). A past validation is not a guarantee that the current build
-  behaves identically. Other SteamVR devices still need hardware-specific
-  testing.
+- The crouch and height changes of 16–18 August 2026 have been revalidated on
+  hardware and are confirmed correct. The hand tuning of 18 August 2026 has not
+  had a full recorded pass after the retuning, and the fold state currently
+  shows incorrect visual behaviours. A past validation is not a guarantee that
+  the current build behaves identically. Other SteamVR devices still need
+  hardware-specific testing.
 
 Regression checklist for a future release (PS VR2, SteamVR):
 
@@ -259,7 +259,7 @@ create a `redist/data` directory.
 
 The package includes `config/Espanol.lang`. Select **Español** under **Options → Game → Language**. The VR tutorial, VR menu options, and controller notes have been translated for this rework.
 
-The base Spanish localization originated with the official Penumbra: Overture translation, was prepared for later Windows and Linux digital releases by DeM, and was revised by Oscar “darkpadawan” Rodríguez for [Clan DLAN](https://www.clandlan.net/). This project adds only the VR-specific strings. The accompanying translation readme did not state explicit redistribution terms, so permission should be confirmed before publishing a formal release containing the full language file.
+The base Spanish localization originated with the official Penumbra: Overture translation, was prepared for later Windows and Linux digital releases by DeM, and was revised by Oscar “darkpadawan” Rodríguez for [Clan DLAN](https://www.clandlan.net/). This project adds only the VR-specific strings. Redistribution of the full language file is confirmed by the project maintainer.
 
 ## Original project
 

@@ -174,6 +174,6 @@ bundled Vive mapping remains a compatibility profile and still needs a
 Vive-specific hardware pass.
 
 This describes the 14 August 2026 milestone build. The crouch and hand-rig
-areas changed afterwards (16–18 August 2026) and have not been through a
-recorded hardware retest since; treat the hand animation and crouch behaviour
-as experimental until then.
+areas changed afterwards (16–18 August 2026). The crouch and height system has
+been revalidated and is confirmed correct; the hand animation remains
+experimental and currently shows incorrect visual behaviour.

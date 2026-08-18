@@ -6,8 +6,9 @@ gameplay interaction as separate concerns. World scale is always `1.0`.
 Current state: this documents the `development` branch. The completion notes
 below describe when each increment was implemented and validated on PS VR2
 hardware; the crouch and hand-rig areas were changed after their hardware
-validation (16–18 August 2026) and are the parts most likely to differ from
-those notes. The animated hands are experimental and frozen for now.
+validation (16–18 August 2026). The crouch and height system has since been
+revalidated and is confirmed correct; the animated hands remain experimental,
+are frozen for now, and still show incorrect visual behaviours.
 
 ## Coordinate spaces
 
@@ -65,8 +66,9 @@ Penumbra entity types.
    offset in the TrackingToWorld transform by the configured crouch depth
    (0.25 m default) instead of the deeper original move-state offset, and
    physical crouch calibrates the standing HMD height during gameplay with a
-   plausibility band (0.90–2.20 m) and hysteresis. These changes have not had a
-   full hardware retest; low-ceiling recovery is still pending.**
+   plausibility band (0.90–2.20 m) and hysteresis. The crouch and height system
+   was revalidated on hardware afterwards and is confirmed correct; low-ceiling
+   recovery is still pending.**
 6. Configurable main-menu/cinematic UI distance and scale. Fullscreen surfaces
    capture a room-space anchor when opened; HMD tracking remains live and
    recentering rebuilds that anchor. **Complete; placement and recentering

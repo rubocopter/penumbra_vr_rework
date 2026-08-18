@@ -95,7 +95,9 @@ SteamVR controller profile instead of hard-coding one headset's layout.
 
 This table records what has been exercised on real hardware and when. It
 describes those milestone builds: the crouch and hand areas changed after the
-dates below (16–18 August 2026) and should be retested before any release.
+dates below (16–18 August 2026). The crouch and height changes have since been
+revalidated and are confirmed correct; the hand fold state is frozen as an
+experimental final and should be treated as such until it is reworked.
 
 | Profile | Status | Validated behaviour |
 | --- | --- | --- |
@@ -154,8 +156,8 @@ rendered viewpoint by the configured crouch depth (0.25 m by default) through a
 posture offset in the TrackingToWorld transform, while physical crouch keeps
 the user's real head displacement. Neither changes world scale, and standing is
 retried safely if a low ceiling blocks the full-height collider. The crouch
-behaviour changed after the 14 August hardware milestone (16–18 August 2026)
-and has not had a full recorded retest since.
+and height changes of 16–18 August 2026 have been revalidated on hardware and
+are confirmed correct.
 
 Fullscreen menus and cinematics are captured at a stable room-space pose when
 opened rather than following every head movement. Recenter places the surface
