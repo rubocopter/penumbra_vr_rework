@@ -2,6 +2,12 @@
 
 The rework is intentionally incremental. Every phase should leave a testable build so regressions can be attributed to a small set of changes.
 
+The rework is developed on the `development` branch. The hardware validation
+dates below describe when each milestone was exercised on PS VR2; the code has
+changed after some of them (notably the crouch and hand work of 16–18 August
+2026), so a dated validation describes the milestone build, not a guarantee
+about the current one.
+
 ## Phase 0 — reproducible baseline
 
 - [x] Build all three native projects with Visual Studio 2022.
@@ -80,7 +86,8 @@ remains outstanding.
 - [x] Validate hybrid physical/button crouch on PS VR2 hardware.
 - [x] Validate physical-only and button-only crouch on PS VR2 hardware.
 - [ ] Validate low-ceiling recovery on hardware.
-- [x] Lower the rendered viewpoint smoothly when button crouch changes the gameplay collider.
+- [x] Lower the rendered viewpoint by the configured crouch depth (0.25 m by default) when button crouch changes the gameplay collider, instead of the deeper original move-state offset; applied through the TrackingToWorld posture offset (changed 16 August 2026, after the hardware milestone).
+- [x] Calibrate a standing HMD height for physical crouch with a plausibility band (0.90–2.20 m) so an out-of-range sample (for example after loading a save) cannot become the baseline (18 August 2026; not hardware-retested after the change).
 - Add configurable handedness and explicit seated/standing calibration.
 - Add and tune controller rumble for interaction, impact, damage, and weapon events where supported on PC.
 - [x] Restore the inventory action popup and add a visible tracked-controller ray and reticle.
@@ -119,18 +126,46 @@ cinematic image rendering, and staged loading were also exercised. This closes
 the initial PS VR2 modernization milestone; the unchecked items above remain
 future comfort, controller-coverage, and rendering work.
 
-### VR hands — rig and basic animation (15 August 2026)
+### VR hands — rig and basic animation (15–18 August 2026)
 
 - [x] Rebuild the HUD hand rigs so each joint pivots at its own mesh position (joints, bind matrices, per-vertex weights).
 - [x] Correct the COLLADA inverse bind matrix layout for both hands (translation into column 3); see `scripts/BINDFIX.md` and `scripts/DIAGNOSIS_FINAL.md`.
 - [x] Verify single-joint, hierarchical (thumb), palm-stability, and full grip/trigger poses against an engine-exact rigid-segment simulation (`scripts/verify_bind_fix.py`).
 - [x] Correct the runtime finger fold direction so both hands curl the fingers toward their own palm.
 - [x] Validate both hands on PS VR2 hardware: fingers pivot at their joints, palm stays stable, thumb follows the hierarchy, grip/trigger keep working, both hands render correctly.
+- [x] Assign the bone indices in both rig-construction sites so the first rig of a session also folds correctly.
+- [x] Retune the fold angles and axes from bind geometry (Middle/Ring 17/17/10, Little 30/30/20, Index 17/17/10 for trigger, thumb axis from the bind plane) so fingertips stay near the palm zone; state declared **experimental final** on 18 August 2026 and intentionally frozen for now.
+- [x] Fix the flare `.hud` so the flare renders at the right VR scale/orientation.
+
+Status: the hand animation work is frozen as an experimental state, not a
+finished feature. The final angle set (18 August) has no recorded full
+hardware-validation pass after the retuning; revalidation is expected whenever
+this area is touched again.
+
+Hand rig tooling (in `scripts/`):
+
+- `verify_bind_fix.py` — engine-exact simulation of the HPL1 skin (IBM layout,
+  per-joint rotations, wrap-around tolerance). Run after any change to the hand
+  rig `.dae` files to confirm joints stay at their mesh positions.
+- `fix_rig_bind_layout.py` and `fix_rig_weights.py` — the two applied one-shot
+  fixes (bind-matrix layout, vertex weights). Idempotent; use `--dry-run` to
+  preview and `--apply` to write. Originals are backed up under
+  `.penumbravr/backup`.
+- `make_hand_rig.py` — regenerates the rigged (skinned) hand models from the
+  static meshes.
+- `render_hand.py` — renders bind vs. grip comparison images
+  (`render_0/1/2.png`).
+- `analyze_other_fingers.py` (uses `diag_rig_geometry.py`) — geometric analysis
+  of the finger flexion axes and tip trajectories; use when re-tuning fold
+  angles or axes.
+- The full diagnosis history is recorded in `scripts/DIAGNOSIS.md`,
+  `scripts/DIAGNOSIS_FINAL.md`, `scripts/BINDFIX.md`, and `scripts/WEIGHTFIX.md`.
 
 Known residual issues:
 
 - Ring/Middle share one fused tube in the source geometry, so their tips cannot spread independently.
 - The Index has a limited free tube between the palm and its first joint, which restricts its clean bend range.
+- The thumb chain is short relative to the palm; its tip does not reach the palm flesh (model limitation).
 - Poses are still basic (grip/trigger blends only); per-finger curl shaping and finer grip profiles are future work.
 
 ## Phase 4 — OpenXR evaluation
