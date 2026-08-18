@@ -85,17 +85,21 @@ and its trigger can select. The original mouse path remains available. Item
 action popups now render their localized action names instead of the empty
 highlighted box left by the historical mod.
 
-These tables document the current PS VR2 and Vive binding profiles; they are
+These tables document the current bundled binding profiles (PS VR2 Sense, HTC
+Vive, Valve Index, Meta Quest/Oculus Touch, Windows Mixed Reality); they are
 not intended as universal in-game button names. Player-facing control prompts
 will remain unchanged until the game can resolve labels from the active
-SteamVR controller profile (for example Touch, Index, Vive, or PS VR2) instead
-of hard-coding one headset's layout.
+SteamVR controller profile instead of hard-coding one headset's layout.
 
 ## Hardware validation status
 
+This table records what has been exercised on real hardware and when. It
+describes those milestone builds: the crouch and hand areas changed after the
+dates below (16–18 August 2026) and should be retested before any release.
+
 | Profile | Status | Validated behaviour |
 | --- | --- | --- |
-| PS VR2 Sense | Hardware-tested, 14 August 2026 | Gameplay/UI actions, repeated inventory transitions, all crouch modes, snap/smooth turn, recenter, pointer, tutorial/new/continue/load routes, pose loss and reconnection |
+| PS VR2 Sense | Hardware-tested, 14–15 August 2026 | Gameplay/UI actions, repeated inventory transitions, all crouch modes, snap/smooth turn, recenter, pointer, tutorial/new/continue/load routes, pose loss and reconnection, rigged hands (15 August) |
 | HTC Vive | Compatibility profile retained | Historical layout is represented in SteamVR Input but this rework has not yet been retested on Vive hardware |
 | Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme with recenter on the left trackpad click |
 | Meta Quest / Oculus Touch | Bundled default profile, not yet hardware-validated | `oculus_touch` profile follows the PS VR2 scheme; recenter is left unassigned for SteamVR mapping |
@@ -129,7 +133,7 @@ value.
 | `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored main menus and cinematics |
 | `UIScale` | `1.0` | `0.5`–`2.0` | Size multiplier for that frontal UI surface |
 | `CrouchMode` | `Hybrid` | `Physical`, `Button`, `Hybrid` | Chooses body movement, the bound crouch action, or either |
-| `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Headset descent below the standing baseline that enters crouch |
+| `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Headset descent below the standing baseline that enters physical crouch; also the view offset applied by button crouch |
 | `SubtitleScale` | `1.35` | `0.75`–`2.0` | Scales cinematic subtitles, radio text, and gameplay messages |
 
 Out-of-range values are clamped and the effective values are written to the
@@ -141,12 +145,17 @@ surface can be moved farther away without forcing it to occupy less of the
 view.
 
 Hybrid crouch is the default. The physical path calibrates a standing HMD
-baseline during gameplay and uses hysteresis to avoid flicker at the threshold;
+baseline during gameplay, rejects samples outside the plausible height band
+(0.90–2.20 m, so a displaced tracking-space sample cannot become the baseline
+after loading a save), and uses hysteresis to avoid flicker at the threshold;
 the button path latches the semantic crouch action. Both change Penumbra's real
-gameplay collider and stealth/movement state. Button crouch also applies the
-move state's smooth vertical offset to the rendered viewpoint, while physical
-crouch keeps the user's real head displacement. Neither changes world scale,
-and standing is retried safely if a low ceiling blocks the full-height collider.
+gameplay collider and stealth/movement state. Button crouch also lowers the
+rendered viewpoint by the configured crouch depth (0.25 m by default) through a
+posture offset in the TrackingToWorld transform, while physical crouch keeps
+the user's real head displacement. Neither changes world scale, and standing is
+retried safely if a low ceiling blocks the full-height collider. The crouch
+behaviour changed after the 14 August hardware milestone (16–18 August 2026)
+and has not had a full recorded retest since.
 
 Fullscreen menus and cinematics are captured at a stable room-space pose when
 opened rather than following every head movement. Recenter places the surface
@@ -202,8 +211,16 @@ summary stays invalid and the hands keep their previous open pose. On the
 legacy polling path the summary is instead derived from the button state:
 grip becomes binary (0/1) while the trigger keeps its analog margin.
 
-The game-side hand animation (Open, Grab, and Trigger poses with blending) is
-the next step and consumes only these two values.
+The game-side hand animation consumes only these two values. At rig setup
+`PlayerHands.cpp` builds two rotation-only pose tracks per hand (HandGrab and
+HandTrigger, one keyframe per bone with the tuned angles and axes) and each
+frame blends their weights by the grip and trigger values. The hands are
+experimental: the joints, angles, and axes were retuned from bind geometry in
+August 2026 and are intentionally frozen for now. Known limitations: the ring
+and middle fingers share a fused mesh tube, the index has a limited free tube,
+and the thumb chain is too short to reach the palm flesh. The `[hand-rig]` log
+lines report the bone indices, axes, angles, and engine rotations at rig setup
+and after every weight change, which helps diagnose fold problems.
 
 ## HTC Vive compatibility defaults
 

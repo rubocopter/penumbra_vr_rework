@@ -3,6 +3,12 @@
 The VR rework keeps runtime tracking, world placement, player state, and
 gameplay interaction as separate concerns. World scale is always `1.0`.
 
+Current state: this documents the `development` branch. The completion notes
+below describe when each increment was implemented and validated on PS VR2
+hardware; the crouch and hand-rig areas were changed after their hardware
+validation (16–18 August 2026) and are the parts most likely to differ from
+those notes. The animated hands are experimental and frozen for now.
+
 ## Coordinate spaces
 
 OpenVR poses enter the engine in **tracking space** and remain unchanged there.
@@ -20,7 +26,10 @@ world yaw:
 5. Derive one rigid TrackingToWorld matrix and apply it to HMD and hand poses.
 
 Height calibration is stored separately from the rigid world transform. It
-must never be implemented by changing world scale.
+must never be implemented by changing world scale. The physical-crouch
+standing baseline is calibrated in `cButtonHandler` on the gameplay side
+(plausibility band 0.90–2.20 m, hysteresis); `cVRTrackingSpace` only receives
+the resulting posture offset through `SetPostureOffset`.
 
 Create recenters horizontal orientation without teleporting the player
 character. Snap and smooth turn change world yaw through the same relationship,
@@ -50,8 +59,14 @@ Penumbra entity types.
    **Complete; validated on PS VR2 hardware.**
 5. Physical, button, and hybrid crouch with a standing-height baseline and
    configurable displacement threshold. Button crouch lowers both the gameplay
-   collider and rendered viewpoint without changing world scale. **Implemented;
-   all three modes validated on PS VR2 hardware, low-ceiling recovery pending.**
+   collider and rendered viewpoint without changing world scale. **All three
+   modes were validated on PS VR2 hardware on 14 August 2026. Since then
+   (16–18 August 2026) button crouch lowers the viewpoint through a posture
+   offset in the TrackingToWorld transform by the configured crouch depth
+   (0.25 m default) instead of the deeper original move-state offset, and
+   physical crouch calibrates the standing HMD height during gameplay with a
+   plausibility band (0.90–2.20 m) and hysteresis. These changes have not had a
+   full hardware retest; low-ceiling recovery is still pending.**
 6. Configurable main-menu/cinematic UI distance and scale. Fullscreen surfaces
    capture a room-space anchor when opened; HMD tracking remains live and
    recentering rebuilds that anchor. **Complete; placement and recentering

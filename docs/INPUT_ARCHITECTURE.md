@@ -35,6 +35,7 @@ does.
 | Own independent left/right target and held-body state | `Player.h`, `PlayerState_Misc_VR.cpp`, `PlayerState_Interact_VR.cpp` |
 | Place the inventory, notebook, and menu pointer | `Inventory.cpp`, `Notebook.cpp`, `MainMenu.cpp`, `NumericalPanel.cpp` |
 | Render equipped hand-held models | `PlayerHands.cpp` |
+| Animate the rigged HUD hand models from the skeletal summary (grip/trigger pose tracks blended by finger curl) | `PlayerHands.cpp` |
 | Translate semantic feedback events into controller vibration profiles | `VRHaptics.cpp` |
 
 Penumbra owns gameplay meaning. Changing how a key is applied to a locked door,
@@ -137,6 +138,18 @@ transform. Turning pivots around the current HMD anchor rather than the room
 origin. Raw tracking-space direction deltas are rotated into world space
 without inheriting positional or height translation.
 
+## Hand animation boundary
+
+The skeletal summary follows the same boundary as the poses: `cSteamVRInput`
+reads the device skeleton (with an animation-layer fallback for drivers that
+only expose estimated data) and stores one normalized grip/trigger pair per
+hand on the tracked-hand state. `PlayerHands.cpp` consumes only that summary:
+it builds two rotation-only pose tracks per hand (HandGrab, HandTrigger) at rig
+setup and blends their weights by grip and trigger. The hand animation is
+experimental: joints, angles, and axes were retuned from bind geometry in
+August 2026 and are frozen for now; see `docs/ROADMAP.md` for the known
+limitations.
+
 ## Hand interaction state
 
 Penumbra now records target and held-body ownership separately for the left and
@@ -159,3 +172,8 @@ without retaining a stale tracked-device index. The same validation covered
 inventory pointing, action selection, crouch, and locked-door collision. The
 bundled Vive mapping remains a compatibility profile and still needs a
 Vive-specific hardware pass.
+
+This describes the 14 August 2026 milestone build. The crouch and hand-rig
+areas changed afterwards (16–18 August 2026) and have not been through a
+recorded hardware retest since; treat the hand animation and crouch behaviour
+as experimental until then.
