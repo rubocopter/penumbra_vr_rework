@@ -131,13 +131,15 @@ cButtonHandler::cButtonHandler(cInit *apInit)  : iUpdateable("ButtonHandler")
 		mpLowLevelHaptic = NULL;
 
 	
-	mState = eButtonHandlerState_Game;
+mState = eButtonHandlerState_Game;
 	mbSnapTurnReady = false;
 	mbVRCrouchButtonLatched = false;
 	mbVRPhysicalCrouch = false;
 	mbVRCrouchApplied = false;
 	mbVRStandingHeightKnown = false;
 	mfVRStandingHeight = 0.0f;
+	mbVRSeatedBaselineKnown = false;
+	mfVRSeatedBaseline = 0.0f;
 
 	mlNumOfActions =0;
 
@@ -251,8 +253,9 @@ void cButtonHandler::Update(float afTimeStep)
       cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
   }
 
-  if(!vrUIContext && mpPlayer->IsActive() && !mpPlayer->GetLookAt()->IsActive())
+if(!vrUIContext && mpPlayer->IsActive() && !mpPlayer->GetLookAt()->IsActive())
   {
+    UpdateVRPlayMode();
     UpdateVRTurn(vrInput, afTimeStep);
 	UpdateVRCrouch(vrInput);
   }
@@ -263,10 +266,13 @@ void cButtonHandler::Update(float afTimeStep)
     mbSnapTurnReady = false;
   }
 
-  if(actionInputActive && vrUIContext && vrInput.uiSelect.justPressed)
+if(actionInputActive && vrUIContext && vrInput.uiSelect.justPressed)
   {
-    const eVRHapticHand pointerHand = mpInit->mpGame->vr_right_hand.IsPoseValid()
-      ? eVRHapticHand_Right : eVRHapticHand_Left;
+    const eVRHapticHand pointerHand = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+      ? (mpInit->mpGame->vr_left_hand.IsPoseValid()
+        ? eVRHapticHand_Left : eVRHapticHand_Right)
+      : (mpInit->mpGame->vr_right_hand.IsPoseValid()
+        ? eVRHapticHand_Right : eVRHapticHand_Left);
     cVRHaptics::Play(mpInit, eVRHapticEvent_UISelect, pointerHand);
   }
 	///////////////////////////////////
@@ -755,7 +761,8 @@ void cButtonHandler::Update(float afTimeStep)
             mpInit->mpPlayer->vr_moveVec += headRight * vrInput.moveX;
           }
 
-          if (vrInput.jump.justPressed) {
+if (vrInput.jump.justPressed) {
+            Log(" [VR input +%lu ms] jump pressed.\n", GetApplicationTime());
             mpPlayer->Jump();
           }
 
@@ -875,8 +882,9 @@ void cButtonHandler::Update(float afTimeStep)
 				{
 					mpPlayer->StopExamine();
 				}
-				if(mpInput->BecameTriggerd("Holster") || vrInput.holster.justPressed)
+if(mpInput->BecameTriggerd("Holster") || vrInput.holster.justPressed)
 				{
+					Log(" [VR input +%lu ms] holster pressed.\n", GetApplicationTime());
 					mpPlayer->StartHolster();
 				}
 
@@ -946,6 +954,72 @@ void cButtonHandler::UpdateVRTurn(const cVRInputState& aInputState, float afTime
 			cMath::ToRad(mpInit->mVRSettings.GetSmoothTurnSpeed()) * afTimeStep;
 		mpInit->mpGame->vr_tracking.AddWorldYaw(fYawDelta);
 	}
+}
+
+//-----------------------------------------------------------------------
+
+void cButtonHandler::UpdateVRPlayMode()
+{
+	if(mpInit->mVRSettings.GetPlayMode() == eVRPlayMode_Standing)
+	{
+		if(mbVRSeatedBaselineKnown)
+		{
+			mbVRSeatedBaselineKnown = false;
+			mfVRSeatedBaseline = 0.0f;
+			mpInit->mpGame->vr_tracking.SetSeatedOffset(0.0f);
+			Log(" [VR comfort +%lu ms] standing play mode; seated offset cleared.\n",
+				GetApplicationTime());
+		}
+		return;
+	}
+
+	const float headHeight =
+		mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
+	// Seated HMD heights stay well below standing eye height; the band bounds
+	// what a plausible seated sample can be.
+	const bool plausibleSeatedHeight = headHeight > 0.60f && headHeight < 1.50f;
+
+	if(!mbVRSeatedBaselineKnown)
+	{
+		if(!plausibleSeatedHeight)
+		{
+			mpInit->mpGame->vr_tracking.SetSeatedOffset(0.0f);
+			return;
+		}
+		mfVRSeatedBaseline = headHeight;
+		mbVRSeatedBaselineKnown = true;
+		Log(" [VR comfort +%lu ms] seated baseline calibrated at %.2f m.\n",
+			GetApplicationTime(), mfVRSeatedBaseline);
+	}
+	else
+	{
+		// Standing up in seated mode invalidates the baseline; the next seated
+		// sample re-calibrates it. A clearly lower sample (sitting down again)
+		// re-baselines directly.
+		if(headHeight > mfVRSeatedBaseline + 0.45f)
+		{
+			mbVRSeatedBaselineKnown = false;
+			mfVRSeatedBaseline = 0.0f;
+			mpInit->mpGame->vr_tracking.SetSeatedOffset(0.0f);
+			Log(" [VR comfort +%lu ms] seated baseline cleared (%.2f m, stood up).\n",
+				GetApplicationTime(), headHeight);
+			return;
+		}
+		if(plausibleSeatedHeight && headHeight < mfVRSeatedBaseline - 0.10f)
+		{
+			mfVRSeatedBaseline = headHeight;
+			Log(" [VR comfort +%lu ms] seated baseline re-calibrated at %.2f m.\n",
+				GetApplicationTime(), mfVRSeatedBaseline);
+		}
+	}
+
+	// Raise the world so the seated eye height maps to the configured standing
+	// height through the same legacy floor-reach adjustment as standing play.
+	const float mappedSeatedHeight = (mfVRSeatedBaseline - 0.2f) * 1.065f;
+	float seatedOffset = mpInit->mVRSettings.GetPlayerHeight() - mappedSeatedHeight;
+	if(seatedOffset < 0.0f) seatedOffset = 0.0f;
+	if(seatedOffset > 1.5f) seatedOffset = 1.5f;
+	mpInit->mpGame->vr_tracking.SetSeatedOffset(seatedOffset);
 }
 
 //-----------------------------------------------------------------------
@@ -1074,7 +1148,10 @@ void cButtonHandler::Reset()
 	mbVRCrouchApplied = false;
 	mbVRStandingHeightKnown = false;
 	mfVRStandingHeight = 0.0f;
+	mbVRSeatedBaselineKnown = false;
+	mfVRSeatedBaseline = 0.0f;
 	mpInit->mpGame->vr_tracking.SetPostureOffset(0.0f);
+	mpInit->mpGame->vr_tracking.SetSeatedOffset(0.0f);
 }
 
 //-----------------------------------------------------------------------

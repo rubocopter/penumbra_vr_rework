@@ -172,11 +172,12 @@ namespace hpl {
 
 	void cGame::GameInit(iLowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars)
 	{
-		mpGameSetup = apGameSetup;
+mpGameSetup = apGameSetup;
 		vr_old_head_tracking_pose = cMatrixf::Identity;
 		pointerDrawStart = cVector3f(0,0,0);
 		pointerDrawEnd = cVector3f(0,0,0);
 		pointerDrawActive = false;
+		vr_dominant_hand = eSteamVRHand_Right;
 
 		Log("Creating Engine Modules\n");
 		Log("--------------------------------------------------------\n");

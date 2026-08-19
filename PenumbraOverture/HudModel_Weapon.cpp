@@ -455,7 +455,7 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 				pCamera->GetForward() * vSpinMul.z;
 
   cMatrixf mtxDamage = cMath::MatrixTranslate(mvVRHBTransOffset);
-  mtxDamage = cMath::MatrixMul(cMath::MatrixInverse(cMath::MatrixScale(mpInit->mpPlayerHands->GetCurrentModel(1)->mfVrScale)), mtxDamage);
+  mtxDamage = cMath::MatrixMul(cMath::MatrixInverse(cMath::MatrixScale(mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->mfVrScale)), mtxDamage);
   mtxDamage = cMath::MatrixMul(newPose.GetRotation(), mtxDamage);
   mtxDamage = cMath::MatrixMul(cMath::MatrixTranslate(vCenter), mtxDamage);
 
@@ -463,7 +463,7 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
   hitboxCenterPos = cMath::MatrixMul(mtxDamage, hitboxCenterPos);
 
   cMatrixf mtxOldDamage = cMath::MatrixTranslate(mvVRHBTransOffset);
-  mtxOldDamage = cMath::MatrixMul(cMath::MatrixInverse(cMath::MatrixScale(mpInit->mpPlayerHands->GetCurrentModel(1)->mfVrScale)), mtxOldDamage);
+  mtxOldDamage = cMath::MatrixMul(cMath::MatrixInverse(cMath::MatrixScale(mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->mfVrScale)), mtxOldDamage);
   mtxOldDamage = cMath::MatrixMul(mmLastPose.GetRotation(), mtxOldDamage);
   mtxOldDamage = cMath::MatrixMul(cMath::MatrixTranslate(lastvCenter), mtxOldDamage);
 
@@ -651,7 +651,7 @@ void cHudModel_WeaponMelee::Attack(cMatrixf newPose)
 	//Check the closest material and play sounds and effects depending on it.
 	if(bHapticImpact)
 	{
-		cVRHaptics::Play(mpInit, eVRHapticEvent_MeleeImpact, eVRHapticHand_Right);
+		cVRHaptics::Play(mpInit, eVRHapticEvent_MeleeImpact, VRHelper::DominantHapticHand(mpInit->mpGame));
 	}
 
 	if(pClosestHitMat && !mbHasHit && mfHitCooldown <= 0.0f)

@@ -99,9 +99,14 @@ namespace hpl {
     cMatrixf vr_old_head_tracking_pose;
     cVRTrackingSpace vr_tracking;
 
-    TrackedController vr_left_hand;
+TrackedController vr_left_hand;
     TrackedController vr_right_hand;
     cSteamVRInput vr_input;
+
+    // Preferred primary hand for pointing, interaction targets, and held
+    // objects. This is an application preference exposed by the VR layer;
+    // gameplay and UI must query it instead of assuming the right hand.
+    eSteamVRHand vr_dominant_hand;
 
 	private:
 		void GameInit(iLowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars);

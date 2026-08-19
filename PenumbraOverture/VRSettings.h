@@ -29,6 +29,18 @@ enum eVRCrouchMode
 	eVRCrouchMode_Hybrid
 };
 
+enum eVRHandedness
+{
+	eVRHandedness_Left,
+	eVRHandedness_Right
+};
+
+enum eVRPlayMode
+{
+	eVRPlayMode_Standing,
+	eVRPlayMode_Seated
+};
+
 class cVRSettings
 {
 public:
@@ -49,6 +61,9 @@ public:
 	eVRCrouchMode GetCrouchMode() const { return mCrouchMode; }
 	float GetPhysicalCrouchDepth() const { return mfPhysicalCrouchDepth; }
 	float GetSubtitleScale() const { return mfSubtitleScale; }
+	eVRHandedness GetHandedness() const { return mHandedness; }
+	eVRPlayMode GetPlayMode() const { return mPlayMode; }
+	float GetPlayerHeight() const { return mfPlayerHeight; }
 
 	void SetMoveSpeed(float afValue) { mfMoveSpeed = Clamp(afValue, 0.25f, 3.0f); }
 	void SetMoveDeadZone(float afValue) { mfMoveDeadZone = Clamp(afValue, 0.0f, 0.9f); }
@@ -62,6 +77,9 @@ public:
 	void SetCrouchMode(eVRCrouchMode aMode) { mCrouchMode = aMode; }
 	void SetPhysicalCrouchDepth(float afValue) { mfPhysicalCrouchDepth = Clamp(afValue, 0.10f, 0.60f); }
 	void SetSubtitleScale(float afValue) { mfSubtitleScale = Clamp(afValue, 0.75f, 2.0f); }
+	void SetHandedness(eVRHandedness aHandedness) { mHandedness = aHandedness; }
+	void SetPlayMode(eVRPlayMode aPlayMode) { mPlayMode = aPlayMode; }
+	void SetPlayerHeight(float afValue) { mfPlayerHeight = Clamp(afValue, 1.40f, 2.10f); }
 
 private:
 	static float Clamp(float afValue, float afMinimum, float afMaximum);
@@ -78,6 +96,9 @@ private:
 	eVRCrouchMode mCrouchMode;
 	float mfPhysicalCrouchDepth;
 	float mfSubtitleScale;
+	eVRHandedness mHandedness;
+	eVRPlayMode mPlayMode;
+	float mfPlayerHeight;
 };
 
 #endif // GAME_VR_SETTINGS_H

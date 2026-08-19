@@ -90,7 +90,8 @@ remains outstanding.
 - [ ] Validate low-ceiling recovery on hardware.
 - [x] Lower the rendered viewpoint by the configured crouch depth (0.25 m by default) when button crouch changes the gameplay collider, instead of the deeper original move-state offset; applied through the TrackingToWorld posture offset (changed 16 August 2026, after the hardware milestone).
 - [x] Calibrate a standing HMD height for physical crouch with a plausibility band (0.90–2.20 m) so an out-of-range sample (for example after loading a save) cannot become the baseline (18 August 2026; revalidated on hardware afterwards).
-- Add configurable handedness and explicit seated/standing calibration.
+- [x] Add configurable handedness and explicit seated/standing calibration: dominant hand drives interaction, pointer, throw, and haptics without touching SteamVR bindings; seated mode applies a height offset at the tracking boundary; player height is a separate semantic value with a Calibrate button (18 August 2026; hardware validation still pending).
+- [ ] Validate the handedness, seated play mode, and player-height settings on PS VR2 hardware.
 - Add and tune controller rumble for interaction, impact, damage, and weapon events where supported on PC.
 - [x] Restore the inventory action popup and add a visible tracked-controller ray and reticle.
 - [x] Reuse the tracked UI ray across menus and fall back to the remaining hand after a pose loss.

@@ -997,8 +997,8 @@ void cPlayer::StartFlashLightButton()
 {
 	if(mpInit->mpInventory->GetItem("flashlight")!=NULL)
 	{
-		mpFlashLight->SetActive(!mpFlashLight->IsActive());
-		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
+mpFlashLight->SetActive(!mpFlashLight->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, VRHelper::OffHapticHand(mpInit->mpGame));
 
 		if(mpFlashLight->IsActive())
 		{
@@ -1013,8 +1013,8 @@ void cPlayer::StartGlowStickButton()
 	if(mpInit->mpInventory->GetItem("glowstick")!=NULL ||
 		mpInit->mpInventory->GetItem("glowst1")!=NULL)
 	{
-		mpGlowStick->SetActive(!mpGlowStick->IsActive());
-		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
+mpGlowStick->SetActive(!mpGlowStick->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, VRHelper::OffHapticHand(mpInit->mpGame));
 
 		if(mpGlowStick->IsActive())
 		{

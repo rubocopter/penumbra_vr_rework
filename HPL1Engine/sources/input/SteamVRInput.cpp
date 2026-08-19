@@ -15,10 +15,14 @@ namespace hpl {
     : mbAvailable(false), mbUsingActions(false), mbFallbackReported(false), mbHasActiveContext(false),
       mbLeftPoseStateKnown(false), mbRightPoseStateKnown(false),
       mbLeftPoseWasValid(false), mbRightPoseWasValid(false),
-      mActiveContext(eSteamVRInputContext_Gameplay), mfMoveDeadZone(0.15f),
+      mActiveContext(eSteamVRInputContext_Gameplay),
+      mActiveHandedness(eSteamVRHand_Right), mfMoveDeadZone(0.15f),
+      mHandedness(eSteamVRHand_Right),
       mGlobalActionSet(vr::k_ulInvalidActionSetHandle),
       mGameplayActionSet(vr::k_ulInvalidActionSetHandle),
       mUIActionSet(vr::k_ulInvalidActionSetHandle),
+      mGameplayActionSetLeft(vr::k_ulInvalidActionSetHandle),
+      mUIActionSetLeft(vr::k_ulInvalidActionSetHandle),
       mMoveAction(vr::k_ulInvalidActionHandle),
       mTurnAction(vr::k_ulInvalidActionHandle),
       mSprintAction(vr::k_ulInvalidActionHandle),
@@ -32,10 +36,26 @@ namespace hpl {
       mCrouchAction(vr::k_ulInvalidActionHandle),
       mPauseAction(vr::k_ulInvalidActionHandle),
       mRecenterAction(vr::k_ulInvalidActionHandle),
+      mMoveActionLeft(vr::k_ulInvalidActionHandle),
+      mTurnActionLeft(vr::k_ulInvalidActionHandle),
+      mSprintActionLeft(vr::k_ulInvalidActionHandle),
+      mInteractActionLeft(vr::k_ulInvalidActionHandle),
+      mExamineActionLeft(vr::k_ulInvalidActionHandle),
+      mHolsterActionLeft(vr::k_ulInvalidActionHandle),
+      mInventoryActionLeft(vr::k_ulInvalidActionHandle),
+      mNotebookActionLeft(vr::k_ulInvalidActionHandle),
+      mQuickLightActionLeft(vr::k_ulInvalidActionHandle),
+      mJumpActionLeft(vr::k_ulInvalidActionHandle),
+      mCrouchActionLeft(vr::k_ulInvalidActionHandle),
+      mPauseActionLeft(vr::k_ulInvalidActionHandle),
       mUISelectAction(vr::k_ulInvalidActionHandle),
       mUIDragAction(vr::k_ulInvalidActionHandle),
       mUIBackAction(vr::k_ulInvalidActionHandle),
       mUICloseAction(vr::k_ulInvalidActionHandle),
+      mUISelectActionLeft(vr::k_ulInvalidActionHandle),
+      mUIDragActionLeft(vr::k_ulInvalidActionHandle),
+      mUIBackActionLeft(vr::k_ulInvalidActionHandle),
+      mUICloseActionLeft(vr::k_ulInvalidActionHandle),
       mLeftPoseAction(vr::k_ulInvalidActionHandle),
       mRightPoseAction(vr::k_ulInvalidActionHandle),
       mLeftHapticAction(vr::k_ulInvalidActionHandle),
@@ -65,6 +85,8 @@ namespace hpl {
     resolved = ResolveActionSet("/actions/global", mGlobalActionSet) && resolved;
     resolved = ResolveActionSet("/actions/gameplay", mGameplayActionSet) && resolved;
     resolved = ResolveActionSet("/actions/ui", mUIActionSet) && resolved;
+    resolved = ResolveActionSet("/actions/gameplay_left", mGameplayActionSetLeft) && resolved;
+    resolved = ResolveActionSet("/actions/ui_left", mUIActionSetLeft) && resolved;
 
     resolved = ResolveAction("/actions/gameplay/in/move", mMoveAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/turn", mTurnAction) && resolved;
@@ -84,6 +106,26 @@ namespace hpl {
     resolved = ResolveAction("/actions/ui/in/drag", mUIDragAction) && resolved;
     resolved = ResolveAction("/actions/ui/in/back", mUIBackAction) && resolved;
     resolved = ResolveAction("/actions/ui/in/close", mUICloseAction) && resolved;
+
+    // Mirrored (left-handed) action sets. Same intents, same action names,
+    // bound to the opposite physical hand.
+    resolved = ResolveAction("/actions/gameplay_left/in/move", mMoveActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/turn", mTurnActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/sprint", mSprintActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/interact", mInteractActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/examine", mExamineActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/holster", mHolsterActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/inventory", mInventoryActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/notebook", mNotebookActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/quick_light", mQuickLightActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/jump", mJumpActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/crouch", mCrouchActionLeft) && resolved;
+    resolved = ResolveAction("/actions/gameplay_left/in/pause", mPauseActionLeft) && resolved;
+
+    resolved = ResolveAction("/actions/ui_left/in/select", mUISelectActionLeft) && resolved;
+    resolved = ResolveAction("/actions/ui_left/in/drag", mUIDragActionLeft) && resolved;
+    resolved = ResolveAction("/actions/ui_left/in/back", mUIBackActionLeft) && resolved;
+    resolved = ResolveAction("/actions/ui_left/in/close", mUICloseActionLeft) && resolved;
 
     resolved = ResolveAction("/actions/global/in/left_pose", mLeftPoseAction) && resolved;
     resolved = ResolveAction("/actions/global/in/right_pose", mRightPoseAction) && resolved;
@@ -113,12 +155,17 @@ namespace hpl {
     // SteamVR reports a held physical control as changed when the newly active
     // action set binds that control to another action. Without latching the
     // first state, R1/Options can open a UI and immediately close it again.
-    const bool suppressContextEdges = !mbUsingActions || !mbHasActiveContext || context != mActiveContext;
+    // The same latch applies when the dominant hand changes and the mirrored
+    // action set takes over.
+    const bool suppressContextEdges = !mbUsingActions || !mbHasActiveContext ||
+      context != mActiveContext || mHandedness != mActiveHandedness;
 
     vr::VRActiveActionSet_t activeSets[2];
     memset(activeSets, 0, sizeof(activeSets));
     activeSets[0].ulActionSet = mGlobalActionSet;
-    activeSets[1].ulActionSet = context == eSteamVRInputContext_UI ? mUIActionSet : mGameplayActionSet;
+    activeSets[1].ulActionSet = mHandedness == eSteamVRHand_Left
+      ? (context == eSteamVRInputContext_UI ? mUIActionSetLeft : mGameplayActionSetLeft)
+      : (context == eSteamVRInputContext_UI ? mUIActionSet : mGameplayActionSet);
 
     vr::EVRInputError error = vr::VRInput()->UpdateActionState(activeSets, sizeof(vr::VRActiveActionSet_t), 2);
     if (error != vr::VRInputError_None) {
@@ -148,33 +195,34 @@ namespace hpl {
     bool anyActionActive = false;
 
     if (context == eSteamVRInputContext_Gameplay) {
-      AnalogState move = ReadAnalog(mMoveAction);
+      AnalogState move = ReadAnalog(ActionFor(mMoveAction, mMoveActionLeft));
       ApplyMoveDeadZone(move.x, move.y);
       nextState.moveX = move.x;
       nextState.moveY = move.y;
       nextState.moveActive = move.active;
       anyActionActive = move.active;
 
-      AnalogState turn = ReadAnalog(mTurnAction);
+      AnalogState turn = ReadAnalog(ActionFor(mTurnAction, mTurnActionLeft));
       nextState.turnX = turn.x;
       nextState.turnActive = turn.active;
       anyActionActive = anyActionActive || turn.active;
 
-      nextState.sprint = ReadDigital(mSprintAction);
-      nextState.interact = ReadDigital(mInteractAction);
-      nextState.examine = ReadDigital(mExamineAction);
-      nextState.holster = ReadDigital(mHolsterAction);
-      nextState.inventory = ReadDigital(mInventoryAction);
-      nextState.notebook = ReadDigital(mNotebookAction);
-      nextState.quickLight = ReadDigital(mQuickLightAction);
-      nextState.jump = ReadDigital(mJumpAction);
-      nextState.crouch = ReadDigital(mCrouchAction);
-      nextState.pause = ReadDigital(mPauseAction);
+      nextState.sprint = ReadDigital(ActionFor(mSprintAction, mSprintActionLeft));
+      nextState.interact = ReadDigital(ActionFor(mInteractAction, mInteractActionLeft));
+      nextState.examine = ReadDigital(ActionFor(mExamineAction, mExamineActionLeft));
+      nextState.holster = ReadDigital(ActionFor(mHolsterAction, mHolsterActionLeft));
+      nextState.inventory = ReadDigital(ActionFor(mInventoryAction, mInventoryActionLeft));
+      nextState.notebook = ReadDigital(ActionFor(mNotebookAction, mNotebookActionLeft));
+      nextState.quickLight = ReadDigital(ActionFor(mQuickLightAction, mQuickLightActionLeft));
+      nextState.jump = ReadDigital(ActionFor(mJumpAction, mJumpActionLeft));
+      nextState.crouch = ReadDigital(ActionFor(mCrouchAction, mCrouchActionLeft));
+      nextState.pause = ReadDigital(ActionFor(mPauseAction, mPauseActionLeft));
 
       // World interaction needs a current pointing pose. Preserve non-spatial
       // controls such as pause/inventory, but release an in-progress interact
-      // cleanly if tracking disappears.
-      if (!rightHand.IsPoseValid()) {
+      // cleanly if the dominant hand's tracking disappears.
+      TrackedController& pointerHand = mHandedness == eSteamVRHand_Left ? leftHand : rightHand;
+      if (!pointerHand.IsPoseValid()) {
         nextState.interact.pressed = false;
         nextState.interact.justPressed = false;
         nextState.interact.justReleased = previousState.interact.pressed;
@@ -199,14 +247,15 @@ namespace hpl {
         nextState.crouch.active || nextState.pause.active;
     }
     else {
-      nextState.uiSelect = ReadDigital(mUISelectAction);
-      nextState.uiDrag = ReadDigital(mUIDragAction);
-      nextState.uiBack = ReadDigital(mUIBackAction);
-      nextState.uiClose = ReadDigital(mUICloseAction);
+      nextState.uiSelect = ReadDigital(ActionFor(mUISelectAction, mUISelectActionLeft));
+      nextState.uiDrag = ReadDigital(ActionFor(mUIDragAction, mUIDragActionLeft));
+      nextState.uiBack = ReadDigital(ActionFor(mUIBackAction, mUIBackActionLeft));
+      nextState.uiClose = ReadDigital(ActionFor(mUICloseAction, mUICloseActionLeft));
 
       // Selection and dragging are pointer operations. Closing or backing out
       // remains available even if optical hand tracking is temporarily lost.
-      if (!rightHand.IsPoseValid()) {
+      TrackedController& pointerHand = mHandedness == eSteamVRHand_Left ? leftHand : rightHand;
+      if (!pointerHand.IsPoseValid()) {
         nextState.uiSelect.pressed = false;
         nextState.uiSelect.justPressed = false;
         nextState.uiSelect.justReleased = previousState.uiSelect.pressed;
@@ -242,14 +291,26 @@ namespace hpl {
     mbFallbackReported = false;
     mbHasActiveContext = true;
     mActiveContext = context;
+    mActiveHandedness = mHandedness;
     mState = nextState;
     return true;
+  }
+
+  vr::VRActionHandle_t cSteamVRInput::ActionFor(vr::VRActionHandle_t rightAction,
+    vr::VRActionHandle_t leftAction) const {
+    return mHandedness == eSteamVRHand_Left ? leftAction : rightAction;
   }
 
   void cSteamVRInput::UpdateLegacyState(eSteamVRInputContext context,
     TrackedController& leftHand, TrackedController& rightHand) {
     const TrackedController::ButtonState& leftState = leftHand.GetButtonState();
     const TrackedController::ButtonState& rightState = rightHand.GetButtonState();
+    const TrackedController::ButtonState& dominantState =
+      mHandedness == eSteamVRHand_Left ? leftState : rightState;
+    // The mirror of the hard-coded right-handed layout: everything that used
+    // the right hand moves to the dominant hand and vice versa.
+    const TrackedController::ButtonState& offState =
+      mHandedness == eSteamVRHand_Left ? rightState : leftState;
 
     // Skeletal data is not available on the fallback path: grip becomes a
     // binary 0/1 button value while the trigger keeps its analog margin.
@@ -269,67 +330,67 @@ namespace hpl {
     cVRInputState legacyState;
 
     if (context == eSteamVRInputContext_Gameplay) {
-      legacyState.moveActive = leftState.touchContact;
-      legacyState.moveX = leftState.touchX;
-      legacyState.moveY = leftState.touchY;
+      legacyState.moveActive = offState.touchContact;
+      legacyState.moveX = offState.touchX;
+      legacyState.moveY = offState.touchY;
       ApplyMoveDeadZone(legacyState.moveX, legacyState.moveY);
 
-      legacyState.sprint.active = rightState.valid_;
-      legacyState.sprint.pressed = rightState.padPressed;
-      legacyState.sprint.justPressed = rightState.padJustPressed;
-      legacyState.sprint.justReleased = rightState.padJustReleased;
+      legacyState.sprint.active = dominantState.valid_;
+      legacyState.sprint.pressed = dominantState.padPressed;
+      legacyState.sprint.justPressed = dominantState.padJustPressed;
+      legacyState.sprint.justReleased = dominantState.padJustReleased;
 
-      legacyState.interact.active = rightState.valid_;
-      legacyState.interact.pressed = rightState.triggerPressed;
-      legacyState.interact.justPressed = rightState.triggerJustPressed;
-      legacyState.interact.justReleased = rightState.triggerJustReleased;
+      legacyState.interact.active = dominantState.valid_;
+      legacyState.interact.pressed = dominantState.triggerPressed;
+      legacyState.interact.justPressed = dominantState.triggerJustPressed;
+      legacyState.interact.justReleased = dominantState.triggerJustReleased;
 
-      legacyState.examine.active = rightState.valid_;
-      legacyState.examine.pressed = rightState.menuPressed;
-      legacyState.examine.justPressed = rightState.menuJustPressed;
-      legacyState.examine.justReleased = rightState.menuJustReleased;
+      legacyState.examine.active = dominantState.valid_;
+      legacyState.examine.pressed = dominantState.menuPressed;
+      legacyState.examine.justPressed = dominantState.menuJustPressed;
+      legacyState.examine.justReleased = dominantState.menuJustReleased;
 
-      legacyState.inventory.active = rightState.valid_;
-      legacyState.inventory.pressed = rightState.gripPressed;
-      legacyState.inventory.justPressed = rightState.gripJustPressed;
-      legacyState.inventory.justReleased = rightState.gripJustReleased;
+      legacyState.inventory.active = dominantState.valid_;
+      legacyState.inventory.pressed = dominantState.gripPressed;
+      legacyState.inventory.justPressed = dominantState.gripJustPressed;
+      legacyState.inventory.justReleased = dominantState.gripJustReleased;
 
-      legacyState.notebook.active = leftState.valid_;
-      legacyState.notebook.pressed = leftState.menuPressed;
-      legacyState.notebook.justPressed = leftState.menuJustPressed;
-      legacyState.notebook.justReleased = leftState.menuJustReleased;
+      legacyState.notebook.active = offState.valid_;
+      legacyState.notebook.pressed = offState.menuPressed;
+      legacyState.notebook.justPressed = offState.menuJustPressed;
+      legacyState.notebook.justReleased = offState.menuJustReleased;
 
-      legacyState.quickLight.active = leftState.valid_;
-      legacyState.quickLight.pressed = leftState.gripPressed;
-      legacyState.quickLight.justPressed = leftState.gripJustPressed;
-      legacyState.quickLight.justReleased = leftState.gripJustReleased;
+      legacyState.quickLight.active = offState.valid_;
+      legacyState.quickLight.pressed = offState.gripPressed;
+      legacyState.quickLight.justPressed = offState.gripJustPressed;
+      legacyState.quickLight.justReleased = offState.gripJustReleased;
 
-      legacyState.jump.active = leftState.valid_;
-      legacyState.jump.pressed = leftState.triggerPressed;
-      legacyState.jump.justPressed = leftState.triggerJustPressed;
-      legacyState.jump.justReleased = leftState.triggerJustReleased;
+      legacyState.jump.active = offState.valid_;
+      legacyState.jump.pressed = offState.triggerPressed;
+      legacyState.jump.justPressed = offState.triggerJustPressed;
+      legacyState.jump.justReleased = offState.triggerJustReleased;
     }
     else {
-      legacyState.uiSelect.active = rightState.valid_;
-      legacyState.uiSelect.pressed = rightState.triggerPressed;
-      legacyState.uiSelect.justPressed = rightState.triggerJustPressed;
-      legacyState.uiSelect.justReleased = rightState.triggerJustReleased;
+      legacyState.uiSelect.active = dominantState.valid_;
+      legacyState.uiSelect.pressed = dominantState.triggerPressed;
+      legacyState.uiSelect.justPressed = dominantState.triggerJustPressed;
+      legacyState.uiSelect.justReleased = dominantState.triggerJustReleased;
 
-      legacyState.uiDrag.active = rightState.valid_;
-      legacyState.uiDrag.pressed = rightState.padPressed;
-      legacyState.uiDrag.justPressed = rightState.padJustPressed;
-      legacyState.uiDrag.justReleased = rightState.padJustReleased;
+      legacyState.uiDrag.active = dominantState.valid_;
+      legacyState.uiDrag.pressed = dominantState.padPressed;
+      legacyState.uiDrag.justPressed = dominantState.padJustPressed;
+      legacyState.uiDrag.justReleased = dominantState.padJustReleased;
 
-      legacyState.uiBack.active = rightState.valid_;
-      legacyState.uiBack.pressed = rightState.menuPressed;
-      legacyState.uiBack.justPressed = rightState.menuJustPressed;
-      legacyState.uiBack.justReleased = rightState.menuJustReleased;
+      legacyState.uiBack.active = dominantState.valid_;
+      legacyState.uiBack.pressed = dominantState.menuPressed;
+      legacyState.uiBack.justPressed = dominantState.menuJustPressed;
+      legacyState.uiBack.justReleased = dominantState.menuJustReleased;
 
-      legacyState.uiClose.active = rightState.valid_ || leftState.valid_;
-      legacyState.uiClose.pressed = rightState.gripPressed || leftState.menuPressed;
-      legacyState.uiClose.justPressed = rightState.gripJustPressed || leftState.menuJustPressed;
+      legacyState.uiClose.active = dominantState.valid_ || offState.valid_;
+      legacyState.uiClose.pressed = dominantState.gripPressed || offState.menuPressed;
+      legacyState.uiClose.justPressed = dominantState.gripJustPressed || offState.menuJustPressed;
       legacyState.uiClose.justReleased = !legacyState.uiClose.pressed &&
-        (rightState.gripJustReleased || leftState.menuJustReleased);
+        (dominantState.gripJustReleased || offState.menuJustReleased);
     }
 
     mState = legacyState;
@@ -399,6 +460,10 @@ namespace hpl {
     if (deadZone < 0.0f) deadZone = 0.0f;
     if (deadZone > 0.9f) deadZone = 0.9f;
     mfMoveDeadZone = deadZone;
+  }
+
+  void cSteamVRInput::SetHandedness(eSteamVRHand hand) {
+    mHandedness = hand;
   }
 
   bool cSteamVRInput::ResolveActionSet(const char* path, vr::VRActionSetHandle_t& handle) {

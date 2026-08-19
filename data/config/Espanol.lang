@@ -394,6 +394,15 @@
     <Entry Name="VRButton">Botón</Entry>
     <Entry Name="VRHybrid">Híbrido</Entry>
     <Entry Name="TipVRAdjust">R2 aumenta o elige el valor siguiente. R3 reduce o elige el valor anterior.</Entry>
+    <Entry Name="VRHandedness">Mano dominante:</Entry>
+    <Entry Name="VRPlayMode">Modo de juego:</Entry>
+    <Entry Name="VRPlayerHeight">Altura del jugador:</Entry>
+    <Entry Name="VRCalibrateHeight">Calibrar</Entry>
+    <Entry Name="VRLeft">Izquierda</Entry>
+    <Entry Name="VRRight">Derecha</Entry>
+    <Entry Name="VRStanding">De pie</Entry>
+    <Entry Name="VRSeated">Sentado</Entry>
+    <Entry Name="TipVRCalibrateHeight">Ponte de pie y pulsa Calibrar para fijar tu altura de pie.</Entry>
     <Entry Name="ActionMode Camera Speed:">Velocidad de cámara en modo acción:</Entry>
     <Entry Name="InteractMode Camera Speed:">Velocidad de cámara en modo interacción:</Entry>
     <Entry Name="Output Device:">Dispositivo de salida:</Entry>

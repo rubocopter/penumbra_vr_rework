@@ -33,6 +33,8 @@
 
 #include "VRHelper.hpp"
 
+#include "VRHaptics.h"
+
 #include <functional>
 
 float gfMenuFadeAmount;
@@ -1003,6 +1005,9 @@ cMainMenuWidget_Text *gpRenderToMonitorText = NULL;
 
 enum eVRMenuSetting
 {
+	eVRMenuSetting_Handedness,
+	eVRMenuSetting_PlayMode,
+	eVRMenuSetting_PlayerHeight,
 	eVRMenuSetting_TurnMode,
 	eVRMenuSetting_SnapAngle,
 	eVRMenuSetting_SmoothSpeed,
@@ -1025,8 +1030,23 @@ static tWString GetVRSettingText(cInit *mpInit, eVRMenuSetting aSetting)
 	char sValue[64];
 	const cVRSettings& settings = mpInit->mVRSettings;
 
-	switch(aSetting)
+switch(aSetting)
 	{
+	case eVRMenuSetting_Handedness:
+		switch(settings.GetHandedness())
+		{
+		case eVRHandedness_Left: return kTranslate("MainMenu", "VRLeft");
+		default: return kTranslate("MainMenu", "VRRight");
+		}
+	case eVRMenuSetting_PlayMode:
+		switch(settings.GetPlayMode())
+		{
+		case eVRPlayMode_Seated: return kTranslate("MainMenu", "VRSeated");
+		default: return kTranslate("MainMenu", "VRStanding");
+		}
+	case eVRMenuSetting_PlayerHeight:
+		sprintf_s(sValue, sizeof(sValue), "%.2f m", settings.GetPlayerHeight());
+		break;
 	case eVRMenuSetting_TurnMode:
 		switch(settings.GetTurnMode())
 		{
@@ -1095,9 +1115,28 @@ public:
 		const int direction = aButton == eMButton_Left ? 1 : (aButton == eMButton_Right ? -1 : 0);
 		if(direction == 0) return;
 
-		cVRSettings& settings = mpInit->mVRSettings;
+cVRSettings& settings = mpInit->mVRSettings;
 		switch(mSetting)
 		{
+		case eVRMenuSetting_Handedness:
+		{
+			int hand = (int)settings.GetHandedness() + direction;
+			if(hand < (int)eVRHandedness_Left) hand = (int)eVRHandedness_Right;
+			if(hand > (int)eVRHandedness_Right) hand = (int)eVRHandedness_Left;
+			settings.SetHandedness((eVRHandedness)hand);
+			break;
+		}
+		case eVRMenuSetting_PlayMode:
+		{
+			int mode = (int)settings.GetPlayMode() + direction;
+			if(mode < (int)eVRPlayMode_Standing) mode = (int)eVRPlayMode_Seated;
+			if(mode > (int)eVRPlayMode_Seated) mode = (int)eVRPlayMode_Standing;
+			settings.SetPlayMode((eVRPlayMode)mode);
+			break;
+		}
+		case eVRMenuSetting_PlayerHeight:
+			settings.SetPlayerHeight(settings.GetPlayerHeight() + 0.05f * direction);
+			break;
 		case eVRMenuSetting_TurnMode:
 		{
 			int mode = (int)settings.GetTurnMode() + direction;
@@ -1148,13 +1187,53 @@ public:
 			return;
 		}
 
-		gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
+gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
 		mpInit->ApplyVRSettings(true);
 		Log(" [VR settings +%lu ms] menu setting %d changed.\n", GetApplicationTime(), (int)mSetting);
 	}
 
 private:
 	eVRMenuSetting mSetting;
+};
+
+//-----------------------------------------------------------------------
+
+class cMainMenuWidget_CalibrateHeight : public cMainMenuWidget_Button
+{
+public:
+	cMainMenuWidget_CalibrateHeight(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+		cVector2f avFontSize, eFontAlign aAlignment)
+		: cMainMenuWidget_Button(apInit, avPos, asText, eMainMenuState_LastEnum, avFontSize, aAlignment)
+	{
+		msTip = kTranslate("MainMenu", "TipVRCalibrateHeight");
+	}
+
+	void OnMouseDown(eMButton aButton)
+	{
+		if(aButton != eMButton_Left) return;
+
+		cVRSettings& settings = mpInit->mVRSettings;
+		const float headHeight =
+			mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
+		if(headHeight > 0.90f && headHeight < 2.20f)
+		{
+			settings.SetPlayerHeight(headHeight);
+			Log(" [VR settings +%lu ms] player height calibrated at %.2f m.\n",
+				GetApplicationTime(), headHeight);
+			cVRHaptics::Play(mpInit, eVRHapticEvent_UISelect,
+				VRHelper::DominantHapticHand(mpInit->mpGame));
+		}
+		else
+		{
+			Log(" [VR settings +%lu ms] WARNING: player height calibration rejected; "
+				"rawHmd=%.3f outside plausible range (0.90, 2.20) m.\n",
+				GetApplicationTime(), headHeight);
+		}
+
+		gpVRSettingTexts[eVRMenuSetting_PlayerHeight]->msText =
+			GetVRSettingText(mpInit, eVRMenuSetting_PlayerHeight);
+		mpInit->ApplyVRSettings(true);
+	}
 };
 
 
@@ -3332,10 +3411,13 @@ void cMainMenu::CreateWidgets()
   ///////////////////////////////////
   vPos = vTextStart;//cVector3f(400, 260, 40);
 
-  AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
-  vPos.y += 37;
+AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
+  vPos.y += 35;
 
-  const eVRMenuSetting vVRSettingOrder[] = {
+const eVRMenuSetting vVRSettingOrder[] = {
+	eVRMenuSetting_Handedness,
+	eVRMenuSetting_PlayMode,
+	eVRMenuSetting_PlayerHeight,
 	eVRMenuSetting_TurnMode,
 	eVRMenuSetting_SnapAngle,
 	eVRMenuSetting_SmoothSpeed,
@@ -3350,6 +3432,9 @@ void cMainMenu::CreateWidgets()
 	eVRMenuSetting_SubtitleScale
   };
   const char *vVRSettingNames[] = {
+	"VRHandedness",
+	"VRPlayMode",
+	"VRPlayerHeight",
 	"VRTurnMode",
 	"VRSnapAngle",
 	"VRSmoothSpeed",
@@ -3375,7 +3460,15 @@ void cMainMenu::CreateWidgets()
 	gpVRSettingTexts[setting] = hplNew(cMainMenuWidget_Text,
 		(mpInit, vValuePos, GetVRSettingText(mpInit, setting), 16, eFontAlign_Left, pSetting));
 	AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRSettingTexts[setting]);
-	vPos.y += 21;
+
+	if(setting == eVRMenuSetting_PlayerHeight)
+	{
+		AddWidgetToState(eMainMenuState_OptionsVRSettings,
+			hplNew(cMainMenuWidget_CalibrateHeight, (mpInit,
+				cVector3f(vTextStart.x + 170, vPos.y, vPos.z),
+				kTranslate("MainMenu", "VRCalibrateHeight"), 14, eFontAlign_Left)));
+	}
+	vPos.y += 19;
   }
 
   cMainMenuWidget *pVRRenderToMonitor = hplNew(cMainMenuWidget_RenderToMonitor,
@@ -3384,8 +3477,8 @@ void cMainMenu::CreateWidgets()
   sText = mpInit->mpGame->mbRenderToMonitor ? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
   gpRenderToMonitorText = hplNew(cMainMenuWidget_Text,
 	(mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z), sText, 16, eFontAlign_Left, pVRRenderToMonitor));
-  AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
-	vPos.y += 24;
+AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
+	vPos.y += 19;
 
   AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Button,
 	(mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 20, eFontAlign_Center)));

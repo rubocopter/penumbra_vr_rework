@@ -35,17 +35,21 @@ Implemented so far:
   objects, and world-space UI; orientation recentering; snap/smooth/disabled
   turning through world yaw.
 - Persistent VR comfort settings in the `[VR]` section of `settings.cfg`,
-  editable in-game under **Options → VR Settings** (movement speed and dead
-  zone, height offset, turning, UI distance and scale, crouch mode and depth,
-  subtitle scale).
+  editable in-game under **Options → VR Settings** (dominant hand, seated or
+  standing play mode, player height with a Calibrate button, movement speed
+  and dead zone, height offset, turning, UI distance and scale, crouch mode
+  and depth, subtitle scale).
 - Physical, button, and hybrid crouch that drive the real gameplay collider.
   Button crouch lowers the rendered viewpoint by the configured crouch depth;
   physical crouch calibrates a standing HMD height with a plausibility band.
+  Seated play mode applies a height offset at the tracking boundary instead
+  of changing world scale, and player height is a separate semantic value
+  with a Calibrate button that measures the HMD height.
 - Room-anchored fullscreen menus and cinematics with scalable text and no
   opaque letterbox/subtitle bands; compositor-safe black loading frames for
   map changes, new game, tutorial, and saved-game routes.
-- Controller-ray menu and inventory pointing (right hand, with left-hand
-  fallback when the right pose is lost), restored inventory action popups, and
+- Controller-ray menu and inventory pointing (dominant hand, with fallback to
+  the other hand when its pose is lost), restored inventory action popups, and
   localized inventory actions.
 - Semantic haptics routed through intent-named profiles with per-event repeat
   limits.
@@ -89,6 +93,12 @@ As of the latest commits on `development` (August 2026):
   by the configured crouch depth instead of the deeper original move-state
   offset. The crouch and height system has been revalidated and is confirmed
   correct.
+- Dominant-hand, seated/standing play mode, and player-height settings were
+  added on 18 August 2026. Handedness drives gameplay interaction, pointer,
+  throw, and haptics without touching SteamVR bindings; seated mode applies a
+  height offset at the tracking boundary instead of changing world scale; the
+  player-height Calibrate button measures the HMD height. These settings are
+  implemented but have not yet been validated on hardware.
 
 ## Validation
 
@@ -131,6 +141,10 @@ Regression checklist for a future release (PS VR2, SteamVR):
 10. Log checks: `hpl.log` reports the active input path (`SteamVR Input actions
     are active.` or `Falling back to legacy controller polling.`) and no
     repeated `[VR ...]` warnings.
+11. New settings: dominant hand (Left/Right) changes which hand interacts,
+    points, and receives haptics; seated play mode raises the world to the
+    configured player height; the Calibrate button on the Player Height row
+    writes the standing HMD height (outside 0.90–2.20 m it is rejected).
 
 See [the development roadmap](docs/ROADMAP.md) for the planned stages and
 [the VR architecture](docs/VR_ARCHITECTURE.md) for the tracking, world-space,

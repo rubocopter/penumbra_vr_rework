@@ -101,7 +101,7 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 
   // Move relative to the player's hand
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   mpPushBody->SetGravity(false);
@@ -313,8 +313,8 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(false);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
 	
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -385,7 +385,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 							cMath::MatrixMul(	mpPushBody->GetWorldMatrix(),
 												mpPushBody->GetMassCentre());
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), mpPushBody->GetLocalMatrix());
 
 	//Set cross hair image.
@@ -405,7 +405,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 
   mpPushBody->SetCollidePlayer(false);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, eVRHapticHand_Right);
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------
@@ -414,8 +414,8 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 {
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(true);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 	mpPushBody->SetGravity(mbHasGravity);
@@ -431,7 +431,7 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 
 	mpPlayer->SetSpeedMul(1.0f);
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -440,12 +440,12 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
   auto firstFrame = max(min(mlThrowHistoryCnt, 2) - 1, 0);
   auto lastFrame = min(mlThrowHistoryCnt, 9);
 
-  mpPushBody->SetLinearVelocity(mpInit->mpGame->vr_right_hand.GetVelocity());
-  mpPushBody->SetAngularVelocity(mpInit->mpGame->vr_right_hand.GetAngularVelocity() * 0.5f);
+  mpPushBody->SetLinearVelocity(VRHelper::DominantHand(mpInit->mpGame).GetVelocity());
+  mpPushBody->SetAngularVelocity(VRHelper::DominantHand(mpInit->mpGame).GetAngularVelocity() * 0.5f);
 
   mpPushBody->SetCollidePlayer(true);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, eVRHapticHand_Right);
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------
@@ -549,7 +549,7 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   //mpPushBody->SetLinearVelocity(mpPushBody->GetWorldPosition() - pos);
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -719,8 +719,8 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(false);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -749,7 +749,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPushBody->SetAutoDisable(false);
 
 	//The pick point relative to the body
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 	mvPickPoint = handMat.GetTranslation();
 
 	/////////////////////////////////////////
@@ -801,7 +801,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
       GetApplicationTime());
   }
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, eVRHapticHand_Right);
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------
@@ -816,8 +816,8 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	mpPushBody->RemoveBodyCallback(mpCallback);
 	}*/
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(true);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
 
 	////////////////////////////
 	//Pause controllers
@@ -852,7 +852,7 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	if(mPrevState == ePlayerState_Normal)
 		mpPlayer->ResetCrossHairPos();
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, eVRHapticHand_Right);
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------
@@ -893,7 +893,7 @@ cPlayerState_Push_VR::cPlayerState_Push_VR(cInit *apInit,cPlayer *apPlayer) : iP
 void cPlayerState_Push_VR::OnUpdate(float afTimeStep)
 {	
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 
   auto destDiff = handMat.GetTranslation() - (mpPushBody->GetLocalPosition() + mvRelPickPoint);
   auto moveDirection = cMath::Vector3Normalize(destDiff);
@@ -1069,8 +1069,8 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(false);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -1129,14 +1129,14 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 	mlForward = 0;
 	mlSideways = 0;
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 
   //The pick point relative to the body
   mvRelPickPoint = handMat.GetTranslation() - mpPushBody->GetLocalPosition();
 
   // mpPushBody->SetCollidePlayer(false);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, eVRHapticHand_Right);
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------
@@ -1145,8 +1145,8 @@ void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 {
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(1))
-    mpInit->mpPlayerHands->GetCurrentModel(1)->SetVisible(true);
+  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
+    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 
@@ -1162,7 +1162,7 @@ void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 	mpPushBody->SetAutoDisable(true);
 	//mpPushBody->AddForce(cVector3f(0,-1,0) *60.0f *mpPushBody->GetMass());
 
-	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, eVRHapticHand_Right);
+	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 

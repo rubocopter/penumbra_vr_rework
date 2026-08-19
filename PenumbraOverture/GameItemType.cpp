@@ -32,6 +32,7 @@
 #include "HudModel_Weapon.h"
 #include "HudModel_Throw.h"
 #include "VRHaptics.h"
+#include "VRHelper.hpp"
 
 //////////////////////////////////////////////////////////////////////////
 // BASE ITEM CLASS
@@ -108,7 +109,7 @@ void cGameItemType_Normal::OnUse(cInventoryItem *apItem, iGameEntity* apEntity)
 
 	if(bUsed || bCallbackUsed)
 	{
-		cVRHaptics::Play(mpInit, eVRHapticEvent_Interaction, eVRHapticHand_Right);
+		cVRHaptics::Play(mpInit, eVRHapticEvent_Interaction, VRHelper::DominantHapticHand(mpInit->mpGame));
 	}
 }
 
@@ -355,6 +356,8 @@ cGameItemType_WeaponMelee::cGameItemType_WeaponMelee(cInit *apInit)
 
 bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum)
 {
+	const int weaponSlot = VRHelper::DominantHandSlot(mpInit->mpGame);
+
 	//////////////
 	//Equip
 	if(alActionNum == 0)
@@ -363,10 +366,10 @@ bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum
 		if(mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName())==NULL)
 			mpInit->mpPlayerHands->AddModelFromFile(apItem->GetHudModelFile());
 
-		if(mpInit->mpPlayerHands->GetCurrentModel(1) &&
-			mpInit->mpPlayerHands->GetCurrentModel(1)->msName == apItem->GetHudModelName())
+		if(mpInit->mpPlayerHands->GetCurrentModel(weaponSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(weaponSlot)->msName == apItem->GetHudModelName())
 		{
-			//mpInit->mpPlayerHands->SetCurrentModel(1, "");
+			//mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, "");
 			
 			mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 		}
@@ -378,7 +381,7 @@ bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum
 				return true;
 			}
 			
-            if(mpInit->mbHasHaptics==false) mpInit->mpPlayerHands->SetCurrentModel(1, apItem->GetHudModelName());
+            if(mpInit->mbHasHaptics==false) mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, apItem->GetHudModelName());
 
 			//////////////////////////
 			//Set up the melee state
@@ -420,6 +423,8 @@ cGameItemType_Throw::cGameItemType_Throw(cInit *apInit)
 
 bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 {
+	const int weaponSlot = VRHelper::DominantHandSlot(mpInit->mpGame);
+
 	//////////////
 	//Equip
 	if(alActionNum == 0)
@@ -428,10 +433,10 @@ bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 		if(mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName())==NULL)
 			mpInit->mpPlayerHands->AddModelFromFile(apItem->GetHudModelFile());
 
-		if(mpInit->mpPlayerHands->GetCurrentModel(1) &&
-			mpInit->mpPlayerHands->GetCurrentModel(1)->msName == apItem->GetHudModelName())
+		if(mpInit->mpPlayerHands->GetCurrentModel(weaponSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(weaponSlot)->msName == apItem->GetHudModelName())
 		{
-			//mpInit->mpPlayerHands->SetCurrentModel(1, "");
+			//mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, "");
 
 			mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 		}
@@ -443,7 +448,7 @@ bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 				return true;
 			}
 
-			mpInit->mpPlayerHands->SetCurrentModel(1, apItem->GetHudModelName());
+			mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, apItem->GetHudModelName());
 
 			//////////////////////////
 			//Set up the throw state

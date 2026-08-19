@@ -11,6 +11,7 @@ fallback and existing game scripts continue to work.
 | --- | --- | --- |
 | Load the SteamVR action manifest | HPL1 | `HPL1Engine/sources/input/SteamVRInput.cpp` |
 | Read logical left/right poses and pose validity | HPL1 | `SteamVRInput.cpp`, `TrackedController.cpp` |
+| Expose the dominant-hand preference and gate poses, legacy fallback, and mirrored action sets by it | HPL1 | `Game.cpp` (`vr_dominant_hand`), `SteamVRInput.cpp` (`SetHandedness`), `VRHelper.hpp` |
 | Poll compositor poses and keep a legacy device-role fallback | HPL1 | `HPL1Engine/sources/game/Game.cpp` |
 | Read SteamVR digital/analog actions | HPL1 | `SteamVRInput.cpp` |
 | Read legacy OpenVR controller IDs and axes | HPL1 | `TrackedController.cpp` |
@@ -20,9 +21,54 @@ fallback and existing game scripts continue to work.
 | Define physical controller bindings | Data/runtime | `data/vr/actions.json`, `data/vr/bindings/*.json` |
 
 HPL1 should expose device-independent facts: a logical hand pose is valid, an
-action changed state, an analog axis has a value, or a haptic request should be
-sent. It should not decide what a door, key, notebook, weapon, or inventory item
-does.
+action changed state, an analog axis has a value, a haptic request should be
+sent, or a hand is the configured dominant one. It should not decide what a
+door, key, notebook, weapon, or inventory item does. Handedness is therefore a
+semantic preference (`cGame::vr_dominant_hand`) consulted by gameplay and UI;
+`cSteamVRInput::SetHandedness` applies it to pose gating, the legacy fallback
+buttons, and the choice of action set.
+
+## Mirrored action sets
+
+SteamVR bindings are mirrored rather than swapped in code: `data/vr/actions.json`
+declares `/actions/gameplay_left` and `/actions/ui_left` with the same
+intent-named actions as `/actions/gameplay` and `/actions/ui`, and every binding
+JSON carries a `_left` set whose controls are the exact left/right mirror of the
+default set (PS VR2: move on the right stick and turn on the left stick, sprint
+and crouch swapped, notebook/holster on the off hand's cross/circle, quick
+light on the off hand's R1, interact/inventory/examine/jump on the dominant
+hand's L2/L1/triangle/square, UI select on L2+R2, UI drag on the left stick,
+UI back on the dominant triangle, UI close on L1/cross/options). Pause and
+recenter are deliberately NOT mirrored: they stay on the same physical
+controls as the default layout (Options and left Create, or the equivalent
+per profile), because sharing a physical input between two actions of the
+same hand set proved unreliable in SteamVR. The global set (poses, haptics,
+skeletons) is not mirrored because those actions are physical and
+hand-agnostic.
+
+The PS VR2 and Touch drivers expose asymmetric face buttons (PS VR2 left:
+square/triangle, right: cross/circle; Touch left: x/y, right: a/b), so each
+mirrored binding moves an action to the same physical button position on the
+other hand instead of reusing the same input name. Changing the dominant hand
+while a tool or light is attached returns the player to bare hands first
+(`cInit::ApplyVRSettings`), so the old slot models cannot duplicate on the
+mirrored slots. The notebook does the same when it opens (`cNotebook::SetActive`):
+it is a navigation-only view that always hangs on the off hand, so both hands
+return to bare (holstered tools, lights off). Its lateral placement is a
+plain displacement on the off hand's local +X axis (toward the body centre
+for both hands in OpenVR) of about half a notebook width, so the hand sits
+at the notebook's outer edge in both dominant modes. Grab-target detection
+runs for the dominant hand only (`cPlayerState_Normal_VR`), so the off hand
+never highlights or grabs anything.
+
+`cSteamVRInput` resolves both sets once at startup. `Update` activates the set
+that matches `mHandedness` (plus the global set), reads every action through
+`ActionFor` so consumer code never sees a hand, and treats a handedness change
+like a context change: edges are suppressed for one frame so a held button
+cannot fire on the mirrored action it was swapped onto. `UpdateLegacyState`
+mirrors the same layout for the OpenVR polling fallback by reading the
+dominant-hand state where the default layout used the right hand and the
+off-hand state where it used the left hand.
 
 ## PenumbraVR responsibilities
 
@@ -102,7 +148,7 @@ Changes that can remain inside HPL1 without rewriting interaction mechanics:
 - pose acquisition and reconnection;
 - dead-zone and analog normalization;
 - action-set lifecycle and input-edge handling;
-- handedness routing at the action level;
+- pose gating and legacy fallback selection by the dominant hand;
 - centralized haptic output;
 - tracking-to-world, recenter, and turn transforms.
 
@@ -117,19 +163,23 @@ Changes that require Penumbra gameplay work:
 - crouch state and character collider changes.
 
 With controller transport normalized, the next input work can add dead zones,
-handedness, or more controller bindings at one stable boundary without
-rewriting HPL1's keyboard/mouse system or Penumbra's interaction state machines.
+more controller bindings, or further semantic preferences at one stable
+boundary without rewriting HPL1's keyboard/mouse system or Penumbra's
+interaction state machines.
 
 The persistent `[VR]` settings use this boundary directly. HPL1 applies a
 radial movement dead zone to both action and fallback axes, Penumbra applies the
 movement-speed multiplier, and `cVRTrackingSpace` owns the vertical calibration
-offset. Defaults preserve the previously validated behaviour apart from the
-small anti-drift dead zone.
+offset (posture offset plus the seated-play-mode offset). Defaults preserve the
+previously validated behaviour apart from the small anti-drift dead zone.
 
 `Options → VR Settings` edits these values through `cVRSettings`, applies them
 to the live engine boundary, and saves the normal user config immediately. R2
 increments or selects the next value, R3 decrements or selects the previous
-value, and Circle is reserved for back navigation in the main menu.
+value, and Circle is reserved for back navigation in the main menu. The
+dominant-hand, play-mode, and player-height rows sit at the top of the list;
+the player-height row carries a Calibrate button that measures the HMD height
+directly.
 
 World yaw is also owned by `cVRTrackingSpace`. Snap turn, smooth turn, and
 orientation recenter modify that single value, so the HMD, both hands, physical
@@ -154,9 +204,11 @@ limitations.
 
 Penumbra now records target and held-body ownership separately for the left and
 right hands. Target detection may run for both hands, but the currently exposed
-R2 interaction deliberately mirrors only the right-hand target into the legacy
-`PickedBody` slot used by original entity callbacks. This removes the old
-first-hand-wins behaviour without prematurely enabling L2 interaction.
+R2 interaction deliberately mirrors only the configured dominant-hand target
+into the legacy `PickedBody` slot used by original entity callbacks. This
+removes the old first-hand-wins behaviour without prematurely enabling L2
+interaction; changing the dominant hand in VR Settings reselects which hand
+drives interaction, pointer, throw velocity, and haptics.
 
 The immutable overlap shape is allocated once per loaded physics world and
 reused by both sequential hand queries. Invalid hand poses are skipped, and an
@@ -176,4 +228,13 @@ Vive-specific hardware pass.
 This describes the 14 August 2026 milestone build. The crouch and hand-rig
 areas changed afterwards (16–18 August 2026). The crouch and height system has
 been revalidated and is confirmed correct; the hand animation remains
-experimental and currently shows incorrect visual behaviour.
+experimental and currently shows incorrect visual behaviour. Dominant-hand,
+seated/standing play mode, and player-height settings were added on
+18 August 2026 and await hardware validation. The left-handed mirror
+(equipment slots bound to the dominant/off hand, mirrored SteamVR action sets
+and legacy fallback, notebook always on the off hand with a plain inward
+lateral offset, interact target detection accepting the left rig name
+`LeftHand` and running for the dominant hand only, asymmetric PS VR2/Touch
+face-button mirrors, per-profile pause and recenter shared between modes, and
+bare-hands resets on handedness change and notebook open) was added on
+19 August 2026 and awaits a final PS VR2 regression pass.

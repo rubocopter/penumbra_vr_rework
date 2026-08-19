@@ -177,7 +177,7 @@ foreach ($legacyButtonField in @(
 $vrSettingsSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\VRSettings.cpp')
 $vrSettingsHeader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\VRSettings.h')
 foreach ($requiredVRSetting in @(
-    'MoveSpeed', 'MoveDeadZone', 'HeightOffset',
+    'MoveSpeed', 'MoveDeadZone', 'HeightOffset', 'PlayerHeight',
     'SnapTurnAngle', 'SmoothTurnSpeed', 'TurnDeadZone',
     'UIDistance', 'UIScale', 'PhysicalCrouchDepth', 'SubtitleScale'
 )) {
@@ -196,12 +196,21 @@ if ($vrSettingsSource -notmatch [regex]::Escape('GetString("VR", "CrouchMode"') 
     $vrSettingsSource -notmatch [regex]::Escape('SetString("VR", "CrouchMode"')) {
     throw 'Persistent VR setting CrouchMode must be loaded from and saved to the [VR] section.'
 }
+foreach ($requiredVRStringSetting in @('Handedness', 'PlayMode')) {
+    if ($vrSettingsSource -notmatch [regex]::Escape("GetString(`"VR`", `"$requiredVRStringSetting`"")) {
+        throw "Persistent VR setting '$requiredVRStringSetting' is not loaded from the [VR] section."
+    }
+    if ($vrSettingsSource -notmatch [regex]::Escape("SetString(`"VR`", `"$requiredVRStringSetting`"")) {
+        throw "Persistent VR setting '$requiredVRStringSetting' is not saved to the [VR] section."
+    }
+}
 
 foreach ($requiredVRSetter in @(
     'SetMoveSpeed', 'SetMoveDeadZone', 'SetHeightOffset', 'SetTurnMode',
     'SetSnapTurnAngle', 'SetSmoothTurnSpeed', 'SetTurnDeadZone',
     'SetUIDistance', 'SetUIScale', 'SetCrouchMode',
-    'SetPhysicalCrouchDepth', 'SetSubtitleScale'
+    'SetPhysicalCrouchDepth', 'SetSubtitleScale',
+    'SetHandedness', 'SetPlayMode', 'SetPlayerHeight'
 )) {
     if ($vrSettingsHeader -notmatch [regex]::Escape($requiredVRSetter)) {
         throw "The in-game VR settings editor is missing clamped setter '$requiredVRSetter'."
@@ -216,6 +225,8 @@ if ($mainMenuSource -notmatch [regex]::Escape('eMainMenuState_Options,//eMainMen
     throw 'The VR settings state is missing from the positional menu back-state table.'
 }
 foreach ($requiredVRMenuTranslation in @(
+    'VRHandedness', 'VRPlayMode', 'VRPlayerHeight', 'VRCalibrateHeight',
+    'VRLeft', 'VRRight', 'VRStanding', 'VRSeated', 'TipVRCalibrateHeight',
     'VRTurnMode', 'VRSnapAngle', 'VRSmoothSpeed', 'VRTurnDeadZone',
     'VRMoveSpeed', 'VRMoveDeadZone', 'VRHeightOffset', 'VRUIDistance',
     'VRUIScale', 'VRCrouchMode', 'VRPhysicalCrouchDepth', 'VRSubtitleScale',
@@ -275,8 +286,8 @@ foreach ($requiredInventoryVRSnippet in @(
 $vrHelperSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\VRHelper.hpp')
 foreach ($requiredPointerSnippet in @(
     'TraceUIPointer',
-    'vr_right_hand.IsPoseValid()',
-    'vr_left_hand.IsPoseValid()',
+    'DominantHand(game).IsPoseValid()',
+    'OffHand(game).IsPoseValid()',
     'pointerDrawActive = true',
     'pointerDrawStart = rayStart'
 )) {
@@ -336,7 +347,8 @@ $vrHeldObjectSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot '
 foreach ($requiredHandStateSnippet in @(
     'cVRHandTarget mVRHandTargets[eVRHandIndex_Count]',
     'iPhysicsBody *mVRHeldBodies[eVRHandIndex_Count]',
-    'GetVRHandTarget(eVRHandIndex_Right)',
+    'GetVRHandTarget(',
+    'vr_dominant_hand == eSteamVRHand_Left',
     'GetVRHandInteractionShape()',
     'SetVRHeldBody(eVRHandIndex_Right'
 )) {

@@ -81,6 +81,56 @@
       "type": "boolean"
     },
     {
+      "name": "/actions/gameplay_left/in/move",
+      "requirement": "mandatory",
+      "type": "vector2"
+    },
+    {
+      "name": "/actions/gameplay_left/in/turn",
+      "type": "vector2"
+    },
+    {
+      "name": "/actions/gameplay_left/in/sprint",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/interact",
+      "requirement": "mandatory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/examine",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/holster",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/inventory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/notebook",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/quick_light",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/jump",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/crouch",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/gameplay_left/in/pause",
+      "type": "boolean"
+    },
+    {
       "name": "/actions/ui/in/select",
       "requirement": "mandatory",
       "type": "boolean"
@@ -96,6 +146,23 @@
     {
       "name": "/actions/ui/in/close",
       "type": "boolean"
+    },
+    {
+      "name": "/actions/ui_left/in/select",
+      "requirement": "mandatory",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui_left/in/drag",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui_left/in/back",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/ui_left/in/close",
+      "type": "boolean"
     }
   ],
   "action_sets": [
@@ -108,7 +175,15 @@
       "usage": "leftright"
     },
     {
+      "name": "/actions/gameplay_left",
+      "usage": "leftright"
+    },
+    {
       "name": "/actions/ui",
+      "usage": "leftright"
+    },
+    {
+      "name": "/actions/ui_left",
       "usage": "leftright"
     }
   ],
@@ -146,6 +221,19 @@
       "/actions/global/out/left_haptic": "Left hand haptics",
       "/actions/global/out/right_haptic": "Right hand haptics",
       "/actions/gameplay": "Gameplay",
+      "/actions/gameplay_left": "Gameplay (left-handed)",
+      "/actions/gameplay_left/in/move": "Move",
+      "/actions/gameplay_left/in/turn": "Turn",
+      "/actions/gameplay_left/in/sprint": "Sprint",
+      "/actions/gameplay_left/in/interact": "Interact",
+      "/actions/gameplay_left/in/examine": "Examine",
+      "/actions/gameplay_left/in/holster": "Holster equipped tool",
+      "/actions/gameplay_left/in/inventory": "Inventory",
+      "/actions/gameplay_left/in/notebook": "Notebook",
+      "/actions/gameplay_left/in/quick_light": "Quick light",
+      "/actions/gameplay_left/in/jump": "Jump",
+      "/actions/gameplay_left/in/crouch": "Crouch",
+      "/actions/gameplay_left/in/pause": "Pause menu",
       "/actions/gameplay/in/move": "Move",
       "/actions/gameplay/in/turn": "Turn",
       "/actions/gameplay/in/sprint": "Sprint",
@@ -159,6 +247,11 @@
       "/actions/gameplay/in/crouch": "Crouch",
       "/actions/gameplay/in/pause": "Pause menu",
       "/actions/ui": "Menus and inventory",
+      "/actions/ui_left": "Menus and inventory (left-handed)",
+      "/actions/ui_left/in/select": "Select",
+      "/actions/ui_left/in/drag": "Drag or combine",
+      "/actions/ui_left/in/back": "Back or examine",
+      "/actions/ui_left/in/close": "Close",
       "/actions/ui/in/select": "Select",
       "/actions/ui/in/drag": "Drag or combine",
       "/actions/ui/in/back": "Back or examine",
@@ -175,6 +268,19 @@
       "/actions/global/out/left_haptic": "Vibración de la mano izquierda",
       "/actions/global/out/right_haptic": "Vibración de la mano derecha",
       "/actions/gameplay": "Juego",
+      "/actions/gameplay_left": "Juego (zurdo)",
+      "/actions/gameplay_left/in/move": "Moverse",
+      "/actions/gameplay_left/in/turn": "Girar",
+      "/actions/gameplay_left/in/sprint": "Correr",
+      "/actions/gameplay_left/in/interact": "Interactuar",
+      "/actions/gameplay_left/in/examine": "Examinar",
+      "/actions/gameplay_left/in/holster": "Guardar herramienta equipada",
+      "/actions/gameplay_left/in/inventory": "Inventario",
+      "/actions/gameplay_left/in/notebook": "Cuaderno",
+      "/actions/gameplay_left/in/quick_light": "Luz rápida",
+      "/actions/gameplay_left/in/jump": "Saltar",
+      "/actions/gameplay_left/in/crouch": "Agacharse",
+      "/actions/gameplay_left/in/pause": "Menú de pausa",
       "/actions/gameplay/in/move": "Moverse",
       "/actions/gameplay/in/turn": "Girar",
       "/actions/gameplay/in/sprint": "Correr",
@@ -188,6 +294,11 @@
       "/actions/gameplay/in/crouch": "Agacharse",
       "/actions/gameplay/in/pause": "Menú de pausa",
       "/actions/ui": "Menús e inventario",
+      "/actions/ui_left": "Menús e inventario (zurdo)",
+      "/actions/ui_left/in/select": "Seleccionar",
+      "/actions/ui_left/in/drag": "Arrastrar o combinar",
+      "/actions/ui_left/in/back": "Atrás o examinar",
+      "/actions/ui_left/in/close": "Cerrar",
       "/actions/ui/in/select": "Seleccionar",
       "/actions/ui/in/drag": "Arrastrar o combinar",
       "/actions/ui/in/back": "Atrás o examinar",

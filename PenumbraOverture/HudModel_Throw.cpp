@@ -26,6 +26,7 @@
 #include "GameEnemy.h"
 #include "MapHandler.h"
 #include "Inventory.h"
+#include "VRHelper.hpp"
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -128,7 +129,7 @@ void cHudModel_Throw::OnAttackUp()
 
 	//cVector3f vRot = cVector3f(pCam->GetPitch(),pCam->GetYaw(), pCam->GetRoll());
   cMatrixf mtxStart; // = cMath::MatrixRotate(vRot, eEulerRotationOrder_XYZ);
-  mpInit->mpPlayerHands->GetCurrentModel(1)->UpdatePoseMatrix(mtxStart, 0.0f);
+  mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->UpdatePoseMatrix(mtxStart, 0.0f);
 	//mtxStart.SetTranslation(pCam->GetPosition());
 	
 	iEntity3D *pEntity = mpInit->mpGame->GetScene()->GetWorld3D()->CreateEntity("Throw",mtxStart,
@@ -144,8 +145,8 @@ void cHudModel_Throw::OnAttackUp()
         for(int i=0; i< pEntity->GetBodyNum(); ++i)
 		{
 			iPhysicsBody *pBody = pEntity->GetBody(i);
-      pBody->SetLinearVelocity(mpInit->mpGame->vr_right_hand.GetVelocity() * 1.5f);
-      pBody->SetAngularVelocity(mpInit->mpGame->vr_right_hand.GetAngularVelocity());
+      pBody->SetLinearVelocity(VRHelper::DominantHand(mpInit->mpGame).GetVelocity() * 1.5f);
+      pBody->SetAngularVelocity(VRHelper::DominantHand(mpInit->mpGame).GetAngularVelocity());
       pBody->SetActive(true);
       pBody->SetEnabled(true);
 		}
@@ -168,7 +169,7 @@ void cHudModel_Throw::OnAttackUp()
 	{
 		mfTime = 0.0f;
 		mpInit->mpInventory->RemoveItem(mpItem);
-		mpInit->mpPlayerHands->SetCurrentModel(1,"");
+		mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 		mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 	}
 

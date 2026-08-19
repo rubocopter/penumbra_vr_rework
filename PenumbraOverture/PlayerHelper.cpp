@@ -1441,6 +1441,8 @@ void cPlayerFlashLight::OnWorldLoad()
 
 void cPlayerFlashLight::Update(float afTimeStep)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive)
 	{
 		//////////////////////////
@@ -1462,7 +1464,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 										cVector3f(0,-1,0));
 			}
 			
-			if(pHudModel == mpInit->mpPlayerHands->GetCurrentModel(0))
+			if(pHudModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
 			{
 				tGameEnemyIterator it = mpInit->mpMapHandler->GetGameEnemyIterator();
 				while(it.HasNext())
@@ -1510,7 +1512,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 	}
 	
 	
-	iHudModel *pHudModel = mpInit->mpPlayerHands->GetCurrentModel(0);
+	iHudModel *pHudModel = mpInit->mpPlayerHands->GetCurrentModel(offSlot);
 	
 	//////////////////////////
 	//Player power
@@ -1566,6 +1568,8 @@ void cPlayerFlashLight::Update(float afTimeStep)
 
 void cPlayerFlashLight::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	cSoundHandler *pSoundHanlder = mpInit->mpGame->GetSound()->GetSoundHandler();
 
 	if(abX && (mpInit->mpPlayer->GetPower()==0 || mbDisabled)) {
@@ -1580,18 +1584,18 @@ void cPlayerFlashLight::SetActive(bool abX)
 	//Active
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Flashlight");
-    mpInit->mpPlayerHands->GetCurrentModel(0)->SetHandIndex(0);
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flashlight");
+    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
 		
 		//pSoundHanlder->PlayGui("item_flashlight_on",false,1);
 	}
 	/////////////////////////////
 	//Not active
-	else if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Flashlight" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flashlight" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		
 		if(mpInit->mpPlayer->GetPower()==0)
 			pSoundHanlder->PlayGui("item_flashlight_nopower",false,1);
@@ -1678,6 +1682,8 @@ void cPlayerGlowStick::Update(float afTimeStep)
 
 void cPlayerGlowStick::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive == abX) return;
 	mbActive = abX;
 
@@ -1686,16 +1692,16 @@ void cPlayerGlowStick::SetActive(bool abX)
 	if(mbActive)
 	{
 		//Log("Setting the glowstick to TRUE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Glowstick");
-    mpInit->mpPlayerHands->GetCurrentModel(0)->SetHandIndex(0);
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Glowstick");
+    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
 		//pSoundHanlder->PlayGui("item_glowstick_on",false,1);
 	}
-	else if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Glowstick" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Glowstick" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 	{
 		//Log("Setting the glowstick to FALSE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(0,"");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		//pSoundHanlder->PlayGui("item_glowstick_off",false,1);
 	}
 }
@@ -2051,6 +2057,7 @@ void cPlayerFlare::OnWorldLoad()
 
 void cPlayerFlare::Update(float afTimeStep)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
 	if(mbActive)
 	{
 		//////////////////////////////////////
@@ -2101,7 +2108,7 @@ void cPlayerFlare::Update(float afTimeStep)
 		// Model entities not loaded yet
 		else
 		{
-			if(mpModel == mpInit->mpPlayerHands->GetCurrentModel(0))
+			if(mpModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
 			{
 				if(mpModel->mvLights.empty()==false)
 				{
@@ -2123,6 +2130,8 @@ void cPlayerFlare::Update(float afTimeStep)
 
 void cPlayerFlare::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive == abX) return;
 	mbActive = abX;
 
@@ -2130,7 +2139,7 @@ void cPlayerFlare::SetActive(bool abX)
 
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Flare");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flare");
 
 		if(mpInit->mpPlayer->GetFlashLight()->IsActive())
 			mpInit->mpPlayer->GetFlashLight()->SetActive(false);
@@ -2146,11 +2155,11 @@ void cPlayerFlare::SetActive(bool abX)
 	{
 		///////////////////////////////
 		//Check if hud model should be put down.
-		if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Flare" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+		if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flare" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 		{
-			mpInit->mpPlayerHands->SetCurrentModel(0,"");
+			mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		}
 
 		///////////////////////////////

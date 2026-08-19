@@ -4,12 +4,49 @@
 #include "math/Math.h"
 #include "game/Game.h"
 #include "scene/Scene.h"
+#include "VRHaptics.h"
 
 using namespace hpl;
 
 namespace VRHelper {
   static inline cMatrixf TrackingToWorldSpace(const cMatrixf& trackingSpaceMtx, cGame* game) {
     return game->vr_tracking.TrackingToWorld(trackingSpaceMtx);
+  }
+
+  // The preferred hand is an application preference owned by the VR layer.
+  // Gameplay and UI must query these helpers instead of assuming that the
+  // right hand is the primary interaction hand.
+  static inline TrackedController& DominantHand(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left
+      ? game->vr_left_hand : game->vr_right_hand;
+  }
+
+  static inline TrackedController& OffHand(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left
+      ? game->vr_right_hand : game->vr_left_hand;
+  }
+
+  // Haptic feedback follows the same hand ownership as the interaction it
+  // reports (held object, used item, melee impact).
+  static inline eVRHapticHand DominantHapticHand(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left
+      ? eVRHapticHand_Left : eVRHapticHand_Right;
+  }
+
+  static inline eVRHapticHand OffHapticHand(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left
+      ? eVRHapticHand_Right : eVRHapticHand_Left;
+  }
+
+  // cPlayerHands model slots: 0 = left hand, 1 = right hand. Equipment
+  // (weapons, lights) must be attached to the slot that owns the object, not
+  // to a fixed side, so handedness keeps working symmetrically.
+  static inline int DominantHandSlot(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left ? 0 : 1;
+  }
+
+  static inline int OffHandSlot(cGame* game) {
+    return game->vr_dominant_hand == eSteamVRHand_Left ? 1 : 0;
   }
 
   static inline cVector3f CollideCenter(tCollidePointVec collidePoints, int numContactPoints) {
@@ -76,9 +113,9 @@ namespace VRHelper {
     return 1;
   }
 
-  // Projects the best available controller pose onto a complete 800x600 UI
-  // surface. The right hand remains the primary pointer, while the left hand
-  // takes over automatically if SteamVR temporarily loses the right pose.
+// Projects the best available controller pose onto a complete 800x600 UI
+  // surface. The dominant hand remains the primary pointer, while the other
+  // hand takes over automatically if SteamVR temporarily loses its pose.
   static inline bool TraceUIPointer(cGame* game, const cMatrixf& uiMatrix,
     bool worldSpace, cVector2f* screenPos, cVector3f* rayStart,
     cVector3f* rayEnd, bool* usingLeftHand = NULL)
@@ -86,12 +123,12 @@ namespace VRHelper {
     cMatrixf handMatrix;
     bool leftHand = false;
 
-    if(game->vr_right_hand.IsPoseValid())
-      handMatrix = game->vr_right_hand.GetMatrix();
-    else if(game->vr_left_hand.IsPoseValid())
+    if(DominantHand(game).IsPoseValid())
+      handMatrix = DominantHand(game).GetMatrix();
+    else if(OffHand(game).IsPoseValid())
     {
-      handMatrix = game->vr_left_hand.GetMatrix();
-      leftHand = true;
+      handMatrix = OffHand(game).GetMatrix();
+      leftHand = game->vr_dominant_hand != eSteamVRHand_Left;
     }
     else
       return false;

@@ -21,6 +21,7 @@
 #include "Init.h"
 #include "Player.h"
 #include "PlayerHelper.h"
+#include "PlayerHands.h"
 #include "Inventory.h"
 #include "SaveHandler.h"
 #include "EffectHandler.h"
@@ -964,9 +965,10 @@ void cNotebook::Update(float afTimeStep)
     mfAlpha = 1;
 	}
 
-  //////////////////////////////
-  //Stick the notebook to the player's left hand
-  if (mpInit->mpGame->vr_left_hand.IsPoseValid())
+//////////////////////////////
+  //Stick the notebook to the player's off hand (the hand not used for
+  //pointing), so the dominant hand keeps the pointer free.
+  if (VRHelper::OffHand(mpInit->mpGame).IsPoseValid())
   {
     auto scene = mpInit->mpGame->GetScene();
 
@@ -974,16 +976,29 @@ void cNotebook::Update(float afTimeStep)
     auto centerPos = pCamera3D->GetPosition();
 
     cMatrixf camInverse = cMath::MatrixInverse(pCamera3D->GetViewMatrix());
-    cVector3f uiPos = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
+    cVector3f uiPos = VRHelper::TrackingToWorldSpace(VRHelper::OffHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame).GetTranslation();
 
-    auto translateMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
+    auto translateMat = VRHelper::TrackingToWorldSpace(VRHelper::OffHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
     auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 1450.0f, -1.0f / 1450.0f, 1.0f / 1450.0f));
 
     // Move the UI in front of the player's eyes
     cMatrixf transMat = cMatrixf::Identity;
 
-    // Translate to center for scaling transformation
-    auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-150.0f, -200.0f, 0.0f));
+    // The notebook always hangs on the inner side of the off hand (toward the
+    // body centre). OpenVR controller poses share the same local-frame
+    // convention for both hands: the local +X axis points toward the body
+    // centre, so the notebook is placed on the +X side of the off hand in
+    // both dominant modes and always extends from the hand toward the centre
+    // of the body, with the hand at the notebook's outer edge. The offset is
+    // applied in the hand's local frame (before the scale and rotation), so
+    // it follows the hand's orientation. The magnitude is about half a
+    // notebook width, so the hand appears to hold the notebook by its outer
+    // edge. (Hardware probes 2026-08-19: the original +150 constant and the
+    // later per-hand sign flip left the notebook on the wrong side of the
+    // hand; the final layout is a plain +X displacement of 450 units, tuned
+    // visually so the hand sits at the notebook's outer edge.)
+    auto centerTranslationMat = cMath::MatrixTranslate(
+      cVector3f(450.0f, -200.0f, 0.0f));
     transMat = cMath::MatrixMul(centerTranslationMat, transMat);
 
     // Scale it down
@@ -1239,6 +1254,20 @@ void cNotebook::SetActive(bool abX)
 		mBookType = eNotebookType_Front;
 		mStateMachine.ChangeState(eNotebookState_Front);
 		mvBookTypes[0].mfAlpha = 1;
+
+    // Opening the notebook is a navigation-only state: the hands return to
+    // bare (tools holstered, lights off) exactly like a dominant-hand change,
+    // regardless of which hand holds the notebook.
+    if(mpInit->mpPlayer != NULL)
+    {
+      if(mpInit->mpPlayer->GetFlashLight()->IsActive())
+        mpInit->mpPlayer->GetFlashLight()->SetActive(false);
+      if(mpInit->mpPlayer->GetGlowStick()->IsActive())
+        mpInit->mpPlayer->GetGlowStick()->SetActive(false);
+      mpInit->mpPlayer->StartHolster();
+      mpInit->mpPlayerHands->SetCurrentModel(0, "");
+      mpInit->mpPlayerHands->SetCurrentModel(1, "");
+    }
 
     // Hide hands
     mpInit->mpPlayer->GetRightHand()->SetVisible(false);

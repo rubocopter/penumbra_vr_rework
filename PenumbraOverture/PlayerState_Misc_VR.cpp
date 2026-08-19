@@ -72,14 +72,26 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
   if (collider != NULL) {
     cMatrixf poseMatrix;
 
+    // Only the dominant hand can grab, so only it detects targets and shows
+    // the grab icon at grab distance; the off hand stays bare and never
+    // highlights anything.
+    const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+      ? eVRHandIndex_Left : eVRHandIndex_Right;
+
     for (int i = 0; i < eVRHandIndex_Count; ++i) {
       const eVRHandIndex handIndex = (eVRHandIndex)i;
       mpPlayer->ClearVRHandTarget(handIndex);
 
-      if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
-          mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "Hand") {
+      if (handIndex != dominantIndex)
+        continue;
 
-        auto hand = mpInit->mpPlayerHands->GetCurrentModel(i);
+// The left and right hand rigs are distinct HUD models named "LeftHand"
+      // and "Hand"; both are valid pointing hands for target detection.
+      iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(i);
+      if (pHandModel &&
+          (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand")) {
+
+        auto hand = pHandModel;
         if (!hand->UpdatePoseMatrix(poseMatrix, 0.0f))
           continue;
 
@@ -242,16 +254,16 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
       }
     }
 
-    // Existing Penumbra entity code still reads the legacy picked-body slot.
-    // Mirror only the right-hand target into it so R2 can never interact with
-    // an object merely touched by the left hand.
-    const cVRHandTarget& rightTarget = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+// Existing Penumbra entity code still reads the legacy picked-body slot.
+    // Mirror only the dominant hand's target into it so the interact button
+    // can never interact with an object merely touched by the other hand.
+    const cVRHandTarget& dominantTarget = mpPlayer->GetVRHandTarget(dominantIndex);
     mpPlayer->GetPickRay()->Clear();
-    if (rightTarget.mpBody != NULL)
+    if (dominantTarget.mpBody != NULL)
     {
-      mpPlayer->GetPickRay()->mpPickedBody = rightTarget.mpBody;
-      mpPlayer->GetPickRay()->mvPickedPos = rightTarget.mvPosition;
-      mpPlayer->GetPickRay()->mfPickedDist = rightTarget.mfDistance;
+      mpPlayer->GetPickRay()->mpPickedBody = dominantTarget.mpBody;
+      mpPlayer->GetPickRay()->mvPickedPos = dominantTarget.mvPosition;
+      mpPlayer->GetPickRay()->mfPickedDist = dominantTarget.mfDistance;
     }
   }
 
@@ -368,11 +380,14 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
 
 void cPlayerState_Normal_VR::OnStartInteract()
 {
-  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+  const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+    ? eVRHandIndex_Left : eVRHandIndex_Right;
+  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(dominantIndex);
   if (target.mpBody)
   {
-	Log(" [VR interaction +%lu ms] R2 target '%s', crosshair %d, distance %.2f.\n",
-	  GetApplicationTime(), target.mpBody->GetName().c_str(),
+	Log(" [VR interaction +%lu ms] %s target '%s', crosshair %d, distance %.2f.\n",
+	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right",
+	  target.mpBody->GetName().c_str(),
 	  (int)target.mCrossHairState, target.mfDistance);
 
     // Keep legacy entity callbacks coherent while the interaction states are
@@ -384,10 +399,10 @@ void cPlayerState_Normal_VR::OnStartInteract()
 
     pEntity->PlayerInteract();
   }
-  else
+else
   {
-	Log(" [VR interaction +%lu ms] R2 pressed with no right-hand target.\n",
-	  GetApplicationTime());
+	Log(" [VR interaction +%lu ms] interact pressed with no %s-hand target.\n",
+	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right");
   }
 }
 
@@ -746,7 +761,7 @@ void cPlayerState_UseItem_VR::OnUpdate(float afTimeStep)
   iPhysicsWorld *pPhysicsWorld = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
   cVector3f vStart, vEnd;
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 
   vStart = handMat.GetTranslation();
   vEnd = vStart + cMath::MatrixInverse(handMat.GetRotation()).GetForward() * -1.0f;
@@ -786,7 +801,7 @@ void cPlayerState_UseItem_VR::OnPostSceneDraw() {
   mpLowGfx->SetDepthTestActive(false);
   mpLowGfx->PushMatrix(eMatrix_ModelView);
 
-  cMatrixf handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(((cCamera3D*)mpInit->mpGame->GetScene()->GetCamera())->GetViewMatrix(), handMat ));
 
   auto ofs = itemMat->GetTextureOffset(eMaterialTexture_Diffuse);

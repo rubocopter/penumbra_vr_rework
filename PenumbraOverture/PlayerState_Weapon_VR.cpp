@@ -24,6 +24,7 @@
 
 #include "HudModel_Weapon.h"
 #include "HudModel_Throw.h"
+#include "VRHelper.hpp"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -168,7 +169,7 @@ void cPlayerState_Throw_VR::OnStartExamine()
 
 void cPlayerState_Throw_VR::OnStartHolster()
 {
-	mpInit->mpPlayerHands->SetCurrentModel(1,"");
+	mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 }
 
@@ -214,9 +215,9 @@ void cPlayerState_Throw_VR::LeaveState(iPlayerState* apNextState)
 {
 	if(	apNextState->mType != ePlayerState_Message &&
 		apNextState->mType != ePlayerState_WeaponMelee &&
-		mpInit->mpPlayerHands->GetCurrentModel(1) == mpHudObject)
+		mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)) == mpHudObject)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(1,"");
+		mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	}
 }
 
@@ -476,9 +477,9 @@ void cPlayerState_WeaponMelee_VR::LeaveState(iPlayerState* apNextState)
 {
 	if(	apNextState->mType != ePlayerState_Message &&
 		apNextState->mType != ePlayerState_Throw &&
-		mpInit->mpPlayerHands->GetCurrentModel(1) == mpHudWeapon)
+		mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)) == mpHudWeapon)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(1,"");
+		mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	}
 }
 

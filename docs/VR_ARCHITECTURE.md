@@ -5,10 +5,12 @@ gameplay interaction as separate concerns. World scale is always `1.0`.
 
 Current state: this documents the `development` branch. The completion notes
 below describe when each increment was implemented and validated on PS VR2
-hardware; the crouch and hand-rig areas were changed after their hardware
-validation (16–18 August 2026). The crouch and height system has since been
-revalidated and is confirmed correct; the animated hands remain experimental,
-are frozen for now, and still show incorrect visual behaviours.
+hardware; the crouch, hand-rig, and height areas were changed after their
+hardware validation (16–18 August 2026). The crouch and height system has since
+been revalidated and is confirmed correct; the animated hands remain
+experimental, are frozen for now, and still show incorrect visual behaviours.
+Dominant-hand, seated/standing play mode, and player-height settings were added
+on 18 August 2026 and have not yet been validated on hardware.
 
 ## Coordinate spaces
 
@@ -32,6 +34,19 @@ standing baseline is calibrated in `cButtonHandler` on the gameplay side
 (plausibility band 0.90–2.20 m, hysteresis); `cVRTrackingSpace` only receives
 the resulting posture offset through `SetPostureOffset`.
 
+The configured player height (VR Settings → Player Height, default 1.70 m,
+range 1.40–2.10 m) is kept separate from the posture offset: it is a semantic
+value chosen by the user or measured by the Calibrate button from the HMD
+height. In standing play mode it is informational (recenter and posture offset
+already handle the HMD anchor). In seated play mode `cButtonHandler` treats
+real HMD height as the chair baseline: it captures the baseline while the HMD
+sits in the plausible seated band (0.60–1.50 m), clears it when the player
+stands up (HMD above baseline + 0.45 m), and derives `seatedOffset =
+clamp(PlayerHeight − (baseline − 0.2 m) × 1.065, 0, 1.5 m)`, delivered to
+`cVRTrackingSpace` through `SetSeatedOffset`. The seated offset raises the
+world to the configured standing eye height without changing world scale, so
+the player character and world objects behave as if the user were standing.
+
 Create recenters horizontal orientation without teleporting the player
 character. Snap and smooth turn change world yaw through the same relationship,
 so the HMD, hands, held objects, physical head displacement, and world-space UI
@@ -51,8 +66,9 @@ Penumbra entity types.
 
 1. Central TrackingToWorld boundary without a gameplay change. **Complete.**
 2. Independent left/right hand target and held-object state; reuse interaction
-   collision geometry. **Complete as infrastructure; only right-hand gameplay
-   interaction is intentionally enabled.**
+   collision geometry. **Complete. Gameplay interaction is driven by the
+   configured dominant hand (`cGame::vr_dominant_hand`), and a dominant-hand
+   preference can now be set in VR Settings.**
 3. Persistent declarative VR settings and an in-game editor under
    `Options → VR Settings`. **Complete; editing and persistence validated on
    PS VR2 hardware.**
@@ -82,8 +98,9 @@ Penumbra entity types.
    this path. **All listed routes validated on PS VR2 hardware.**
 9. Inventory ray/reticle and restored action-popup text.
    **Implemented, generalized to all interactive UI surfaces, and able to fall
-   back to the left hand if the right pose is unavailable. Pointer, fallback,
-   and right-hand pose reacquisition validated on PS VR2 hardware.**
+   back to the other hand if the dominant-hand pose is unavailable. Pointer,
+   fallback, and dominant-hand pose reacquisition validated on PS VR2
+   hardware.**
 10. Room-scale collision reconciliation: when HPL rejects physical head-driven
     body motion, subtract the rejected component from the VR tracking origin.
     VR move interactions retain HPL1's native character collision, preventing a
@@ -113,3 +130,13 @@ Penumbra entity types.
     also receives `/FS` so parallel compiler processes serialize PDB writes.
     **Build pipeline corrected and its clean Release output validated across all
     startup/load routes on hardware.**
+15. Dominant hand, seated/standing play mode, and player height. Handedness is
+    a semantic preference: `cGame::vr_dominant_hand` (default Right) drives
+    gameplay interaction, pointer origin, throw velocity, and haptic routing;
+    `cSteamVRInput::SetHandedness` only affects pose gating (the dominant hand
+    gates `interact`) and the legacy fallback buttons, leaving SteamVR
+    bindings untouched. Seated play mode applies a height offset at the
+    TrackingToWorld boundary instead of changing world scale, with a chair
+    baseline captured from HMD height. Player height is a separate semantic
+    value with a Calibrate button that measures the HMD height. **Implemented
+    on 18 August 2026; hardware validation pending.**

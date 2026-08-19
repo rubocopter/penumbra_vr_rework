@@ -60,8 +60,8 @@ code.
 
 | Control | Action |
 | --- | --- |
-| Aim with the right controller; left if the right pose is unavailable | Move the pointer |
-| R2, or L2 during left-hand fallback | Select; in VR settings, increase or choose the next value; in inventory, perform the default action |
+| Aim with the dominant-hand controller; the other hand if that pose is unavailable | Move the pointer |
+| R2, or the off-hand trigger during fallback | Select; in VR settings, increase or choose the next value; in inventory, perform the default action |
 | R3 | In VR settings, decrease or choose the previous value; in inventory, drag or combine items |
 | Circle | Go back in menus; in inventory, open an item's actions or go back |
 | R1, Square, or Options | Close the current screen |
@@ -69,27 +69,86 @@ code.
 When a tool such as the hammer is equipped, R2 operates that tool. Press Triangle to holster it before using R2 to interact with doors and other objects again.
 
 To use an inventory item on the world, open the inventory with R1, aim at the
-item with the right controller, and press R2. The inventory closes with the item
-readied; aim at its target from interaction range and press R2 again. R2 also
-selects an action opened with Circle, while R3 remains available for the
-original drag-and-combine interaction.
+item with the dominant-hand controller, and press R2. The inventory closes with
+the item readied; aim at its target from interaction range and press R2 again.
+R2 also selects an action opened with Circle, while R3 remains available for
+the original drag-and-combine interaction.
 
 Input edges are latched when the game switches between gameplay and UI action
 sets. A button that opened a screen must be released and pressed again before
 its UI binding can close that screen.
 
 The main menu, inventory, notebook, and numerical panels use the same tracked
-ray, cyan endpoint reticle, and lightly smoothed cursor. The right hand is the
-primary pointer; if its SteamVR pose is unavailable, the left hand takes over
-and its trigger can select. The original mouse path remains available. Item
-action popups now render their localized action names instead of the empty
-highlighted box left by the historical mod.
+ray, cyan endpoint reticle, and lightly smoothed cursor. The configured
+dominant hand is the primary pointer; if its SteamVR pose is unavailable, the
+other hand takes over and its trigger can select. The original mouse path
+remains available. Item action popups now render their localized action names
+instead of the empty highlighted box left by the historical mod.
 
 These tables document the current bundled binding profiles (PS VR2 Sense, HTC
 Vive, Valve Index, Meta Quest/Oculus Touch, Windows Mixed Reality); they are
 not intended as universal in-game button names. Player-facing control prompts
 will remain unchanged until the game can resolve labels from the active
 SteamVR controller profile instead of hard-coding one headset's layout.
+
+## Left-handed mirror
+
+With `Handedness = Left`, the game activates the fully mirrored action sets
+`/actions/gameplay_left` and `/actions/ui_left` declared in `vr/actions.json`
+and bound in every bundled profile. The intent is the same as the default
+layout (movement, sprint, notebook, holster, UI select, and so on), but every
+control is the left/right mirror of the tables above: what the default layout
+put on the right hand now sits on the left hand and vice versa. Equipment
+slots follow the same rule in gameplay code, so the dominant hand stays free
+for the pointer, interaction, and tools while the off hand carries the
+inventory and quick light.
+
+For example, the PS VR2 left-handed gameplay layout is:
+
+| Control | Action |
+| --- | --- |
+| Right stick | Move |
+| R3 | Sprint |
+| Left stick | Snap or smooth turn |
+| L3 | Toggle crouch |
+| R1 | Toggle the current quick light |
+| Cross (right) | Notebook |
+| Circle (right) | Holster the equipped tool or weapon |
+| Square (left) | Jump |
+| L2 | Interact, or use the equipped tool or weapon |
+| L1 | Inventory |
+| Triangle (left) | Examine |
+| Options (right) | Pause menu |
+| Create (left) | Recenter horizontal view |
+
+The PS VR2 driver exposes only two face buttons per hand (left: square and
+triangle; right: cross and circle), so the mirrored layout moves every action
+to the same physical button position on the other hand: jump is the bottom
+button of the dominant hand, notebook the bottom button of the off hand,
+examine the top button of the dominant hand, and holster the top button of
+the off hand. The UI layout mirrors the same way: select on L2 or R2, drag on
+the left stick click, back on Triangle (left), close on L1, Cross (right) or
+Options, and recenter on Create (left). Pause and recenter stay on the same
+physical controls as the default layout (Options and left Create), because
+binding the left Create to two conflicting actions proved unreliable in
+SteamVR. The global set (poses, haptics, skeletons) is not mirrored because
+those actions are physical and hand-agnostic. Interact target detection also
+accepts the left hand's rig name (`LeftHand`), so the mirrored layout can use
+tools and grab objects with the dominant left hand. Only the dominant hand
+performs grab-target detection and shows the grab icon at grab distance; the
+off hand can never grab, so it stays bare and never highlights objects.
+Changing the handedness in VR Settings returns the player to bare hands
+(tools holstered, lights off) before the mirror takes over, and latches input
+edges for one frame so a held button cannot fire on the action it was swapped
+onto; the legacy OpenVR fallback mirrors the same layout by reading the
+dominant and off hands. The notebook always hangs on the off hand (the hand
+not used for pointing), so the dominant hand keeps the pointer free; it is
+displaced on the off hand's local +X axis (which points toward the body
+centre for both hands in OpenVR) by about half a notebook width, so the hand
+sits at the notebook's outer edge and the notebook extends toward the centre
+in both dominant modes. Opening it returns both hands to bare exactly like a
+handedness change, since it is a navigation-only view. The mirror was added
+on 19 August 2026 and awaits a final hardware regression pass.
 
 ## Hardware validation status
 
@@ -103,7 +162,7 @@ experimental final and should be treated as such until it is reworked.
 | --- | --- | --- |
 | PS VR2 Sense | Hardware-tested, 14–15 August 2026 | Gameplay/UI actions, repeated inventory transitions, all crouch modes, snap/smooth turn, recenter, pointer, tutorial/new/continue/load routes, pose loss and reconnection, rigged hands (15 August) |
 | HTC Vive | Compatibility profile retained | Historical layout is represented in SteamVR Input but this rework has not yet been retested on Vive hardware |
-| Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme with recenter on the left trackpad click |
+| Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme; recenter and pause stay on the left trackpad and left system button in both handedness modes |
 | Meta Quest / Oculus Touch | Bundled default profile, not yet hardware-validated | `oculus_touch` profile follows the PS VR2 scheme; recenter is left unassigned for SteamVR mapping |
 | Windows Mixed Reality | Bundled default profile, not yet hardware-validated | `microsoft/motion_controller` profile keeps the WMR trackpads for pause and recenter |
 
@@ -118,13 +177,18 @@ under a dedicated `[VR]` section. On Windows this file is normally at
 `Documents/Penumbra Overture/Episode1/settings.cfg`.
 
 They can be changed in-game under **Options → VR Settings**. Aim at a setting
-with the right controller, press R2 to increase/select the next value, or R3 to
-decrease/select the previous value. Changes apply immediately and are saved at
-once. Circle returns to the previous menu without also changing the highlighted
-value.
+with the dominant-hand controller, press R2 to increase/select the next value,
+or R3 to decrease/select the previous value. Changes apply immediately and are
+saved at once. Circle returns to the previous menu without also changing the
+highlighted value. The dominant-hand, play-mode, and player-height rows are the
+first three entries; the player-height row has a Calibrate button on the same
+line.
 
 | Setting | Default | Valid range | Effect |
 | --- | ---: | ---: | --- |
+| `Handedness` | `Right` | `Left`, `Right` | Chooses the dominant hand driving interaction, pointer, throw, and haptics; `Left` also activates the fully mirrored action set |
+| `PlayMode` | `Standing` | `Standing`, `Seated` | Seated mode raises the world to the configured standing eye height |
+| `PlayerHeight` | `1.70` | `1.40`–`2.10` m | Configured standing height, set manually or with Calibrate |
 | `MoveSpeed` | `1.0` | `0.25`–`3.0` | Multiplies smooth-locomotion speed |
 | `MoveDeadZone` | `0.15` | `0.0`–`0.9` | Radial dead zone, rescaled outside the centre |
 | `HeightOffset` | `0.0` | `-0.5`–`0.5` m | Adds a vertical calibration offset without changing world scale |
@@ -141,8 +205,8 @@ value.
 Out-of-range values are clamped and the effective values are written to the
 game log on startup. Snap turn requires the stick to return through its dead
 zone before another step can fire. Turning is disabled in menus and scripted
-look sequences; Create remains available as a global recenter action. Settings
-for handedness will only be added once its corresponding behaviour exists. UI distance and scale are independent so the
+look sequences; recenter remains bound to the dominant Create (or equivalent
+per-hand control) in each action set. UI distance and scale are independent so the
 surface can be moved farther away without forcing it to occupy less of the
 view.
 
@@ -159,6 +223,18 @@ retried safely if a low ceiling blocks the full-height collider. The crouch
 and height changes of 16–18 August 2026 have been revalidated on hardware and
 are confirmed correct.
 
+Seated play mode (VR Settings → Play Mode) keeps the same chain without
+touching world scale. While the HMD height sits in the plausible seated band
+(0.60–1.50 m), `cButtonHandler` treats it as the chair baseline; standing up
+above the baseline by more than 0.45 m clears it. The seated offset is the
+configured player height minus the baseline eye height
+(`clamp(PlayerHeight − (baseline − 0.2 m) × 1.065, 0, 1.5 m)`) and is applied
+at the TrackingToWorld transform, so the player character and world objects
+behave as if the user were standing. The Player Height row's Calibrate button
+measures the HMD height while the user stands straight and writes it back to
+the setting (samples outside 0.90–2.20 m are rejected). In standing mode the
+configured height is informational.
+
 Fullscreen menus and cinematics are captured at a stable room-space pose when
 opened rather than following every head movement. Recenter places the surface
 in front of the current view again. Synchronous map changes, initial/new-game
@@ -172,11 +248,11 @@ headset.
 ## Haptic feedback
 
 The SteamVR action path routes semantic feedback to the logical controller
-hands. The initial profiles provide a subtle right-hand pulse for UI selection,
-object pickup/drop, successful item use, and melee impact; quick-light feedback
-is sent to the left hand; damage is sent to both hands. Per-event repeat limits
-filter transient contact jitter without reducing the strength of a valid pulse.
-The game log records each submitted event as
+hands. The initial profiles provide a subtle dominant-hand pulse for UI
+selection, object pickup/drop, successful item use, and melee impact;
+quick-light feedback is sent to the off hand; damage is sent to both hands.
+Per-event repeat limits filter transient contact jitter without reducing the
+strength of a valid pulse. The game log records each submitted event as
 `[VR haptics +... ms] ... (submitted)` so controller-side testing can distinguish a
 gameplay event that was generated from one that never reached SteamVR.
 
@@ -247,8 +323,8 @@ on real hardware before distribution.
 ## Valve Index defaults
 
 The bundled `knuckles` profile follows the PS VR2 scheme, adapted to the Index
-controllers. The left trackpad click is available as a recenter while the
-system button remains the pause control.
+controllers. The left trackpad click recenters the view and the left system
+button opens the pause menu in both handedness modes.
 
 ### Gameplay
 
@@ -313,7 +389,8 @@ so the recenter action is left unassigned; it can be mapped through SteamVR.
 
 The bundled `microsoft/motion_controller` profile uses the WMR joysticks as the
 primary movement inputs and keeps the trackpads for secondary functions. The
-left trackpad click recenters the view; the right trackpad click pauses.
+left trackpad click recenters the view and the right trackpad click pauses in
+both handedness modes.
 
 ### Gameplay
 
