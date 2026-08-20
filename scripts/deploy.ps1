@@ -42,6 +42,16 @@ function Get-FileHashValue([string]$path) {
     return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Get-RelativePath([string]$basePath, [string]$fullPath) {
+    # Path.GetRelativePath only exists on .NET Framework 4.7.1+; Windows
+    # PowerShell 5.1 on a legacy .NET Framework does not provide it. Uri is
+    # available since .NET Framework 4.0, so this works everywhere.
+    $base = [System.IO.Path]::GetFullPath($basePath).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+    $baseUri = [System.Uri]($base + [System.IO.Path]::DirectorySeparatorChar)
+    $fullUri = [System.Uri]([System.IO.Path]::GetFullPath($fullPath))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($fullUri).ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+}
+
 function Get-SteamRoots {
     $roots = New-Object System.Collections.Generic.List[string]
 
@@ -234,7 +244,7 @@ if ($Restore) {
 $resolvedPackageRoot = Resolve-PackageRoot $PackageRoot $Configuration
 $mappings = @{}
 Get-ChildItem -LiteralPath $resolvedPackageRoot -File -Recurse | ForEach-Object {
-    $relativePath = [System.IO.Path]::GetRelativePath($resolvedPackageRoot, $_.FullName).Replace('\', '/')
+    $relativePath = (Get-RelativePath $resolvedPackageRoot $_.FullName).Replace('\', '/')
     $mappings[$relativePath] = [pscustomobject]@{
         Path = $relativePath
         SourcePath = $_.FullName

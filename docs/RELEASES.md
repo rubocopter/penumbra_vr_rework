@@ -7,6 +7,10 @@ stable release: expect bugs and behaviours that still need polish. The
 installer backs up every replaced file and can restore them, so trying the mod
 does not risk the stock game.
 
+Fixed installer compatibility on systems where the underlying .NET Framework
+does not provide System.IO.Path.GetRelativePath (Windows PowerShell 5.1 /
+legacy .NET Framework).
+
 ### What is in this build
 
 - Device-independent SteamVR Input actions (gameplay, UI, and global action

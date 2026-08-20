@@ -50,11 +50,19 @@ if (Test-Path -LiteralPath (Join-Path $packageRoot 'data')) {
 }
 
 $manifestPath = Join-Path $packageRoot 'SHA256SUMS.txt'
+function Get-RelativePath([string]$basePath, [string]$fullPath) {
+    # Path.GetRelativePath only exists on .NET Framework 4.7.1+; Uri works
+    # since .NET Framework 4.0 and keeps package.ps1 usable on any runtime.
+    $base = [System.IO.Path]::GetFullPath($basePath).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+    $baseUri = [System.Uri]($base + [System.IO.Path]::DirectorySeparatorChar)
+    $fullUri = [System.Uri]([System.IO.Path]::GetFullPath($fullPath))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($fullUri).ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+}
 $manifestLines = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
     Where-Object { $_.FullName -ne $manifestPath } |
     Sort-Object FullName |
     ForEach-Object {
-        $relativePath = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace('\', '/')
+        $relativePath = (Get-RelativePath $packageRoot $_.FullName).Replace('\', '/')
         $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         "$hash  $relativePath"
     }
