@@ -231,7 +231,8 @@ foreach ($requiredVRMenuTranslation in @(
     'VRMoveSpeed', 'VRMoveDeadZone', 'VRHeightOffset', 'VRUIDistance',
     'VRUIScale', 'VRCrouchMode', 'VRPhysicalCrouchDepth', 'VRSubtitleScale',
     'VRDisabled', 'VRSnap', 'VRSmooth', 'VRPhysical', 'VRButton', 'VRHybrid',
-    'TipVRAdjust'
+    'TipVRAdjust', 'VRControls', 'VRMovement', 'VRCalibration', 'VRDisplay',
+    'VRDetectionDepth', 'VRRecenter', 'TipVRRecenter'
 )) {
     $translationKey = "MainMenu/$requiredVRMenuTranslation"
     if (-not $englishEntries.ContainsKey($translationKey) -or

@@ -403,6 +403,13 @@
     <Entry Name="VRStanding">De pie</Entry>
     <Entry Name="VRSeated">Sentado</Entry>
     <Entry Name="TipVRCalibrateHeight">Ponte de pie y pulsa Calibrar para fijar tu altura de pie.</Entry>
+    <Entry Name="VRControls">CONTROLES</Entry>
+    <Entry Name="VRMovement">MOVIMIENTO</Entry>
+    <Entry Name="VRCalibration">CALIBRACIÓN</Entry>
+    <Entry Name="VRDisplay">PANTALLA</Entry>
+    <Entry Name="VRDetectionDepth">Profundidad de detección:</Entry>
+    <Entry Name="VRRecenter">Re-centrar</Entry>
+    <Entry Name="TipVRRecenter">Recentra la vista horizontal. Igual que pulsar Create.</Entry>
     <Entry Name="ActionMode Camera Speed:">Velocidad de cámara en modo acción:</Entry>
     <Entry Name="InteractMode Camera Speed:">Velocidad de cámara en modo interacción:</Entry>
     <Entry Name="Output Device:">Dispositivo de salida:</Entry>

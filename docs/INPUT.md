@@ -186,13 +186,20 @@ Implemented VR comfort values are stored in the normal user `settings.cfg`
 under a dedicated `[VR]` section. On Windows this file is normally at
 `Documents/Penumbra Overture/Episode1/settings.cfg`.
 
-They can be changed in-game under **Options → VR Settings**. Aim at a setting
-with the dominant-hand controller, press R2 to increase/select the next value,
-or R3 to decrease/select the previous value. Changes apply immediately and are
-saved at once. Circle returns to the previous menu without also changing the
-highlighted value. The dominant-hand, play-mode, and player-height rows are the
-first three entries; the player-height row has a Calibrate button on the same
-line.
+They can be changed in-game under **Options → VR Settings**. The menu is
+grouped into four sections — CONTROLS (handedness), MOVEMENT (locomotion and
+turning), CALIBRATION (play mode, height, recenter), and DISPLAY (UI distance
+and scale). Aim at a setting with the dominant-hand controller, press R2 to
+increase/select the next value, or R3 to decrease/select the previous value.
+Changes apply immediately and are saved at once. Circle returns to the previous
+menu without also changing the highlighted value. The player-height row has a
+Calibrate button on the same line, and the CALIBRATION section ends with a
+Recenter row that re-orients the playspace in one press. Settings that do not
+apply to the current configuration are shown greyed out: with Turn Mode on
+Smooth the snap angle is disabled, with Turn Mode on Snap the smooth speed is
+disabled, and with Turn Mode on Disabled both are disabled. With Crouch Mode on
+Physical the depth row is relabelled "Detection depth" (the headset-descent
+threshold) instead of the viewpoint-lowering depth.
 
 | Setting | Default | Valid range | Effect |
 | --- | ---: | ---: | --- |

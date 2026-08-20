@@ -407,6 +407,13 @@
     <Entry Name="VRStanding">Standing</Entry>
     <Entry Name="VRSeated">Seated</Entry>
     <Entry Name="TipVRCalibrateHeight">Stand up straight and press Calibrate to set your standing height.</Entry>
+    <Entry Name="VRControls">CONTROLS</Entry>
+    <Entry Name="VRMovement">MOVEMENT</Entry>
+    <Entry Name="VRCalibration">CALIBRATION</Entry>
+    <Entry Name="VRDisplay">DISPLAY</Entry>
+    <Entry Name="VRDetectionDepth">Detection depth:</Entry>
+    <Entry Name="VRRecenter">Recenter</Entry>
+    <Entry Name="TipVRRecenter">Recenter the horizontal view. Same as pressing Create.</Entry>
     <Entry Name="ActionMode Camera Speed:">Action Mode Camera Speed:</Entry>
     <Entry Name="InteractMode Camera Speed:">Interaction Mode Camera Speed:</Entry>
     <Entry Name="Output Device:">Output Device:</Entry>
