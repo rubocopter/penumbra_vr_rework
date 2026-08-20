@@ -984,21 +984,27 @@ void cNotebook::Update(float afTimeStep)
     // Move the UI in front of the player's eyes
     cMatrixf transMat = cMatrixf::Identity;
 
-    // The notebook always hangs on the inner side of the off hand (toward the
-    // body centre). OpenVR controller poses share the same local-frame
-    // convention for both hands: the local +X axis points toward the body
-    // centre, so the notebook is placed on the +X side of the off hand in
-    // both dominant modes and always extends from the hand toward the centre
-    // of the body, with the hand at the notebook's outer edge. The offset is
-    // applied in the hand's local frame (before the scale and rotation), so
-    // it follows the hand's orientation. The magnitude is about half a
-    // notebook width, so the hand appears to hold the notebook by its outer
-    // edge. (Hardware probes 2026-08-19: the original +150 constant and the
-    // later per-hand sign flip left the notebook on the wrong side of the
-    // hand; the final layout is a plain +X displacement of 450 units, tuned
-    // visually so the hand sits at the notebook's outer edge.)
+    // The notebook is a 2D UI surface of 800x600 px whose origin (0,0) is
+    // anchored to the off hand. The visible book (notebook_front/open.bmp,
+    // 350x460, opaque) is drawn at (225,70), so its centre sits at (400,300)
+    // of that surface -- NOT at the origin. Offsetting the hand on the whole
+    // quad instead of on the book is what made the book float far from the
+    // hand (a +450 lateral offset put the book centre 850 px = 0.59 m to the
+    // side of the hand at the 1/1450 scale). The offset below therefore
+    // targets the book rectangle: the hand goes to the book's outer edge and
+    // the book extends toward the body centre. The lateral direction is
+    // expressed in the hand's local frame, and in this engine the same +X
+    // axis points toward the body on the left hand and away from it on the
+    // right hand, so the edge to grab depends on which hand is the off hand:
+    //   off hand left  (slot 0): hand at the book left edge  (UI x=225) -> -225
+    //   off hand right (slot 1): hand at the book right edge (UI x=575) -> -575
+    // The -300 vertical offset puts the book's vertical centre at the hand.
+    // At 1/1450 the book measures 350x460 px = 0.24x0.32 m, so it extends
+    // about 0.24 m from the hand toward the body in both dominant modes.
+    const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+    const float bookEdgeX = (offSlot == 0) ? -225.0f : -575.0f;
     auto centerTranslationMat = cMath::MatrixTranslate(
-      cVector3f(450.0f, -200.0f, 0.0f));
+      cVector3f(bookEdgeX, -300.0f, 0.0f));
     transMat = cMath::MatrixMul(centerTranslationMat, transMat);
 
     // Scale it down

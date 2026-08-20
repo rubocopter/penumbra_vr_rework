@@ -54,10 +54,17 @@ while a tool or light is attached returns the player to bare hands first
 (`cInit::ApplyVRSettings`), so the old slot models cannot duplicate on the
 mirrored slots. The notebook does the same when it opens (`cNotebook::SetActive`):
 it is a navigation-only view that always hangs on the off hand, so both hands
-return to bare (holstered tools, lights off). Its lateral placement is a
-plain displacement on the off hand's local +X axis (toward the body centre
-for both hands in OpenVR) of about half a notebook width, so the hand sits
-at the notebook's outer edge in both dominant modes. Grab-target detection
+return to bare (holstered tools, lights off). The notebook is an 800x600 px
+UI surface whose origin is anchored to the off hand, but the visible book
+(350x460 px) is drawn at (225,70) inside it, so the placement targets the
+book rectangle instead of the surface: the hand goes to the book's outer
+edge (UI x=225 for the left off hand, x=575 for the right off hand, because
+in this engine the same local +X points toward the body only on the left
+hand) and the book extends about a book width (0.24 m at 1/1450) toward the
+body centre in both dominant modes. This geometry lesson (anchor to the
+visible object, not the surface origin) is what a future equipped-object
+hold needs so the hand is seen holding the item, and to animate the grab
+motion. Grab-target detection
 runs for the dominant hand only (`cPlayerState_Normal_VR`), so the off hand
 never highlights or grabs anything.
 
@@ -69,6 +76,17 @@ cannot fire on the mirrored action it was swapped onto. `UpdateLegacyState`
 mirrors the same layout for the OpenVR polling fallback by reading the
 dominant-hand state where the default layout used the right hand and the
 off-hand state where it used the left hand.
+
+Recenter is the one action that receives special handling in `Update`. It is a
+global action read hand-agnostically before the context branch, and its edge
+latch applies only when the dominant hand changes. A context switch or a return
+from the legacy fallback must not swallow a real create press, because the
+fallback path has no create button to poll (the PS VR2 legacy binding exposes
+no create source at all). Recenter also counts as an active action on every
+frame: the player stands still to re-aim, so a recenter press is often the only
+active input that frame, and an idle frame that dropped to legacy polling
+silently lost the press (observed as recenter working in one dominant mode and
+not the other, depending on whether another action happened to be active).
 
 ## PenumbraVR responsibilities
 
@@ -232,8 +250,10 @@ experimental and currently shows incorrect visual behaviour. Dominant-hand,
 seated/standing play mode, and player-height settings were added on
 18 August 2026 and await hardware validation. The left-handed mirror
 (equipment slots bound to the dominant/off hand, mirrored SteamVR action sets
-and legacy fallback, notebook always on the off hand with a plain inward
-lateral offset, interact target detection accepting the left rig name
+and legacy fallback, notebook always on the off hand with its lateral
+placement targeted at the visible book rectangle (hand at the book's outer
+edge, book extending toward the body in both modes), interact target
+detection accepting the left rig name
 `LeftHand` and running for the dominant hand only, asymmetric PS VR2/Touch
 face-button mirrors, per-profile pause and recenter shared between modes, and
 bare-hands resets on handedness change and notebook open) was added on

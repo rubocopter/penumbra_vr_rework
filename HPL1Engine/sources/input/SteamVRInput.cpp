@@ -191,8 +191,17 @@ namespace hpl {
 
     cVRInputState nextState;
     nextState.recenter = ReadDigital(mRecenterAction);
-    if (suppressContextEdges) SuppressDigitalEdges(nextState.recenter);
-    bool anyActionActive = false;
+    // The mirror transition can re-report a held create as a fresh press, so
+    // latch that edge only when the dominant hand changes. A context switch or
+    // a return from the legacy fallback must not swallow a real recenter press:
+    // the legacy path has no create button to fall back on.
+    if (mHandedness != mActiveHandedness) {
+      SuppressDigitalEdges(nextState.recenter);
+    }
+    // Recenter is frequently the only active input (the player stands still to
+    // re-aim). Count it as an active action, otherwise an idle frame drops to
+    // legacy polling below and the press is lost.
+    bool anyActionActive = nextState.recenter.active;
 
     if (context == eSteamVRInputContext_Gameplay) {
       AnalogState move = ReadAnalog(ActionFor(mMoveAction, mMoveActionLeft));
@@ -271,8 +280,8 @@ namespace hpl {
         SuppressDigitalEdges(nextState.uiClose);
       }
 
-      anyActionActive = nextState.uiSelect.active || nextState.uiDrag.active ||
-        nextState.uiBack.active || nextState.uiClose.active;
+      anyActionActive = anyActionActive || nextState.uiSelect.active ||
+        nextState.uiDrag.active || nextState.uiBack.active || nextState.uiClose.active;
     }
 
     if (!anyActionActive) {

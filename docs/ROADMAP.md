@@ -105,6 +105,12 @@ remains outstanding.
 
 - Audit projection, render target lifecycle, frame pacing, and mirror rendering.
 - Extend configurable UI placement to the notebook and remaining in-world surfaces.
+- Use the notebook's geometry lesson (anchor the object to its visible geometry,
+  not to the UI-surface origin) as the basis for equipping objects so the hand
+  model is seen holding them, and for animating the grab motion. The notebook
+  showed that the hand must target the drawn book rectangle (350x460 px inside
+  the 800x600 surface), not the surface origin, and that the mirroring of the
+  controller pose must be taken into account per off hand (19 August 2026).
 - [x] Anchor fullscreen menus/cinematics in room space and add scalable subtitles/messages.
 - [x] Stage a compositor-safe black frame before synchronous map loads.
 - [x] Route new-game, tutorial, and saved-game loads through the staged VR compositor path.

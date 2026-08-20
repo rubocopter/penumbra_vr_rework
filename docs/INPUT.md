@@ -142,13 +142,23 @@ Changing the handedness in VR Settings returns the player to bare hands
 edges for one frame so a held button cannot fire on the action it was swapped
 onto; the legacy OpenVR fallback mirrors the same layout by reading the
 dominant and off hands. The notebook always hangs on the off hand (the hand
-not used for pointing), so the dominant hand keeps the pointer free; it is
-displaced on the off hand's local +X axis (which points toward the body
-centre for both hands in OpenVR) by about half a notebook width, so the hand
-sits at the notebook's outer edge and the notebook extends toward the centre
-in both dominant modes. Opening it returns both hands to bare exactly like a
-handedness change, since it is a navigation-only view. The mirror was added
-on 19 August 2026 and awaits a final hardware regression pass.
+not used for pointing), so the dominant hand keeps the pointer free. The
+notebook is an 800x600 px UI surface anchored to the off hand; the visible
+book (350x460 px) is placed with the hand at its outer edge and extends
+about a book width (0.24 m) toward the body centre in both dominant modes
+(the left off hand grips the book's left edge, the right off hand its right
+edge, because the engine mirrors the controller pose). Opening it returns
+both hands to bare exactly like a handedness change, since it is a
+navigation-only view. The mirror was added on 19 August 2026 and awaits a
+final hardware regression pass. Recenter is the only action exempted from the
+context/latency latch beyond a dominant-hand change, and it counts as an
+active action on every frame: pressing Create while standing still is often
+the only input that frame, and without that exemption an idle frame could
+fall back to legacy polling and drop the press (recenter worked in one
+dominant mode but not the other, depending on which actions happened to be
+active). The PS VR2 legacy binding has no Create source, so the fallback path
+cannot recover it; the fix on 20 August 2026 keeps the press on the action
+path.
 
 ## Hardware validation status
 
