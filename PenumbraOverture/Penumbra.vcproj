@@ -257,24 +257,6 @@
 				RelativePath=".\PlayerHelper.cpp">
 			</File>
 			<File
-				RelativePath=".\PlayerState_Interact.cpp">
-			</File>
-			<File
-				RelativePath=".\PlayerState_InteractHaptX.cpp">
-			</File>
-			<File
-				RelativePath=".\PlayerState_Misc.cpp">
-			</File>
-			<File
-				RelativePath=".\PlayerState_MiscHaptX.cpp">
-			</File>
-			<File
-				RelativePath=".\PlayerState_Weapon.cpp">
-			</File>
-			<File
-				RelativePath=".\PlayerState_WeaponHaptX.cpp">
-			</File>
-			<File
 				RelativePath=".\PreMenu.cpp">
 			</File>
 			<File
@@ -443,24 +425,6 @@
 			</File>
 			<File
 				RelativePath=".\PlayerState.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_Interact.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_InteractHaptX.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_Misc.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_MiscHaptX.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_Weapon.h">
-			</File>
-			<File
-				RelativePath=".\PlayerState_WeaponHaptX.h">
 			</File>
 			<File
 				RelativePath=".\PreMenu.h">

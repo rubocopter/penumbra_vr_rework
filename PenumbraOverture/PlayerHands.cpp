@@ -27,6 +27,22 @@
 
 #include "VRHelper.hpp"
 
+static const char* ksFingerNames[] = {
+	"Middle","Middle","Middle",
+	"Ring","Ring","Ring",
+	"Little","Little","Little",
+	"Index","Index","Index",
+	"Thumb","Thumb","Thumb"
+};
+static const char* ksHandBoneNames[] = {
+	"Middle1","Middle2","Middle3",
+	"Ring1","Ring2","Ring3",
+	"Little1","Little2","Little3",
+	"Index1","Index2","Index3",
+	"Thumb1","Thumb2","Thumb3"
+};
+static const int lHandBoneNum = 15;
+
 //////////////////////////////////////////////////////////////////////////
 // HELP FUNCTIONS
 //////////////////////////////////////////////////////////////////////////
@@ -49,27 +65,6 @@ cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem)
 
 //-----------------------------------------------------------------------
 
-cMatrixf InterpolatePosesToMatrix(float afT, const cHudModelPose& aPoseA, 
-										   const cHudModelPose& aPoseB)
-{
-	cVector3f vPos = aPoseA.mvPos * (1- afT) + aPoseB.mvPos * afT;
-
-	cMatrixf mtxRotA = cMath::MatrixRotate(aPoseA.mvRot,eEulerRotationOrder_XYZ);
-	cMatrixf mtxRotB = cMath::MatrixRotate(aPoseB.mvRot,eEulerRotationOrder_XYZ);
-
-	cQuaternion qA; qA.FromRotationMatrix(mtxRotA);
-	cQuaternion qB; qB.FromRotationMatrix(mtxRotB);
-
-	cQuaternion qFinal = cMath::QuaternionSlerp(afT,qA,qB,true);
-
-	cMatrixf mtxFinal = cMath::MatrixQuaternion(qFinal);
-	mtxFinal.SetTranslation(vPos);
-
-	return mtxFinal;
-}
-
-//-----------------------------------------------------------------------
-
 //////////////////////////////////////////////////////////////////////////
 // HUD MODEL
 //////////////////////////////////////////////////////////////////////////
@@ -83,6 +78,7 @@ iHudModel::iHudModel(ePlayerHandType aType)
 	mpHandAnimState[0] = NULL;
 	mpHandAnimState[1] = NULL;
 	mbHandRigSetup = false;
+	mlHandIndex = 0;
 }
 
 //-----------------------------------------------------------------------
@@ -165,47 +161,73 @@ void iHudModel::SetupHandAnimation()
 {
 	if(mpEntity == NULL || mbHandRigSetup) return;
 
-	static const char* ksBoneNames[] = {
-		"Middle1","Middle2","Middle3",
-		"Ring1","Ring2","Ring3",
-		"Little1","Little2","Little3",
-		"Index1","Index2","Index3",
-		"Thumb1","Thumb2","Thumb3"
-	};
-	static const int lNumBones = 15;
+	const char* sHand = mlHandIndex == 0 ? "left" : "right";
+
+	Log(" [hand-rig] %s: entity has %d bone states\n", sHand, mpEntity->GetBoneStateNum());
+	for(int i=0; i< mpEntity->GetBoneStateNum(); ++i)
+	{
+		cBoneState *pBone = mpEntity->GetBoneState(i);
+		Log(" [hand-rig] %s: boneState[%d]='%s'\n", sHand, i, pBone->GetName());
+	}
 
 	//Own rotation per joint in degrees. Grab: middle/ring/little/thumb.
-	//Trigger: index. (Cumulative: Middle/Ring 60/120/165, Little 55/110/150,
-	//Index 55/110/155, Thumb 40/75.)
-	static const float kfGrabAngles[lNumBones] = {
-		60,60,45,	//Middle
-		60,60,45,	//Ring
-		55,55,40,	//Little
+	//Trigger: index. (Cumulative: Middle/Ring 70/140/175, Little 55/110/150,
+	//Index 55/110/155, Thumb 130/220. The grab angles were re-tuned for the
+	//grip=1 fold capped so the fingertips stay near the palm zone instead of
+	//~10 units below it (VR probe 2026-08-17: y=-10.2 at grip 0.7 with
+	//70/70/35; 17/17/10 gives y~-3.5, near the inner palm face at y~-2.2).
+	//M1/M2 are the long segments (6.75/4.54 u) and drive the drop; M3's lever
+	//is 0.81 u. Little reduced from 55/55/40 to 30/30/20: with 55/55/40 its
+	//tip crossed the ring base line (z=-0.93) into the ring zone by grip
+	//~0.55; 30/30/20 keeps it in the pinky zone (z>=-1.3 at grip 0.7) with a
+	//shallow curl toward the palm edge.
+	static const float kfGrabAngles[lHandBoneNum] = {
+		17,17,10,	//Middle
+		17,17,10,	//Ring
+		30,30,20,	//Little
 		0,0,0,		//Index
-		40,35,0		//Thumb
+		130,90,0	//Thumb
 	};
-	static const float kfTriggerAngles[lNumBones] = {
+	static const float kfTriggerAngles[lHandBoneNum] = {
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
-		55,55,45,	//Index
+		17,17,10,	//Index
 		0,0,0		//Thumb
 	};
+	//Index trigger folded with the same 17/17/10 discipline as the grab
+	//fingers: the old 55/55/45 (155 deg) plunged the tip ~7 units below the
+	//palm face at real grips (y=-7.1 at grip 0.7; face at its z is -2.6).
+	//Its (0,0,-1) axis is already within 1.9 deg of the anatomical vertical
+	//axis of the index chain, so only the amount changed.
 
-	int lBoneIdx[lNumBones];
-	for(int i=0; i<lNumBones; ++i)
+	int lBoneIdx[lHandBoneNum];
+	for(int i=0; i<lHandBoneNum; ++i)
 	{
-		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksBoneNames[i]);
+		lBoneIdx[i] = mpEntity->GetBoneStateIndex(ksHandBoneNames[i]);
+		mlBoneIdx[i] = lBoneIdx[i];
 		if(lBoneIdx[i] < 0)
 		{
-			mbHandRigSetup = true;
+			Log(" [hand-rig] %s: bone resolve FAILED for '%s' (idx=%d)\n",
+				sHand, ksHandBoneNames[i], lBoneIdx[i]);
+			mbHandRigSetup = false;
 			return;
 		}
 	}
 
 	const bool bLeft = (mlHandIndex == 0);
 	cVector3f vFingerAxis = cVector3f(0,0, bLeft ? 1.0f : -1.0f);
-	cVector3f vThumbAxis = cVector3f(0, 0.8910f, bLeft ? -0.4540f : 0.4540f);
+	//Thumb axis derived from the bind geometry (plane through the thumb chain
+	//and the palm centre): the old (0,0.982,0.187) folded in a nearly
+	//horizontal plane, sweeping the short 3.5 u chain backwards at the hand
+	//edge (tip y ~ -1.0, visually barely moving despite the 130/90 rotations);
+	//the new plane sweeps the tip across toward the index at the palm's height
+	//(y ~ -1.8). The chain is still too short to reach the palm flesh (model
+	//limitation, not an angle issue). The little finger curls into the palm
+	//with a 60 deg tilt (a plain finger axis would fold it straight down,
+	//beside the ring finger, outside the palm).
+	cVector3f vThumbAxis = cVector3f(0.065f, 0.9970f, bLeft ? 0.0460f : -0.0460f);
+	cVector3f vPinkyAxis = cVector3f(0, -0.8660f, bLeft ? 0.5000f : -0.5000f);
 
 	static const char* ksPoseNames[] = { "HandGrab", "HandTrigger" };
 	static const float* kfPoseAngles[] = { kfGrabAngles, kfTriggerAngles };
@@ -215,16 +237,22 @@ void iHudModel::SetupHandAnimation()
 		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[p], "") );
 		pAnim->SetLength(0.001f);
 
-		for(int i=0; i<lNumBones; ++i)
+		for(int i=0; i<lHandBoneNum; ++i)
 		{
 			if(kfPoseAngles[p][i] == 0.0f) continue;
 
-			cAnimationTrack *pTrack = pAnim->CreateTrack(ksBoneNames[i], eAnimTransformFlag_Rotate);
+			cAnimationTrack *pTrack = pAnim->CreateTrack(ksHandBoneNames[i], eAnimTransformFlag_Rotate);
 			pTrack->SetNodeIndex(lBoneIdx[i]);
 
 			cKeyFrame *pFrame = pTrack->CreateKeyFrame(0);
-			cVector3f vAxis = (i >= 12) ? vThumbAxis : vFingerAxis;
+			cVector3f vAxis = (i >= 12) ? vThumbAxis : (i >= 6 && i < 9) ? vPinkyAxis : vFingerAxis;
 			pFrame->rotation = cQuaternion(cMath::ToRad(kfPoseAngles[p][i]), vAxis);
+
+			Log(" [hand-rig] %s: pose=%s finger=%s boneName=%s boneIndex=%d "
+				"axis=(%.4f,%.4f,%.4f) angle=%.1f appliedRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f)\n",
+				sHand, ksPoseNames[p], ksFingerNames[i], ksHandBoneNames[i], lBoneIdx[i],
+				vAxis.x, vAxis.y, vAxis.z, kfPoseAngles[p][i],
+				pFrame->rotation.w, pFrame->rotation.v.x, pFrame->rotation.v.y, pFrame->rotation.v.z);
 		}
 
 		mpHandAnimState[p] = mpEntity->AddAnimation(pAnim, ksPoseNames[p], 1.0f);
@@ -261,9 +289,65 @@ void iHudModel::UpdateHandAnimation()
 
 	mpHandAnimState[0]->SetWeight(fGrip);
 	mpHandAnimState[1]->SetWeight(fTrigger);
+
+	static float sfLastGrip[2] = { -1.0f, -1.0f };
+	static float sfLastTrigger[2] = { -1.0f, -1.0f };
+	static bool sbLogPending[2] = { false, false };
+
+	const char* sHand = mlHandIndex == 0 ? "left" : "right";
+	bool bGripChanged = cMath::Abs(fGrip - sfLastGrip[mlHandIndex]) > 0.02f;
+	bool bTriggerChanged = cMath::Abs(fTrigger - sfLastTrigger[mlHandIndex]) > 0.02f;
+	sfLastGrip[mlHandIndex] = fGrip;
+	sfLastTrigger[mlHandIndex] = fTrigger;
+
+	//Log one frame after a weight change so the engine bone states
+	//already reflect the new weights.
+	if(bGripChanged || bTriggerChanged)
+	{
+		Log(" [hand-rig] %s: grip=%.3f trigger=%.3f\n", sHand, fGrip, fTrigger);
+		sbLogPending[mlHandIndex] = true;
+	}
+	else if(sbLogPending[mlHandIndex])
+	{
+		sbLogPending[mlHandIndex] = false;
+		for(int i=0; i<lHandBoneNum; ++i)
+		{
+			if(mlBoneIdx[i] < 0) continue;
+			cBoneState *pState = mpEntity->GetBoneState(mlBoneIdx[i]);
+			if(pState == NULL) continue;
+
+			cQuaternion qRot;
+			qRot.FromRotationMatrix(pState->GetLocalMatrix().GetRotation());
+
+			float fAngle = cMath::ToDeg(2.0f * acos(cMath::Clamp(qRot.w, -1.0f, 1.0f)));
+			float fSin = sqrtf(1.0f - qRot.w * qRot.w);
+			cVector3f vAxis(0,0,0);
+			if(fSin > 0.0001f) vAxis = qRot.v / fSin;
+
+			float fWeight = (i >= 9 && i < 12) ? fTrigger : fGrip;
+			Log(" [hand-rig] %s: finger=%s boneName=%s boneIndex=%d weight=%.3f "
+				"engineRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f) engineAngle=%.1f engineAxis=(%.4f,%.4f,%.4f)\n",
+				sHand, ksFingerNames[i], ksHandBoneNames[i], mlBoneIdx[i], fWeight,
+				qRot.w, qRot.v.x, qRot.v.y, qRot.v.z, fAngle, vAxis.x, vAxis.y, vAxis.z);
+		}
+
+		//Thumb probe: where the thumb tip ends up relative to the hand origin.
+		if(mlBoneIdx[14] >= 0)
+		{
+			cBoneState *pThumb = mpEntity->GetBoneState(mlBoneIdx[14]);
+			if(pThumb)
+			{
+				cVector3f vTip = pThumb->GetWorldMatrix().GetTranslation();
+				cVector3f vHand = mpEntity->GetWorldMatrix().GetTranslation();
+				Log(" [hand-rig] %s: thumbTip world=(%.3f,%.3f,%.3f) relHand=(%.3f,%.3f,%.3f) grip=%.3f\n",
+					sHand, vTip.x, vTip.y, vTip.z,
+					(vTip - vHand).x, (vTip - vHand).y, (vTip - vHand).z, fGrip);
+			}
+		}
+	}
 }
 
-//-----------------------------------------------------------------------
+	//-----------------------------------------------------------------------
 
 void iHudModel::SetVisible(bool visible) {
   mpEntity->SetVisible(visible);
@@ -366,9 +450,6 @@ cPlayerHands::cPlayerHands(cInit *apInit)  : iUpdateable("FadeHandler")
 
 	mpMeshManager = mpInit->mpGame->GetResources()->GetMeshManager();
 
-	mlMaxPositions = 3;
-	mlMaxRotations = 16;
-
 	mlCurrentModelNum = 2;
 
 	for(int i=0; i< mlCurrentModelNum; ++i)
@@ -411,18 +492,6 @@ void cPlayerHands::OnStart()
 
 void cPlayerHands::Update(float afTimeStep)
 {
-	UpdatePrevPostions();
-	
-	///////////////////////////////////
-	//Get the camera properties
-	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
-	
-	cVector3f vRot = cVector3f(pCam->GetPitch(), pCam->GetYaw(),pCam->GetRoll());
-	cMatrixf mtxSmoothCam = 	cMath::MatrixRotate(vRot * -1.0f, eEulerRotationOrder_YXZ);
-	cVector3f vUp = mtxSmoothCam.GetUp();//pCam->GetUp();
-	cVector3f vRight = mtxSmoothCam.GetRight();//pCam->GetRight();
-	cVector3f vForward = mtxSmoothCam.GetForward()*-1.0f;//pCam->GetForward();
-	
 	/////////////////////////////////////
 	// Update the current model
 	for(int i=0; i< mlCurrentModelNum; ++i)
@@ -449,12 +518,6 @@ void cPlayerHands::Update(float afTimeStep)
 			{
         pHudModel->UpdatePoseMatrix(mtxPose, afTimeStep);
 
-				//if(pHudModel->UpdatePoseMatrix(mtxPose,afTimeStep)==false)
-				//{
-				//	 mtxPose = cMath::MatrixRotate(pHudModel->mEquipPose.mvRot,eEulerRotationOrder_XYZ);
-				//	 mtxPose.SetTranslation(pHudModel->mEquipPose.mvPos);
-				//}
-
 				break;
 			}
 			//Equip
@@ -464,33 +527,11 @@ void cPlayerHands::Update(float afTimeStep)
 
         pHudModel->mState = eHudModelState_Idle;
 
-        /*
-				float fT = cMath::Clamp(pHudModel->mfTime,0,1);
-				mtxPose = InterpolatePosesToMatrix(fT,pHudModel->mUnequipPose,pHudModel->mEquipPose);
-				
-				pHudModel->mfTime += afTimeStep/pHudModel->mfEquipTime;
-				if(pHudModel->mfTime >= 1)
-				{
-					pHudModel->mState = eHudModelState_Idle;
-					pHudModel->mfTime = 1;
-				}
-        */
-
 				break;
 			}
 			//Unequip
 			case eHudModelState_Unequip:
 				{
-          /*
-					float fT = cMath::Clamp(pHudModel->mfTime,0,1);
-					mtxPose = InterpolatePosesToMatrix(fT,pHudModel->mEquipPose,pHudModel->mUnequipPose);
-
-					pHudModel->mfTime += afTimeStep/pHudModel->mfUnequipTime;
-					if(pHudModel->mfTime >= 1)
-					{
-          */
-						//Log("Creating next model and destroying current!\n");
-
             pHudModel->mState = eHudModelState_Idle;
 						pHudModel->mfTime =0;
 						
@@ -505,34 +546,9 @@ void cPlayerHands::Update(float afTimeStep)
 						pHudModel->Reset();
 
 						continue;
-					//}
 					break;
 				}
 		}
-
-		
-		////////////////////
-		//Set rotation
-    /*
-		cMatrixf mtxTransform = cMath::MatrixMul( 
-								cMath::MatrixRotate(mvSmoothCameraRot, eEulerRotationOrder_XYZ),
-								mtxPose.GetRotation()
-											);
-
-		//pHudModel->mpEntity->SetMatrix(mtxRot);
-		
-		/////////////////////////
-		//Set position
-		const cVector3f &vLocalPos = mtxPose.GetTranslation();
-		cVector3f vRealLocalPos =	vUp *		vLocalPos.y + 
-									vRight *	vLocalPos.x +
-									vForward *	vLocalPos.z +
-									cVector3f(0,-mpInit->mpPlayer->GetHeadMove()->GetPos()*0.1f,0);;
-
-		mtxTransform.SetTranslation(pCam->GetPosition() + vRealLocalPos);
-		
-		pHudModel->mpEntity->SetMatrix(mtxTransform);
-    */
 
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
@@ -675,15 +691,12 @@ bool cPlayerHands::AddModelFromFile(const tString &asFile)
 
 void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 {
-	//Log("Setting current %d to '%s'\n",alNum,asName.c_str());
-	
 	//////////////////////////////////////////////
 	//Check so that it is not already equipped
 	if(mvCurrentHudModels[alNum] &&
 		cString::ToLowerCase(asName) == cString::ToLowerCase(mvCurrentHudModels[alNum]->msName) &&
 		mvCurrentHudModels[alNum]->mState == eHudModelState_Idle)
 	{
-		//Log(" model already active!\n");
 		return;
 	}
 	
@@ -714,8 +727,6 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 					mvCurrentHudModels[alNum]->mfTime = 1.0f - mvCurrentHudModels[alNum]->mfTime;
 				}
 				mvCurrentHudModels[alNum]->msNextModel = asName;
-				//Log(" Unequipping %s, time: %f\n",mvCurrentHudModels[alNum]->msName.c_str(),
-				//							mvCurrentHudModels[alNum]->mfTime);
 			}
 			else
 			{
@@ -728,6 +739,7 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 		}
 		else
 		{
+			pHandModel->SetHandIndex(alNum);
 			pHandModel->LoadEntities();
 			pHandModel->EquipEffect(true);
 
@@ -754,11 +766,6 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 			mvCurrentHudModels[alNum]->mState = eHudModelState_Unequip;
 			mvCurrentHudModels[alNum]->mfTime = 1.0f - mvCurrentHudModels[alNum]->mfTime;
 			mvCurrentHudModels[alNum]->msNextModel = asName;
-			//Log(" Destroying old\n");
-		}
-		else
-		{
-			//Log("No old to destroy!!!\n");
 		}
 	}
 }
@@ -794,67 +801,15 @@ void cPlayerHands::OnWorldExit()
 
 void cPlayerHands::OnWorldLoad()
 {
-	mlstRotations.clear();
-	mlstPositions.clear();
-
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
 		iHudModel *pHudModel = mvCurrentHudModels[i];
 		if(pHudModel)
 		{
+			pHudModel->SetHandIndex(i);
 			pHudModel->LoadEntities();
 		}
 	}
-}
-
-//-----------------------------------------------------------------------
-
-//////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS
-//////////////////////////////////////////////////////////////////////////
-
-//-----------------------------------------------------------------------
-void cPlayerHands::UpdatePrevPostions()
-{
-	///////////////////////////////////
-	//Get current position
-	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
-	cVector3f vCamRotation(pCam->GetPitch(),pCam->GetYaw(),0);
-	cVector3f vCamPosition = pCam->GetPosition();
-	
-	mlstRotations.push_back(vCamRotation);
-	mlstPositions.push_back(vCamPosition);
-
-	//Delete if there are too many values stored.
-	if((int)mlstPositions.size()> mlMaxPositions) mlstPositions.pop_front();
-	if((int)mlstRotations.size()> mlMaxRotations) mlstRotations.pop_front();
-	
-	///////////////////////////////////////
-	//Get the current camera postion and rotation
-	cVector3f vRotation(0,0,0);
-	cVector3f vPosition(0,0,0);
-	float fRotNum=0;
-	float fPosNum=0;
-
-	float fRotMulStart = 1.0f;
-	float fRotMulEnd = 0.1f;
-	float fSize = (float) mlstRotations.size();
-	//float fD = (fRotMulStart - fRotMulEnd) / fSize;
-	float fMul = 1.0f;//fRotMulEnd;
-
-	for(tVector3fListIt it = mlstRotations.begin(); it != mlstRotations.end(); ++it)
-	{
-		vRotation += *it * fMul; fRotNum+=fMul;
-		//fMul += fD;
-	}
-
-	for(tVector3fListIt it = mlstPositions.begin(); it != mlstPositions.end(); ++it)
-	{
-		vPosition += *it; fPosNum++;
-	}
-
-	mvSmoothCameraPos = vCamPosition;//vPosition / fPosNum;
-	mvSmoothCameraRot = vRotation / fRotNum;
 }
 
 //-----------------------------------------------------------------------

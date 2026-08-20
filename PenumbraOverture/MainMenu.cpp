@@ -33,6 +33,8 @@
 
 #include "VRHelper.hpp"
 
+#include "VRHaptics.h"
+
 #include <functional>
 
 float gfMenuFadeAmount;
@@ -387,7 +389,9 @@ cMainMenuWidget_Text::cMainMenuWidget_Text(cInit *apInit, const cVector3f &avPos
 	mvFontSize = avFontSize;
 
 	mAlignment = aAlignment;
-	
+
+	mTextColor = cColor(0.9f, 1);
+
 	mRect.w = mpFont->GetLength(mvFontSize,msText.c_str());
 	mRect.h = mvFontSize.y +3;
 	mRect.y = avPos.y+3;
@@ -425,10 +429,10 @@ void cMainMenuWidget_Text::UpdateSize()
 void cMainMenuWidget_Text::OnDraw()
 {
 	if(mfMaxWidth <=0)
-		mpFont->Draw(mvPositon,mvFontSize,cColor(0.9f,1),mAlignment,_W("%ls"),msText.c_str());
+		mpFont->Draw(mvPositon,mvFontSize,mTextColor,mAlignment,_W("%ls"),msText.c_str());
 	else
 		mpFont->DrawWordWrap(	mvPositon,mfMaxWidth,mvFontSize.y+1,
-								mvFontSize,cColor(0.9f,1),mAlignment,msText.c_str());
+								mvFontSize,mTextColor,mAlignment,msText.c_str());
 }
 
 //-----------------------------------------------------------------------
@@ -1003,6 +1007,9 @@ cMainMenuWidget_Text *gpRenderToMonitorText = NULL;
 
 enum eVRMenuSetting
 {
+	eVRMenuSetting_Handedness,
+	eVRMenuSetting_PlayMode,
+	eVRMenuSetting_PlayerHeight,
 	eVRMenuSetting_TurnMode,
 	eVRMenuSetting_SnapAngle,
 	eVRMenuSetting_SmoothSpeed,
@@ -1018,15 +1025,58 @@ enum eVRMenuSetting
 	eVRMenuSetting_LastEnum
 };
 
+class cMainMenuWidget_VRSetting;
+
+static void RefreshVRSettingAvailability(cInit *apInit);
+
 cMainMenuWidget_Text *gpVRSettingTexts[eVRMenuSetting_LastEnum] = { NULL };
+cMainMenuWidget_VRSetting *gpVRSettingButtons[eVRMenuSetting_LastEnum] = { NULL };
+
+static const char *VRSettingsTextName(eVRMenuSetting aSetting)
+{
+	switch(aSetting)
+	{
+	case eVRMenuSetting_Handedness: return "VRHandedness";
+	case eVRMenuSetting_PlayMode: return "VRPlayMode";
+	case eVRMenuSetting_PlayerHeight: return "VRPlayerHeight";
+	case eVRMenuSetting_TurnMode: return "VRTurnMode";
+	case eVRMenuSetting_SnapAngle: return "VRSnapAngle";
+	case eVRMenuSetting_SmoothSpeed: return "VRSmoothSpeed";
+	case eVRMenuSetting_TurnDeadZone: return "VRTurnDeadZone";
+	case eVRMenuSetting_MoveSpeed: return "VRMoveSpeed";
+	case eVRMenuSetting_MoveDeadZone: return "VRMoveDeadZone";
+	case eVRMenuSetting_CrouchMode: return "VRCrouchMode";
+	case eVRMenuSetting_PhysicalCrouchDepth: return "VRPhysicalCrouchDepth";
+	case eVRMenuSetting_HeightOffset: return "VRHeightOffset";
+	case eVRMenuSetting_UIDistance: return "VRUIDistance";
+	case eVRMenuSetting_UIScale: return "VRUIScale";
+	case eVRMenuSetting_SubtitleScale: return "VRSubtitleScale";
+	default: return "";
+	}
+}
 
 static tWString GetVRSettingText(cInit *mpInit, eVRMenuSetting aSetting)
 {
 	char sValue[64];
 	const cVRSettings& settings = mpInit->mVRSettings;
 
-	switch(aSetting)
+switch(aSetting)
 	{
+	case eVRMenuSetting_Handedness:
+		switch(settings.GetHandedness())
+		{
+		case eVRHandedness_Left: return kTranslate("MainMenu", "VRLeft");
+		default: return kTranslate("MainMenu", "VRRight");
+		}
+	case eVRMenuSetting_PlayMode:
+		switch(settings.GetPlayMode())
+		{
+		case eVRPlayMode_Seated: return kTranslate("MainMenu", "VRSeated");
+		default: return kTranslate("MainMenu", "VRStanding");
+		}
+	case eVRMenuSetting_PlayerHeight:
+		sprintf_s(sValue, sizeof(sValue), "%.2f m", settings.GetPlayerHeight());
+		break;
 	case eVRMenuSetting_TurnMode:
 		switch(settings.GetTurnMode())
 		{
@@ -1082,22 +1132,46 @@ static tWString GetVRSettingText(cInit *mpInit, eVRMenuSetting aSetting)
 class cMainMenuWidget_VRSetting : public cMainMenuWidget_Button
 {
 public:
-	cMainMenuWidget_VRSetting(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+cMainMenuWidget_VRSetting(cInit *apInit, const cVector3f &avPos, const tWString& asText,
 		cVector2f avFontSize, eFontAlign aAlignment, eVRMenuSetting aSetting)
 		: cMainMenuWidget_Button(apInit, avPos, asText, eMainMenuState_LastEnum, avFontSize, aAlignment),
-		  mSetting(aSetting)
+		  mSetting(aSetting), mbEnabled(true)
 	{
 		msTip = kTranslate("MainMenu", "TipVRAdjust");
 	}
 
+	void SetEnabled(bool abEnabled) { mbEnabled = abEnabled; }
+	bool IsEnabled() const { return mbEnabled; }
+
 	void OnMouseDown(eMButton aButton)
 	{
+		if(!mbEnabled) return;
+
 		const int direction = aButton == eMButton_Left ? 1 : (aButton == eMButton_Right ? -1 : 0);
 		if(direction == 0) return;
 
-		cVRSettings& settings = mpInit->mVRSettings;
+cVRSettings& settings = mpInit->mVRSettings;
 		switch(mSetting)
 		{
+		case eVRMenuSetting_Handedness:
+		{
+			int hand = (int)settings.GetHandedness() + direction;
+			if(hand < (int)eVRHandedness_Left) hand = (int)eVRHandedness_Right;
+			if(hand > (int)eVRHandedness_Right) hand = (int)eVRHandedness_Left;
+			settings.SetHandedness((eVRHandedness)hand);
+			break;
+		}
+		case eVRMenuSetting_PlayMode:
+		{
+			int mode = (int)settings.GetPlayMode() + direction;
+			if(mode < (int)eVRPlayMode_Standing) mode = (int)eVRPlayMode_Seated;
+			if(mode > (int)eVRPlayMode_Seated) mode = (int)eVRPlayMode_Standing;
+			settings.SetPlayMode((eVRPlayMode)mode);
+			break;
+		}
+		case eVRMenuSetting_PlayerHeight:
+			settings.SetPlayerHeight(settings.GetPlayerHeight() + 0.05f * direction);
+			break;
 		case eVRMenuSetting_TurnMode:
 		{
 			int mode = (int)settings.GetTurnMode() + direction;
@@ -1148,13 +1222,138 @@ public:
 			return;
 		}
 
-		gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
+gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
 		mpInit->ApplyVRSettings(true);
+		RefreshVRSettingAvailability(mpInit);
 		Log(" [VR settings +%lu ms] menu setting %d changed.\n", GetApplicationTime(), (int)mSetting);
+	}
+
+	void OnMouseOver(bool abOver)
+	{
+		if(mbEnabled)
+		{
+			cMainMenuWidget_Button::OnMouseOver(abOver);
+		}
+		else
+		{
+			mbOver = abOver;
+		}
+	}
+
+	void OnDraw()
+	{
+		if(mbEnabled)
+		{
+			cMainMenuWidget_Button::OnDraw();
+		}
+		else
+		{
+			mpFont->Draw(mvPositon, mvFontSize, cColor(0.45f, 0.9f), mAlignment, msText.c_str());
+		}
 	}
 
 private:
 	eVRMenuSetting mSetting;
+	bool mbEnabled;
+};
+
+//-----------------------------------------------------------------------
+
+class cMainMenuWidget_RecenterButton : public cMainMenuWidget_Button
+{
+public:
+	cMainMenuWidget_RecenterButton(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+		cVector2f avFontSize, eFontAlign aAlignment)
+		: cMainMenuWidget_Button(apInit, avPos, asText, eMainMenuState_LastEnum, avFontSize, aAlignment)
+	{
+		msTip = kTranslate("MainMenu", "TipVRRecenter");
+	}
+
+	void OnMouseDown(eMButton aButton)
+	{
+		if(aButton != eMButton_Left) return;
+
+		mpInit->mpGame->vr_tracking.RecenterOrientation();
+		mpInit->mpGame->GetScene()->ResetVRMainUIAnchor();
+		mpInit->mpGame->vr_old_head_tracking_pose =
+			mpInit->mpGame->vr_tracking.GetHeadTrackingPose();
+		Log(" [VR settings +%lu ms] recentered orientation; world yaw %.1f deg.\n",
+			GetApplicationTime(),
+			cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
+	}
+};
+
+//-----------------------------------------------------------------------
+
+static void RefreshVRSettingAvailability(cInit *apInit)
+{
+	const cVRSettings& settings = apInit->mVRSettings;
+	const bool bSnap = settings.GetTurnMode() == eVRTurnMode_Snap;
+	const bool bSmooth = settings.GetTurnMode() == eVRTurnMode_Smooth;
+	const bool bTurnDisabled = settings.GetTurnMode() == eVRTurnMode_Disabled;
+
+	gpVRSettingButtons[eVRMenuSetting_SnapAngle]->SetEnabled(!bSmooth && !bTurnDisabled);
+	gpVRSettingButtons[eVRMenuSetting_SmoothSpeed]->SetEnabled(!bSnap && !bTurnDisabled);
+
+	gpVRSettingTexts[eVRMenuSetting_SnapAngle]->SetTextColor(
+		!bSmooth && !bTurnDisabled ? cColor(0.9f, 1) : cColor(0.45f, 0.9f));
+	gpVRSettingTexts[eVRMenuSetting_SmoothSpeed]->SetTextColor(
+		!bSnap && !bTurnDisabled ? cColor(0.9f, 1) : cColor(0.45f, 0.9f));
+
+	// In physical crouch the depth is the threshold the tracked height must
+	// cross; in button and hybrid modes it is the viewpoint lowering amount,
+	// so only the label changes with the mode.
+	tWString sDepthLabel;
+	if(settings.GetCrouchMode() == eVRCrouchMode_Physical)
+	{
+		sDepthLabel = apInit->mpGame->GetResources()->Translate("MainMenu", "VRDetectionDepth");
+		if(sDepthLabel == _W("")) sDepthLabel = _W("Detection depth:");
+	}
+	else
+	{
+		sDepthLabel = apInit->mpGame->GetResources()->Translate("MainMenu", "VRPhysicalCrouchDepth");
+	}
+	gpVRSettingButtons[eVRMenuSetting_PhysicalCrouchDepth]->msText = sDepthLabel;
+}
+
+//-----------------------------------------------------------------------
+
+class cMainMenuWidget_CalibrateHeight : public cMainMenuWidget_Button
+{
+public:
+	cMainMenuWidget_CalibrateHeight(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+		cVector2f avFontSize, eFontAlign aAlignment)
+		: cMainMenuWidget_Button(apInit, avPos, asText, eMainMenuState_LastEnum, avFontSize, aAlignment)
+	{
+		msTip = kTranslate("MainMenu", "TipVRCalibrateHeight");
+	}
+
+	void OnMouseDown(eMButton aButton)
+	{
+		if(aButton != eMButton_Left) return;
+
+		cVRSettings& settings = mpInit->mVRSettings;
+		const float headHeight =
+			mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation().y;
+		if(headHeight > 0.90f && headHeight < 2.20f)
+		{
+			settings.SetPlayerHeight(headHeight);
+			Log(" [VR settings +%lu ms] player height calibrated at %.2f m.\n",
+				GetApplicationTime(), headHeight);
+			cVRHaptics::Play(mpInit, eVRHapticEvent_UISelect,
+				VRHelper::DominantHapticHand(mpInit->mpGame));
+		}
+		else
+		{
+			Log(" [VR settings +%lu ms] WARNING: player height calibration rejected; "
+				"rawHmd=%.3f outside plausible range (0.90, 2.20) m.\n",
+				GetApplicationTime(), headHeight);
+		}
+
+		gpVRSettingTexts[eVRMenuSetting_PlayerHeight]->msText =
+			GetVRSettingText(mpInit, eVRMenuSetting_PlayerHeight);
+		mpInit->ApplyVRSettings(true);
+	}
 };
 
 
@@ -3327,68 +3526,108 @@ void cMainMenu::CreateWidgets()
 	vPos.y += 37;
 	AddWidgetToState(eMainMenuState_Options,hplNew( cMainMenuWidget_Button,(mpInit,vPos,kTranslate("MainMenu","Back"),eMainMenuState_Start,25,eFontAlign_Center)) );
 
-  ///////////////////////////////////
+///////////////////////////////////
   // VR Settings
   ///////////////////////////////////
   vPos = vTextStart;//cVector3f(400, 260, 40);
 
-  AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
-  vPos.y += 37;
+AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
+  vPos.y += 30;
 
-  const eVRMenuSetting vVRSettingOrder[] = {
-	eVRMenuSetting_TurnMode,
-	eVRMenuSetting_SnapAngle,
-	eVRMenuSetting_SmoothSpeed,
-	eVRMenuSetting_TurnDeadZone,
-	eVRMenuSetting_MoveSpeed,
-	eVRMenuSetting_MoveDeadZone,
-	eVRMenuSetting_CrouchMode,
-	eVRMenuSetting_PhysicalCrouchDepth,
-	eVRMenuSetting_HeightOffset,
-	eVRMenuSetting_UIDistance,
-	eVRMenuSetting_UIScale,
-	eVRMenuSetting_SubtitleScale
-  };
-  const char *vVRSettingNames[] = {
-	"VRTurnMode",
-	"VRSnapAngle",
-	"VRSmoothSpeed",
-	"VRTurnDeadZone",
-	"VRMoveSpeed",
-	"VRMoveDeadZone",
-	"VRCrouchMode",
-	"VRPhysicalCrouchDepth",
-	"VRHeightOffset",
-	"VRUIDistance",
-	"VRUIScale",
-	"VRSubtitleScale"
+  struct sVRSettingSection {
+    const char *msTitleKey;
+    const eVRMenuSetting *mpSettings;
+    int mlCount;
   };
 
-  for(int i = 0; i < eVRMenuSetting_LastEnum; ++i)
+  static const eVRMenuSetting vVRControlsSettings[] = {
+    eVRMenuSetting_Handedness
+  };
+  static const eVRMenuSetting vVRMovementSettings[] = {
+    eVRMenuSetting_MoveSpeed,
+    eVRMenuSetting_MoveDeadZone,
+    eVRMenuSetting_TurnMode,
+    eVRMenuSetting_SnapAngle,
+    eVRMenuSetting_SmoothSpeed,
+    eVRMenuSetting_TurnDeadZone,
+    eVRMenuSetting_CrouchMode,
+    eVRMenuSetting_PhysicalCrouchDepth
+  };
+  static const eVRMenuSetting vVRCalibrationSettings[] = {
+    eVRMenuSetting_PlayMode,
+    eVRMenuSetting_PlayerHeight,
+    eVRMenuSetting_HeightOffset
+  };
+  static const eVRMenuSetting vVRDisplaySettings[] = {
+    eVRMenuSetting_UIDistance,
+    eVRMenuSetting_UIScale,
+    eVRMenuSetting_SubtitleScale
+  };
+  static const sVRSettingSection vVRSections[] = {
+    { "VRControls", vVRControlsSettings, 1 },
+    { "VRMovement", vVRMovementSettings, 8 },
+    { "VRCalibration", vVRCalibrationSettings, 3 },
+    { "VRDisplay", vVRDisplaySettings, 3 }
+  };
+
+  for(int section = 0; section < 4; ++section)
   {
-	const eVRMenuSetting setting = vVRSettingOrder[i];
-	cMainMenuWidget *pSetting = hplNew(cMainMenuWidget_VRSetting,
-		(mpInit, vPos, kTranslate("MainMenu", vVRSettingNames[i]), 16, eFontAlign_Right, setting));
-	AddWidgetToState(eMainMenuState_OptionsVRSettings, pSetting);
+    const sVRSettingSection& vSection = vVRSections[section];
 
-	cVector3f vValuePos(vTextStart.x + 12, vPos.y, vPos.z);
-	gpVRSettingTexts[setting] = hplNew(cMainMenuWidget_Text,
-		(mpInit, vValuePos, GetVRSettingText(mpInit, setting), 16, eFontAlign_Left, pSetting));
-	AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRSettingTexts[setting]);
-	vPos.y += 21;
+    vPos.y += 4;
+    cMainMenuWidget_Text *pSectionTitle = hplNew(cMainMenuWidget_Text,
+      (mpInit, vPos, kTranslate("MainMenu", vSection.msTitleKey), 14, eFontAlign_Right));
+    pSectionTitle->SetTextColor(cColor(0.6f, 0.85f, 1.0f, 1.0f));
+    AddWidgetToState(eMainMenuState_OptionsVRSettings, pSectionTitle);
+    vPos.y += 13;
+
+    for(int i = 0; i < vSection.mlCount; ++i)
+    {
+      const eVRMenuSetting setting = vSection.mpSettings[i];
+      cMainMenuWidget_VRSetting *pSetting = hplNew(cMainMenuWidget_VRSetting,
+        (mpInit, vPos, kTranslate("MainMenu", VRSettingsTextName(setting)), 14, eFontAlign_Right, setting));
+      AddWidgetToState(eMainMenuState_OptionsVRSettings, pSetting);
+      gpVRSettingButtons[setting] = pSetting;
+
+      cVector3f vValuePos(vTextStart.x + 12, vPos.y, vPos.z);
+      gpVRSettingTexts[setting] = hplNew(cMainMenuWidget_Text,
+        (mpInit, vValuePos, GetVRSettingText(mpInit, setting), 14, eFontAlign_Left, pSetting));
+      AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRSettingTexts[setting]);
+
+      if(setting == eVRMenuSetting_PlayerHeight)
+      {
+        AddWidgetToState(eMainMenuState_OptionsVRSettings,
+          hplNew(cMainMenuWidget_CalibrateHeight, (mpInit,
+            cVector3f(vTextStart.x + 170, vPos.y, vPos.z),
+            kTranslate("MainMenu", "VRCalibrateHeight"), 13, eFontAlign_Left)));
+      }
+      vPos.y += 14;
+    }
+
+    if(section == 2)
+    {
+      // One-shot action inside the calibration section, not a stored setting.
+      AddWidgetToState(eMainMenuState_OptionsVRSettings,
+        hplNew(cMainMenuWidget_RecenterButton, (mpInit, vPos,
+          kTranslate("MainMenu", "VRRecenter"), 14, eFontAlign_Right)));
+      vPos.y += 14;
+    }
   }
 
+  RefreshVRSettingAvailability(mpInit);
+
+  vPos.y += 4;
   cMainMenuWidget *pVRRenderToMonitor = hplNew(cMainMenuWidget_RenderToMonitor,
-	(mpInit, vPos, kTranslate("MainMenu", "VRRenderToMonitor"), 16, eFontAlign_Right));
+    (mpInit, vPos, kTranslate("MainMenu", "VRRenderToMonitor"), 14, eFontAlign_Right));
   AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRRenderToMonitor);
   sText = mpInit->mpGame->mbRenderToMonitor ? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
   gpRenderToMonitorText = hplNew(cMainMenuWidget_Text,
-	(mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z), sText, 16, eFontAlign_Left, pVRRenderToMonitor));
-  AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
-	vPos.y += 24;
+    (mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z), sText, 14, eFontAlign_Left, pVRRenderToMonitor));
+AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
+  vPos.y += 14;
 
   AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Button,
-	(mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 20, eFontAlign_Center)));
+    (mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 18, eFontAlign_Center)));
 
 	///////////////////////////////////
 	// Options Controls

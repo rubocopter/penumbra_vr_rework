@@ -9,8 +9,8 @@ namespace hpl {
 }
 
 TrackedController::TrackedController()
-  : last_packet_(0), button_state_(false), device_index_(vr::k_unTrackedDeviceIndexInvalid),
-    pose_valid_(false), last_matrix_(cMatrixf::Identity), matrix_(cMatrixf::Identity),
+  : button_state_(false), device_index_(vr::k_unTrackedDeviceIndexInvalid),
+    pose_valid_(false), matrix_(cMatrixf::Identity),
     velocity_(0.0f), angular_velocity_(0.0f) {
 }
 
@@ -18,12 +18,7 @@ TrackedController::~TrackedController() {
 }
 
 void TrackedController::SetMatrix(const cMatrixf& matrix) {
-  last_matrix_ = matrix_;
   matrix_ = matrix;
-}
-
-cMatrixf TrackedController::GetLastMatrix() {
-  return last_matrix_;
 }
 
 cMatrixf TrackedController::GetMatrix() {
@@ -118,14 +113,6 @@ void TrackedController::UpdateButtonState() {
   button_state_.padPressed = (state.ulButtonPressed & (1ULL << ((int)k_EButton_SteamVR_Touchpad))) > 0;
 
   // Pad touched
-  button_state_.touchJustContacted = false;
-  button_state_.touchJustReleased = false;
-
-  if (state.ulButtonTouched & (1ULL << ((int)k_EButton_SteamVR_Touchpad)))
-    button_state_.touchJustContacted = !button_state_.touchContact;
-  else
-    button_state_.touchJustReleased = button_state_.touchContact;
-
   button_state_.touchContact = (state.ulButtonTouched & (1ULL << ((int)k_EButton_SteamVR_Touchpad))) > 0;
 
   // Touchpad coordinates
@@ -160,16 +147,11 @@ void TrackedController::UpdateButtonState() {
 
 void TrackedController::InvalidateButtonState() {
   ButtonState disconnected(false);
-  disconnected.touchJustReleased = button_state_.touchContact;
   disconnected.padJustReleased = button_state_.padPressed;
   disconnected.gripJustReleased = button_state_.gripPressed;
   disconnected.triggerJustReleased = button_state_.triggerPressed;
   disconnected.menuJustReleased = button_state_.menuPressed;
-  button_state_ = disconnected;
-}
-
-void TrackedController::SetButtonState(const ButtonState& state) {
-  button_state_ = state;
+button_state_ = disconnected;
 }
 
 TrackedController::ButtonState TrackedController::GetButtonState() {

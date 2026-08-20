@@ -21,6 +21,7 @@
 #include "Init.h"
 #include "Player.h"
 #include "PlayerHelper.h"
+#include "PlayerHands.h"
 #include "Inventory.h"
 #include "SaveHandler.h"
 #include "EffectHandler.h"
@@ -964,9 +965,10 @@ void cNotebook::Update(float afTimeStep)
     mfAlpha = 1;
 	}
 
-  //////////////////////////////
-  //Stick the notebook to the player's left hand
-  if (mpInit->mpGame->vr_left_hand.IsPoseValid())
+//////////////////////////////
+  //Stick the notebook to the player's off hand (the hand not used for
+  //pointing), so the dominant hand keeps the pointer free.
+  if (VRHelper::OffHand(mpInit->mpGame).IsPoseValid())
   {
     auto scene = mpInit->mpGame->GetScene();
 
@@ -974,16 +976,35 @@ void cNotebook::Update(float afTimeStep)
     auto centerPos = pCamera3D->GetPosition();
 
     cMatrixf camInverse = cMath::MatrixInverse(pCamera3D->GetViewMatrix());
-    cVector3f uiPos = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame).GetTranslation();
+    cVector3f uiPos = VRHelper::TrackingToWorldSpace(VRHelper::OffHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame).GetTranslation();
 
-    auto translateMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_left_hand.GetMatrix(), mpInit->mpGame);
+    auto translateMat = VRHelper::TrackingToWorldSpace(VRHelper::OffHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
     auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 1450.0f, -1.0f / 1450.0f, 1.0f / 1450.0f));
 
     // Move the UI in front of the player's eyes
     cMatrixf transMat = cMatrixf::Identity;
 
-    // Translate to center for scaling transformation
-    auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-150.0f, -200.0f, 0.0f));
+    // The notebook is a 2D UI surface of 800x600 px whose origin (0,0) is
+    // anchored to the off hand. The visible book (notebook_front/open.bmp,
+    // 350x460, opaque) is drawn at (225,70), so its centre sits at (400,300)
+    // of that surface -- NOT at the origin. Offsetting the hand on the whole
+    // quad instead of on the book is what made the book float far from the
+    // hand (a +450 lateral offset put the book centre 850 px = 0.59 m to the
+    // side of the hand at the 1/1450 scale). The offset below therefore
+    // targets the book rectangle: the hand goes to the book's outer edge and
+    // the book extends toward the body centre. The lateral direction is
+    // expressed in the hand's local frame, and in this engine the same +X
+    // axis points toward the body on the left hand and away from it on the
+    // right hand, so the edge to grab depends on which hand is the off hand:
+    //   off hand left  (slot 0): hand at the book left edge  (UI x=225) -> -225
+    //   off hand right (slot 1): hand at the book right edge (UI x=575) -> -575
+    // The -300 vertical offset puts the book's vertical centre at the hand.
+    // At 1/1450 the book measures 350x460 px = 0.24x0.32 m, so it extends
+    // about 0.24 m from the hand toward the body in both dominant modes.
+    const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+    const float bookEdgeX = (offSlot == 0) ? -225.0f : -575.0f;
+    auto centerTranslationMat = cMath::MatrixTranslate(
+      cVector3f(bookEdgeX, -300.0f, 0.0f));
     transMat = cMath::MatrixMul(centerTranslationMat, transMat);
 
     // Scale it down
@@ -1239,6 +1260,20 @@ void cNotebook::SetActive(bool abX)
 		mBookType = eNotebookType_Front;
 		mStateMachine.ChangeState(eNotebookState_Front);
 		mvBookTypes[0].mfAlpha = 1;
+
+    // Opening the notebook is a navigation-only state: the hands return to
+    // bare (tools holstered, lights off) exactly like a dominant-hand change,
+    // regardless of which hand holds the notebook.
+    if(mpInit->mpPlayer != NULL)
+    {
+      if(mpInit->mpPlayer->GetFlashLight()->IsActive())
+        mpInit->mpPlayer->GetFlashLight()->SetActive(false);
+      if(mpInit->mpPlayer->GetGlowStick()->IsActive())
+        mpInit->mpPlayer->GetGlowStick()->SetActive(false);
+      mpInit->mpPlayer->StartHolster();
+      mpInit->mpPlayerHands->SetCurrentModel(0, "");
+      mpInit->mpPlayerHands->SetCurrentModel(1, "");
+    }
 
     // Hide hands
     mpInit->mpPlayer->GetRightHand()->SetVisible(false);

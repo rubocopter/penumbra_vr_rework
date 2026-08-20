@@ -238,7 +238,7 @@ void cGameLamp::OnPlayerInteract()
 		if(	mpInit->mpPlayer->GetPickedBody()->GetMass() != 0 && 
 			bInteracted==false && ((mbLit && mbInteractOff) || (!mbLit && mbInteractOn)))
 		{
-			if(mpInit->mbHasHaptics && mpInit->mpPlayer->mbProxyTouching==false) return;
+			if(mpInit->mbHasHaptics) return;
 
 			mpInit->mpPlayer->mbPickAtPoint = false;
 			mpInit->mpPlayer->mbRotateWithPlayer = true;

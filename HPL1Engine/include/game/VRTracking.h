@@ -28,6 +28,7 @@ namespace hpl {
 			  mPlayerWorldPose(cMatrixf::Identity),
 			  mfHeightCalibration(0.0f),
 			  mfPostureOffset(0.0f),
+			  mfSeatedOffset(0.0f),
 			  mfWorldYaw(0.0f)
 		{
 		}
@@ -70,6 +71,19 @@ namespace hpl {
 		float GetPostureOffset() const
 		{
 			return mfPostureOffset;
+		}
+
+		// Seated play raises the world so the player's seated eye height maps to
+		// the configured standing height. It is a play-mode preference, kept
+		// separate from posture (crouch) and the manual height calibration.
+		void SetSeatedOffset(float afSeatedOffset)
+		{
+			mfSeatedOffset = afSeatedOffset;
+		}
+
+		float GetSeatedOffset() const
+		{
+			return mfSeatedOffset;
 		}
 
 		void SetWorldYaw(float afWorldYaw)
@@ -121,7 +135,7 @@ namespace hpl {
 			// explicit concern. World scale remains 1.0.
 			calibratedPosition.x = 0.0f;
 			calibratedPosition.y = (calibratedPosition.y - 0.2f) * 1.065f +
-				mfHeightCalibration + mfPostureOffset;
+				mfHeightCalibration + mfPostureOffset + mfSeatedOffset;
 			calibratedPosition.z = 0.0f;
 			calibratedHeadPose.SetTranslation(calibratedPosition);
 
@@ -150,6 +164,7 @@ namespace hpl {
 		cMatrixf mPlayerWorldPose;
 		float mfHeightCalibration;
 		float mfPostureOffset;
+		float mfSeatedOffset;
 		float mfWorldYaw;
 	};
 

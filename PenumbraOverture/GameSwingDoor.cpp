@@ -203,7 +203,7 @@ void cGameSwingDoor::OnPlayerInteract()
 	float fDist = mpInit->mpPlayer->GetPickedDist();
 
 	// if(fDist > mfMaxInteractDist) return;
-	if(mpInit->mbHasHaptics && mpInit->mpPlayer->mbProxyTouching==false) return;
+	if(mpInit->mbHasHaptics) return;
 
 	//Set some properties
 	mpInit->mpPlayer->mfForwardUpMul = 1.0f;

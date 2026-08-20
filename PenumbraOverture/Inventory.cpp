@@ -124,10 +124,7 @@ cInventory::cInventory(cInit *apInit)  : iUpdateable("Inventory")
 	mvItemTypes[eGameItemType_GlowStick] = hplNew( cGameItemType_GlowStick,(mpInit) );
 	mvItemTypes[eGameItemType_Flare] = hplNew( cGameItemType_Flare,(mpInit) );
 	mvItemTypes[eGameItemType_Painkillers] = hplNew( cGameItemType_Painkillers,(mpInit) );
-	if(mpInit->mbHasHaptics)
-		mvItemTypes[eGameItemType_WeaponMelee] = hplNew( cGameItemType_WeaponMeleeHaptX,(mpInit) );
-	else
-		mvItemTypes[eGameItemType_WeaponMelee] = hplNew( cGameItemType_WeaponMelee,(mpInit) );
+	mvItemTypes[eGameItemType_WeaponMelee] = hplNew( cGameItemType_WeaponMelee,(mpInit) );
 	mvItemTypes[eGameItemType_Throw] = hplNew( cGameItemType_Throw,(mpInit) );
 
 	Reset();

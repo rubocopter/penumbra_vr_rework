@@ -267,30 +267,6 @@ template <class T> 	class cMatrix {
 						m[0][3], m[1][3], m[2][3] ,m[3][3]);
 	}
 
-  static inline cMatrix FromSteamVRMatrix44(vr::HmdMatrix44_t pA)
-  {
-    cMatrix mat;
-
-    mat.m[0][0] = pA.m[0][0];
-    mat.m[0][1] = pA.m[0][1];
-    mat.m[0][2] = pA.m[0][2];
-    mat.m[0][3] = pA.m[0][3];
-    mat.m[1][0] = pA.m[1][0];
-    mat.m[1][1] = pA.m[1][1];
-    mat.m[1][2] = pA.m[1][2];
-    mat.m[1][3] = pA.m[1][3];
-    mat.m[2][0] = pA.m[2][0];
-    mat.m[2][1] = pA.m[2][1];
-    mat.m[2][2] = pA.m[2][2];
-    mat.m[2][3] = pA.m[2][3];
-    mat.m[3][0] = pA.m[3][0];
-    mat.m[3][1] = pA.m[3][1];
-    mat.m[3][2] = pA.m[3][2];
-    mat.m[3][3] = pA.m[3][3];
-
-    return mat;
-  }
-
   static inline cMatrix FromSteamVRMatrix34(vr::HmdMatrix34_t pA)
   {
     cMatrix mat;

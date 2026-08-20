@@ -124,6 +124,7 @@ public:
 	bool OnStartInventoryShortCut(int alNum);
 
 	void SetHudWeapon(cHudModel_WeaponMelee* apHudWeapon){ mpHudWeapon = apHudWeapon;}
+	cHudModel_WeaponMelee* GetHudWeapon(){ return mpHudWeapon;}
 
 private:
 	cHudModel_WeaponMelee *mpHudWeapon;

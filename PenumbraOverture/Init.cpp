@@ -19,6 +19,7 @@
 #include "Init.h"
 #include "impl/CGProgram.h"
 #include "Player.h"
+#include "PlayerHelper.h"
 #include "ButtonHandler.h"
 #include "MapHandler.h"
 #include "GameObject.h"
@@ -669,6 +670,35 @@ void cInit::ApplyVRSettings(bool abSave)
 		mpGame->vr_tracking.SetHeightCalibration(mVRSettings.GetHeightOffset());
 		mpGame->GetScene()->SetVRMainUIDistance(mVRSettings.GetUIDistance());
 		mpGame->GetScene()->SetVRMainUIScale(mVRSettings.GetUIScale());
+
+		// The dominant hand is an application preference exposed by the VR
+		// layer; gameplay and UI read it instead of assuming the right hand.
+		const eSteamVRHand prevDominant = mpGame->vr_dominant_hand;
+		const eSteamVRHand newDominant = mVRSettings.GetHandedness() == eVRHandedness_Left
+			? eSteamVRHand_Left : eSteamVRHand_Right;
+
+		// Changing the dominant hand while a tool or light is attached would
+		// leave the old model on its slot and then reattach duplicates once
+		// the mirrored layout takes over. Return to bare hands first.
+		if(prevDominant != newDominant && mpPlayer != NULL)
+		{
+			if(mpPlayer->GetFlashLight()->IsActive())
+				mpPlayer->GetFlashLight()->SetActive(false);
+			if(mpPlayer->GetGlowStick()->IsActive())
+				mpPlayer->GetGlowStick()->SetActive(false);
+			mpPlayer->StartHolster();
+			mpPlayerHands->SetCurrentModel(0, "");
+			mpPlayerHands->SetCurrentModel(1, "");
+		}
+
+		mpGame->vr_dominant_hand = newDominant;
+		mpGame->vr_input.SetHandedness(newDominant);
+
+		// The seated offset is computed during gameplay by cButtonHandler.
+		// Leaving seated mode clears it immediately so the world does not
+		// keep the raised baseline across a map change.
+		if(mVRSettings.GetPlayMode() == eVRPlayMode_Standing)
+			mpGame->vr_tracking.SetSeatedOffset(0.0f);
 	}
 
 	if(abSave && mpConfig != NULL)

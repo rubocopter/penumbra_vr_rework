@@ -61,6 +61,7 @@ private:
 	void TypeAndValFromAction(iAction *apAction, tString *apType, tString *apVal);
 	void UpdateVRTurn(const cVRInputState& aInputState, float afTimeStep);
 	void UpdateVRCrouch(const cVRInputState& aInputState);
+	void UpdateVRPlayMode();
 	
 	int mlNumOfActions;
 
@@ -79,6 +80,8 @@ private:
 	bool mbVRCrouchApplied;
 	bool mbVRStandingHeightKnown;
 	float mfVRStandingHeight;
+	bool mbVRSeatedBaselineKnown;
+	float mfVRSeatedBaseline;
 };
 
 

@@ -192,6 +192,8 @@ public:
 	void SetExtraWidget(cMainMenuWidget *apExtra){ mpExtra = apExtra;}
 	cMainMenuWidget* GetExtraWidget(){ return mpExtra;}
 
+	void SetTextColor(const cColor &aColor){ mTextColor = aColor;}
+
 	void UpdateSize();
 
 	tWString msText;
@@ -206,6 +208,8 @@ protected:
 	float mfMaxWidth;
 
 	cMainMenuWidget *mpExtra;
+
+	cColor mTextColor;
 };
 
 //---------------------------------------------

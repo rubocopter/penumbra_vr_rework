@@ -17,12 +17,6 @@ namespace hpl {
     eSteamVRHand_Right
   };
 
-  enum eVRInputSource {
-    eVRInputSource_None,
-    eVRInputSource_SteamVRActions,
-    eVRInputSource_LegacyOpenVR
-  };
-
   struct cVRButtonState {
     cVRButtonState() : active(false), pressed(false), justPressed(false), justReleased(false) {}
 
@@ -37,12 +31,8 @@ namespace hpl {
   // historical OpenVR polling fallback.
   struct cVRInputState {
     cVRInputState()
-      : source(eVRInputSource_None), context(eSteamVRInputContext_Gameplay),
-        moveActive(false), moveX(0.0f), moveY(0.0f),
+      : moveActive(false), moveX(0.0f), moveY(0.0f),
         turnActive(false), turnX(0.0f) {}
-
-    eVRInputSource source;
-    eSteamVRInputContext context;
 
     bool moveActive;
     float moveX;
@@ -78,11 +68,10 @@ namespace hpl {
       TrackedController& leftHand, TrackedController& rightHand);
 
     bool IsAvailable() const { return mbAvailable; }
-    bool IsUsingActions() const { return mbUsingActions; }
     const cVRInputState& GetState() const { return mState; }
-    const tString& GetManifestPath() const { return msManifestPath; }
     void SetMoveDeadZone(float deadZone);
-    float GetMoveDeadZone() const { return mfMoveDeadZone; }
+    void SetHandedness(eSteamVRHand hand);
+    eSteamVRHand GetHandedness() const { return mHandedness; }
 
     bool TriggerHaptic(eSteamVRHand hand, float durationSeconds, float frequency, float amplitude);
 
@@ -100,13 +89,16 @@ namespace hpl {
     bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
       const char* handName, bool& stateKnown, bool& wasValid);
     void UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand, const char* handName);
-    void LogHandSummary(const TrackedController& hand, const char* handName, const char* source,
-      unsigned long& lastLogTime);
     cVRButtonState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
     void SuppressDigitalEdges(cVRButtonState& state) const;
     void ApplyMoveDeadZone(float& x, float& y) const;
     tString FindManifestPath() const;
+    // Mirrored action sets (/actions/gameplay_left, /actions/ui_left) carry the
+    // same intents bound to the opposite physical hand, so left-handed users
+    // get a full left/right mirror of the button layout.
+    vr::VRActionHandle_t ActionFor(vr::VRActionHandle_t rightAction,
+      vr::VRActionHandle_t leftAction) const;
 
     bool mbAvailable;
     bool mbUsingActions;
@@ -117,13 +109,17 @@ namespace hpl {
     bool mbLeftPoseWasValid;
     bool mbRightPoseWasValid;
     eSteamVRInputContext mActiveContext;
+    eSteamVRHand mActiveHandedness;
     cVRInputState mState;
     float mfMoveDeadZone;
+    eSteamVRHand mHandedness;
     tString msManifestPath;
 
     vr::VRActionSetHandle_t mGlobalActionSet;
     vr::VRActionSetHandle_t mGameplayActionSet;
     vr::VRActionSetHandle_t mUIActionSet;
+    vr::VRActionSetHandle_t mGameplayActionSetLeft;
+    vr::VRActionSetHandle_t mUIActionSetLeft;
 
     vr::VRActionHandle_t mMoveAction;
     vr::VRActionHandle_t mTurnAction;
@@ -139,10 +135,28 @@ namespace hpl {
     vr::VRActionHandle_t mPauseAction;
     vr::VRActionHandle_t mRecenterAction;
 
+    vr::VRActionHandle_t mMoveActionLeft;
+    vr::VRActionHandle_t mTurnActionLeft;
+    vr::VRActionHandle_t mSprintActionLeft;
+    vr::VRActionHandle_t mInteractActionLeft;
+    vr::VRActionHandle_t mExamineActionLeft;
+    vr::VRActionHandle_t mHolsterActionLeft;
+    vr::VRActionHandle_t mInventoryActionLeft;
+    vr::VRActionHandle_t mNotebookActionLeft;
+    vr::VRActionHandle_t mQuickLightActionLeft;
+    vr::VRActionHandle_t mJumpActionLeft;
+    vr::VRActionHandle_t mCrouchActionLeft;
+    vr::VRActionHandle_t mPauseActionLeft;
+
     vr::VRActionHandle_t mUISelectAction;
     vr::VRActionHandle_t mUIDragAction;
     vr::VRActionHandle_t mUIBackAction;
     vr::VRActionHandle_t mUICloseAction;
+
+    vr::VRActionHandle_t mUISelectActionLeft;
+    vr::VRActionHandle_t mUIDragActionLeft;
+    vr::VRActionHandle_t mUIBackActionLeft;
+    vr::VRActionHandle_t mUICloseActionLeft;
 
     vr::VRActionHandle_t mLeftPoseAction;
     vr::VRActionHandle_t mRightPoseAction;
@@ -151,8 +165,6 @@ namespace hpl {
 
     vr::VRActionHandle_t mLeftSkeletonAction;
     vr::VRActionHandle_t mRightSkeletonAction;
-    unsigned long mlLastLeftHandSummaryLog;
-    unsigned long mlLastRightHandSummaryLog;
     unsigned long mlLastSkeletonErrorLog;
     int mlLastSkeletonErrorCode;
     int mlLastSkeletonFallbackCode;

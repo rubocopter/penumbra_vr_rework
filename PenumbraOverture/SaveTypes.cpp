@@ -20,7 +20,7 @@
 
 #include "GlobalInit.h"
 
-#include "PlayerState_Interact.h"
+#include "PlayerState_Interact_VR.h"
 #include "Player.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ void cEngineBody_SaveData::FromBody(iPhysicsBody *pBody)
 		gpInit->mpPlayer->GetPushBody()== pBody &&
 		gpInit->mpPlayer->mbUseNormalMass==false)
 	{
-		mfMass = pBody->GetMass() * cPlayerState_Grab::mfMassDiv;
+		mfMass = pBody->GetMass() * cPlayerState_Grab_VR::mfMassDiv;
 	}
 	else
 	{

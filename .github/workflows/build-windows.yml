@@ -2,7 +2,7 @@ name: Build Windows
 
 on:
   push:
-    branches: [modernization]
+    branches: [development, master]
   pull_request:
   workflow_dispatch:
 

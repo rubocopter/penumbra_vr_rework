@@ -72,14 +72,26 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
   if (collider != NULL) {
     cMatrixf poseMatrix;
 
+    // Only the dominant hand can grab, so only it detects targets and shows
+    // the grab icon at grab distance; the off hand stays bare and never
+    // highlights anything.
+    const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+      ? eVRHandIndex_Left : eVRHandIndex_Right;
+
     for (int i = 0; i < eVRHandIndex_Count; ++i) {
       const eVRHandIndex handIndex = (eVRHandIndex)i;
       mpPlayer->ClearVRHandTarget(handIndex);
 
-      if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
-          mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "Hand") {
+      if (handIndex != dominantIndex)
+        continue;
 
-        auto hand = mpInit->mpPlayerHands->GetCurrentModel(i);
+// The left and right hand rigs are distinct HUD models named "LeftHand"
+      // and "Hand"; both are valid pointing hands for target detection.
+      iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(i);
+      if (pHandModel &&
+          (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand")) {
+
+        auto hand = pHandModel;
         if (!hand->UpdatePoseMatrix(poseMatrix, 0.0f))
           continue;
 
@@ -165,17 +177,6 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
                 // Areas only seem to be important for things that don't require precision (i.e., you never interact with them)
                 // Level change triggers, non-physics objects tend to be "area bodies"
 
-                /*
-                if (pEntity->GetDescription() != _W("") ||
-                    pEntity->GetCallbackScript(eGameEntityScriptType_PlayerInteract) != NULL ||
-                    pEntity->GetCallbackScript(eGameEntityScriptType_PlayerExamine) != NULL ||
-                    pEntity->GetHasInteraction())
-                {
-                  vPickedAreaPos = VRHelper::CollideCenter(collideData.mvContactPoints, collideData.mlNumOfPoints);
-                  fPickedAreaDist = eyeDist;
-                  pPickedAreaBody = pBody;
-                }
-                */
               }
               else
               {
@@ -250,54 +251,19 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             handState);
         }
 
-        /*
-        for (int j = 0; j < mpPlayer->GetPickOverlapCallback()->mvPickedEntityCenters.size(); j++) {
-          vStart = poseMatrix.GetTranslation();
-          vEnd = vStart + (vStart - mpPlayer->GetPickOverlapCallback()->mvPickedEntityCenters[i]) * 3.0f;
-
-          mpPlayer->GetPickRay()->Clear();
-          pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), vStart, vEnd, true, false, true);
-          mpPlayer->GetPickRay()->CalculateResults();
-
-          if (mpPlayer->GetPickedBody())
-          {
-            iGameEntity *pEntity = (iGameEntity*)mpPlayer->GetPickedBody()->GetUserData();
-
-            auto handState = pEntity->GetPickCrossHairState(mpPlayer->GetPickedBody());
-
-            if (handState != eCrossHairState_None && handState != eCrossHairState_Examine) {
-              mpPlayer->SetHandCrossHairState(i, handState);
-            }
-            else {
-              mpPlayer->SetCrossHairState(eCrossHairState_None);
-
-              pEntity->PlayerPick();
-              handState = mpPlayer->GetCrossHairState();
-
-              mpPlayer->SetCrossHairState(lastState);
-              mpPlayer->SetExamineBody(lastPick);
-
-              if (handState != eCrossHairState_None && handState != eCrossHairState_Examine)
-                mpPlayer->SetHandCrossHairState(i, handState);
-            }
-
-            break;
-          }
-        }
-        */
       }
     }
 
-    // Existing Penumbra entity code still reads the legacy picked-body slot.
-    // Mirror only the right-hand target into it so R2 can never interact with
-    // an object merely touched by the left hand.
-    const cVRHandTarget& rightTarget = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+// Existing Penumbra entity code still reads the legacy picked-body slot.
+    // Mirror only the dominant hand's target into it so the interact button
+    // can never interact with an object merely touched by the other hand.
+    const cVRHandTarget& dominantTarget = mpPlayer->GetVRHandTarget(dominantIndex);
     mpPlayer->GetPickRay()->Clear();
-    if (rightTarget.mpBody != NULL)
+    if (dominantTarget.mpBody != NULL)
     {
-      mpPlayer->GetPickRay()->mpPickedBody = rightTarget.mpBody;
-      mpPlayer->GetPickRay()->mvPickedPos = rightTarget.mvPosition;
-      mpPlayer->GetPickRay()->mfPickedDist = rightTarget.mfDistance;
+      mpPlayer->GetPickRay()->mpPickedBody = dominantTarget.mpBody;
+      mpPlayer->GetPickRay()->mvPickedPos = dominantTarget.mvPosition;
+      mpPlayer->GetPickRay()->mfPickedDist = dominantTarget.mfDistance;
     }
   }
 
@@ -338,252 +304,6 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 }
 
 void cPlayerState_Normal_VR::OnPostSceneDraw() {
-  /*
-  cVector3f handSize(40.0f, 15.0f, 23.5f);
-
-  auto lastState = mpPlayer->GetCrossHairState();
-  auto lastPick = mpPlayer->GetExamineBody();
-
-  auto collider = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(handSize, NULL);
-
-  {
-    iLowLevelGraphics *mpLowGfx = mpInit->mpGame->GetGraphics()->GetLowLevel();
-
-    mpLowGfx->SetDepthTestActive(false);
-    mpLowGfx->PushMatrix(eMatrix_ModelView);
-
-    for (int i = 0; i < eVRHandIndex_Count; ++i) {
-      cMatrixf poseMatrix;
-
-      if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
-          mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "Hand") {
-
-        auto hand = mpInit->mpPlayerHands->GetCurrentModel(i);
-
-        hand->UpdatePoseMatrix(poseMatrix, 0.0f);
-
-        cCamera3D *pCamera = static_cast<cCamera3D*>(mpInit->mpGame->GetScene()->GetCamera());
-        cVector3f vCenter = poseMatrix.GetTranslation();
-
-        auto mtxTouch = poseMatrix.GetRotation();
-        mtxTouch = cMath::MatrixMul(cMath::MatrixTranslate(vCenter), mtxTouch);
-
-        {
-          cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
-          iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
-
-          ////////////////////////////////
-          //Iterate bodies
-          float fClosestHitDist = 9999.0f;
-          cVector3f vClosestHitPos;
-          iPhysicsMaterial* pClosestHitMat = NULL;
-          cPhysicsBodyIterator it = pPhysicsWorld->GetBodyIterator();
-          while (it.HasNext())
-          {
-            iPhysicsBody *pBody = it.Next();
-
-            iGameEntity *pEntity = NULL;
-            if (pBody->GetUserData())
-              pEntity = (iGameEntity*)pBody->GetUserData();
-            else
-              continue;
-
-            cVector3f center = pBody->GetBV()->GetWorldCenter();
-
-            mpLowGfx->SetMatrix(eMatrix_ModelView, pCamera->GetViewMatrix());
-
-            mpLowGfx->DrawSphere(center, 0.05f,
-              cColor(1, 0, 0, 1));
-          }
-        }
-
-        /*
-          cCollideData collideData;
-          collideData.SetMaxSize(12);
-
-          if (mpInit->mpPlayerHands->GetCurrentModel(i) &&
-            (mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "Hand" ||
-            mpInit->mpPlayerHands->GetCurrentModel(i)->msName == "LeftHand")) {
-
-            auto hand = mpInit->mpPlayerHands->GetCurrentModel(i);
-
-            hand->UpdatePoseMatrix(poseMatrix, 0.0f);
-
-            cCamera3D *pCamera = static_cast<cCamera3D*>(mpInit->mpGame->GetScene()->GetCamera());
-            cVector3f vCenter = poseMatrix.GetTranslation();
-
-            auto mtxTouch = poseMatrix.GetRotation();
-            mtxTouch = cMath::MatrixMul(cMath::MatrixTranslate(vCenter), mtxTouch);
-
-            bool bCollide = false;
-
-            float fPickedAreaDist;
-            cVector3f vPickedAreaPos;
-            iPhysicsBody* pPickedAreaBody = NULL;
-
-            float fPickedDist;
-            cVector3f vPickedPos;
-            iPhysicsBody* pPickedBody = NULL;
-
-            {
-              cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
-              iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
-
-              ////////////////////////////////
-              //Iterate bodies
-              float fClosestHitDist = 9999.0f;
-              cVector3f vClosestHitPos;
-              iPhysicsMaterial* pClosestHitMat = NULL;
-              cPhysicsBodyIterator it = pPhysicsWorld->GetBodyIterator();
-              while (it.HasNext())
-              {
-                iPhysicsBody *pBody = it.Next();
-
-                iGameEntity *pEntity = NULL;
-                if (pBody->GetUserData())
-                  pEntity = (iGameEntity*)pBody->GetUserData();
-                else
-                  continue;
-
-                pBody->GetBV()->GetWorldCenter()
-
-                collideData.mlNumOfPoints = 0;
-
-                if (pPhysicsWorld->CheckShapeCollision(pBody->GetShape(), pBody->GetLocalMatrix(),
-                  collider,
-                  mtxTouch, collideData, 1) == false)
-                {
-                  continue;
-                }
-
-                if (pEntity)
-                {
-                  //Skip stick area
-                  if (pEntity->GetType() == eGameEntityType_StickArea) continue;
-
-                  //Area
-                  if (pEntity->GetType() == eGameEntityType_Area ||
-                    pEntity->GetType() == eGameEntityType_StickArea ||
-                    pEntity->GetType() == eGameEntityType_DamageArea ||
-                    pEntity->GetType() == eGameEntityType_ForceArea)
-                  {
-                    if (pEntity->GetDescription() != _W("") ||
-                      pEntity->GetCallbackScript(eGameEntityScriptType_PlayerInteract) != NULL ||
-                      pEntity->GetCallbackScript(eGameEntityScriptType_PlayerExamine) != NULL ||
-                      pEntity->GetHasInteraction())
-                    {
-                      vPickedAreaPos = VRHelper::CollideCenter(collideData.mvContactPoints, collideData.mlNumOfPoints);
-                      fPickedAreaDist = cMath::Vector3Dist(vCenter, vPickedAreaPos);
-                      pPickedAreaBody = pBody;
-                    }
-                  }
-                  //Other entity
-                  else
-                  {
-                    vPickedPos = VRHelper::CollideCenter(collideData.mvContactPoints, collideData.mlNumOfPoints);
-                    fPickedDist = cMath::Vector3Dist(vCenter, vPickedPos);
-                    pPickedBody = pBody;
-                  }
-                }
-              }
-            }
-
-            //Check if an area is closer than the closest normal body
-            if (pPickedAreaBody && fPickedAreaDist < fPickedDist)
-            {
-              bool bUseArea = false;
-
-              if (pPickedBody)
-              {
-                iGameEntity *pEntity = (iGameEntity*)pPickedBody->GetUserData();
-                cGameArea *pArea = (cGameArea*)pPickedAreaBody->GetUserData();
-
-                if (pEntity)
-                {
-                  //Too for from object
-                  if (pEntity->GetMaxExamineDist() < fPickedDist) bUseArea = true;
-
-                  //No description for object and it is not possible to interact with it
-                  else if (pEntity->GetDescription() == _W(""))
-                  {
-                    if (pPickedBody->GetMass() == 0) bUseArea = true;
-
-                    else if (pEntity->GetType() == eGameEntityType_Object)
-                    {
-                      cGameObject *pObject = static_cast<cGameObject*>(pEntity);
-
-                      if (pObject->GetInteractMode() == eObjectInteractMode_Static) bUseArea = true;
-                    }
-                  }
-                }
-                else
-                {
-                  bUseArea = true;
-                }
-              }
-              else
-              {
-                bUseArea = true;
-              }
-
-              if (bUseArea)
-              {
-                pPickedBody = pPickedAreaBody;
-                fPickedDist = fPickedAreaDist;
-                vPickedPos = vPickedAreaPos;
-              }
-            }
-
-            cMatrixf mtxCollider = cMath::MatrixMul(pCamera->GetViewMatrix(), mtxTouch);
-
-            mpLowGfx->SetMatrix(eMatrix_ModelView, mtxCollider);
-
-            mpPlayer->GetPickRay()->Clear();
-
-            mpPlayer->GetPickRay()->mpPickedAreaBody = pPickedAreaBody;
-            mpPlayer->GetPickRay()->mfPickedAreaDist = fPickedAreaDist;
-            mpPlayer->GetPickRay()->mvPickedAreaPos = vPickedAreaPos;
-
-            mpPlayer->GetPickRay()->mpPickedBody = pPickedBody;
-            mpPlayer->GetPickRay()->mfPickedDist = fPickedDist;
-            mpPlayer->GetPickRay()->mvPickedPos = vPickedPos;
-
-            if (mpPlayer->GetPickedBody())
-            {
-              iGameEntity *pEntity = (iGameEntity*)mpPlayer->GetPickedBody()->GetUserData();
-
-              auto handState = pEntity->GetPickCrossHairState(mpPlayer->GetPickedBody());
-
-              if (handState != eCrossHairState_None && handState != eCrossHairState_Examine) {
-                mpPlayer->SetHandCrossHairState(i, handState);
-              }
-              else {
-                mpPlayer->SetCrossHairState(eCrossHairState_None);
-
-                pEntity->PlayerPick();
-                handState = mpPlayer->GetCrossHairState();
-
-                mpPlayer->SetCrossHairState(lastState);
-                mpPlayer->SetExamineBody(lastPick);
-
-                if (handState != eCrossHairState_None && handState != eCrossHairState_Examine)
-                  bCollide = true;
-              }
-            }
-            
-
-        cMatrixf mtxCollider = cMath::MatrixMul(pCamera->GetViewMatrix(), mtxTouch);
-
-        mpLowGfx->SetMatrix(eMatrix_ModelView, mtxCollider);
-
-        mpLowGfx->DrawBoxMaxMin(handSize*0.5, handSize*-0.5f,
-          cColor(1, 0, 0, 1));
-      }
-    }
-
-    mpLowGfx->PopMatrix(eMatrix_ModelView);
-  }
-    */
 
   iLowLevelGraphics *mpLowGfx = mpInit->mpGame->GetGraphics()->GetLowLevel();
 
@@ -628,7 +348,7 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
       auto ofs = crosshairMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
       tVertexVec vtx;
-      vtx.reserve(4);
+      vtx.resize(4);
 
       cColor color(1.0f, 1.0f);
 
@@ -660,11 +380,14 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
 
 void cPlayerState_Normal_VR::OnStartInteract()
 {
-  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(eVRHandIndex_Right);
+  const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+    ? eVRHandIndex_Left : eVRHandIndex_Right;
+  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(dominantIndex);
   if (target.mpBody)
   {
-	Log(" [VR interaction +%lu ms] R2 target '%s', crosshair %d, distance %.2f.\n",
-	  GetApplicationTime(), target.mpBody->GetName().c_str(),
+	Log(" [VR interaction +%lu ms] %s target '%s', crosshair %d, distance %.2f.\n",
+	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right",
+	  target.mpBody->GetName().c_str(),
 	  (int)target.mCrossHairState, target.mfDistance);
 
     // Keep legacy entity callbacks coherent while the interaction states are
@@ -676,10 +399,10 @@ void cPlayerState_Normal_VR::OnStartInteract()
 
     pEntity->PlayerInteract();
   }
-  else
+else
   {
-	Log(" [VR interaction +%lu ms] R2 pressed with no right-hand target.\n",
-	  GetApplicationTime());
+	Log(" [VR interaction +%lu ms] interact pressed with no %s-hand target.\n",
+	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right");
   }
 }
 
@@ -1038,7 +761,7 @@ void cPlayerState_UseItem_VR::OnUpdate(float afTimeStep)
   iPhysicsWorld *pPhysicsWorld = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
   cVector3f vStart, vEnd;
 
-  auto handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 
   vStart = handMat.GetTranslation();
   vEnd = vStart + cMath::MatrixInverse(handMat.GetRotation()).GetForward() * -1.0f;
@@ -1078,7 +801,7 @@ void cPlayerState_UseItem_VR::OnPostSceneDraw() {
   mpLowGfx->SetDepthTestActive(false);
   mpLowGfx->PushMatrix(eMatrix_ModelView);
 
-  cMatrixf handMat = VRHelper::TrackingToWorldSpace(mpInit->mpGame->vr_right_hand.GetMatrix(), mpInit->mpGame);
+cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
   mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(((cCamera3D*)mpInit->mpGame->GetScene()->GetCamera())->GetViewMatrix(), handMat ));
 
   auto ofs = itemMat->GetTextureOffset(eMaterialTexture_Diffuse);

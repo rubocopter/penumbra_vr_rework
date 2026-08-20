@@ -1,0 +1,21 @@
+<HUD_MODEL>
+	<MAIN
+		Name = "Flare"
+		ModelFile = "hud_object_flare.dae"
+		EquipTime = 0.43f
+		UnequipTime = 0.01f
+		
+		EquipPose_Pos = "-0.207 -0.200 0.247"
+		EquipPose_Rot =	"-127.7 -11.2 172.5"
+		
+		UnequipPose_Pos = "-0.207 -0.383 0.247"
+		UnequipPose_Rot = "-127.7 -11.2 172.5"
+
+		EquipSound = ""
+		UnequipSound = ""
+		
+		VrTransOffset = "0.0 0.0 0.1"
+		VrRotOffset = "1.57 0.0 0.0"
+		VrScale = 1.8f
+	 />
+</HUD_MODEL>

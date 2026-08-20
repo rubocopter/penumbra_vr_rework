@@ -24,15 +24,8 @@
 #include "MapHandler.h"
 #include "PlayerMoveStates.h"
 
-#include "PlayerState_InteractHaptX.h"
-#include "PlayerState_MiscHaptX.h"
-#include "PlayerState_WeaponHaptX.h"
-
 #include "PlayerState_Interact_VR.h"
-#include "PlayerState_Interact.h"
 #include "PlayerState_Misc_VR.h"
-#include "PlayerState_Misc.h"
-#include "PlayerState_Weapon.h"
 #include "VRHaptics.h"
 #include "PlayerState_Weapon_VR.h"
 
@@ -104,34 +97,6 @@ cPlayer::cPlayer(cInit *apInit)  : iUpdateable("Player")
 	
 	mvStates.resize(ePlayerState_LastEnum);
 
-  /*
-	if(mpInit->mbHasHaptics)
-	{
-		mvStates[ePlayerState_Normal] = hplNew( cPlayerState_NormalHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Push] = hplNew( cPlayerState_PushHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Move] = hplNew( cPlayerState_MoveHaptX, (mpInit,this) );
-		mvStates[ePlayerState_InteractMode] = hplNew( cPlayerState_InteractModeHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Grab] = hplNew( cPlayerState_GrabHaptX, (mpInit,this) );
-		mvStates[ePlayerState_WeaponMelee] = hplNew( cPlayerState_WeaponMeleeHaptX, (mpInit,this) );
-		mvStates[ePlayerState_UseItem] = hplNew( cPlayerState_UseItemHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Message] = hplNew( cPlayerState_MessageHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Throw] = hplNew( cPlayerState_ThrowHaptX, (mpInit,this) );
-		mvStates[ePlayerState_Climb] = hplNew( cPlayerState_ClimbHaptX, (mpInit,this) );
-	}
-	else
-	{
-		mvStates[ePlayerState_Normal] = hplNew( cPlayerState_Normal, (mpInit,this) );
-		mvStates[ePlayerState_Push] = hplNew( cPlayerState_Push, (mpInit,this) );
-		mvStates[ePlayerState_Move] = hplNew( cPlayerState_Move, (mpInit,this) );
-		mvStates[ePlayerState_InteractMode] = hplNew( cPlayerState_InteractMode, (mpInit,this) );
-		mvStates[ePlayerState_Grab] = hplNew( cPlayerState_Grab, (mpInit,this) );
-		mvStates[ePlayerState_WeaponMelee] = hplNew( cPlayerState_WeaponMelee, (mpInit,this) );
-		mvStates[ePlayerState_UseItem] = hplNew( cPlayerState_UseItem, (mpInit,this) );
-		mvStates[ePlayerState_Message] = hplNew( cPlayerState_Message, (mpInit,this) );
-		mvStates[ePlayerState_Throw] = hplNew( cPlayerState_Throw, (mpInit,this) );
-		mvStates[ePlayerState_Climb] = hplNew( cPlayerState_Climb, (mpInit,this) );
-	}	
-  */
 
   // because VR
   mvStates[ePlayerState_Normal] = hplNew(cPlayerState_Normal_VR, (mpInit, this));
@@ -480,17 +445,6 @@ void cPlayer::FootStep(float afMul, const tString &asType, bool abSkipCount)
 						10, 1.0f/60.0f, pSoundData->GetMaxDistance());
 	}
 
-	/*cWorld3D *pWorld = mpScene->GetWorld3D();
-
-	cSoundEntity *pSound = pWorld->CreateSoundEntity("Step",sSoundName,true);
-	if(pSound)
-	{
-		pSound->SetVolume(afMul * pSound->GetVolume());
-		pSound->SetPosition(cVector3f(0,0.2f,0.4f));
-		
-		mFeetNode.AddEntity(pSound);
-		mFeetNode.SetPosition(mFeetNode.GetLocalPosition());
-	}*/
 }
 
 //-----------------------------------------------------------------------
@@ -1043,8 +997,8 @@ void cPlayer::StartFlashLightButton()
 {
 	if(mpInit->mpInventory->GetItem("flashlight")!=NULL)
 	{
-		mpFlashLight->SetActive(!mpFlashLight->IsActive());
-		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
+mpFlashLight->SetActive(!mpFlashLight->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, VRHelper::OffHapticHand(mpInit->mpGame));
 
 		if(mpFlashLight->IsActive())
 		{
@@ -1059,8 +1013,8 @@ void cPlayer::StartGlowStickButton()
 	if(mpInit->mpInventory->GetItem("glowstick")!=NULL ||
 		mpInit->mpInventory->GetItem("glowst1")!=NULL)
 	{
-		mpGlowStick->SetActive(!mpGlowStick->IsActive());
-		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, eVRHapticHand_Left);
+mpGlowStick->SetActive(!mpGlowStick->IsActive());
+		cVRHaptics::Play(mpInit, eVRHapticEvent_LightToggle, VRHelper::OffHapticHand(mpInit->mpGame));
 
 		if(mpGlowStick->IsActive())
 		{
@@ -1629,8 +1583,24 @@ void cPlayer::Update(float afTimeStep)
       vr_headPos += headDelta;
     }
 
-    vr_headPos.y = mpCharBody->GetFeetPosition().y;
+vr_headPos.y = mpCharBody->GetFeetPosition().y;
     mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
+  }
+
+  static unsigned long lastVRPosLog = 0;
+  const unsigned long now = GetApplicationTime();
+  if(now - lastVRPosLog > 2000)
+  {
+    lastVRPosLog = now;
+    cVector3f vFeet = mpCharBody->GetFeetPosition();
+    cVector3f vHmd = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation();
+    cVector3f vHead = mpInit->mpGame->vr_tracking.GetHeadWorldPose().GetTranslation();
+    Log(" [VR pos +%lu ms] feet=(%.2f,%.2f,%.2f) hmdHeight=%.2f calibration=%.2f posture=%.2f headWorld=(%.2f,%.2f,%.2f) yaw=%.1f\n",
+      now, vFeet.x, vFeet.y, vFeet.z, vHmd.y,
+      mpInit->mpGame->vr_tracking.GetHeightCalibration(),
+      mpInit->mpGame->vr_tracking.GetPostureOffset(),
+      vHead.x, vHead.y, vHead.z,
+      cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
   }
 }
 
@@ -1834,20 +1804,6 @@ void cPlayer::OnDraw()
 	//DEBUG: State
 	if(mpInit->mbHasHaptics)
 	{
-	/*tWString sState =_W("Unknown");
-	if(mState == ePlayerState_Normal) sState = _W("Normal");
-	else if(mState == ePlayerState_Push) sState = _W("Push");
-	else if(mState == ePlayerState_Move) sState = _W("Move");
-	else if(mState == ePlayerState_InteractMode) sState = _W("InteractMode");
-	else if(mState == ePlayerState_UseItem) sState = _W("UseItem");
-	else if(mState == ePlayerState_Message) sState = _W("Message");
-	else if(mState == ePlayerState_Grab) sState = _W("Grab");
-	else if(mState == ePlayerState_WeaponMelee) sState = _W("WeaponMelee");
-	else if(mState == ePlayerState_Throw) sState = _W("Throw");
-	else if(mState == ePlayerState_Climb) sState = _W("Climb");
-	
-	mpFont->Draw(cVector3f(5,5,0),12,cColor(1,1,1,1),eFontAlign_Left,_W("State: %s"),
-					sState.c_str());*/
 	}
 	//DEBUG: MoveState
 	/*tString sState ="";
@@ -1861,34 +1817,6 @@ void cPlayer::OnDraw()
 					sState.c_str());*/
 	
 	//DEBUG: Picked body
-	/*if(mpInit->mbHasHaptics)
-	{
-		if(mpPickRayCallback->mpPickedBody){
-			mpFont->Draw(cVector3f(5,35,0),12,cColor(1,1,1,1),eFontAlign_Left,_W("Body: %s"),
-				cString::To16Char(mpPickRayCallback->mpPickedBody->GetName()).c_str());
-		}
-		else{
-			mpFont->Draw(cVector3f(5,35,0),12,cColor(1,1,1,1),eFontAlign_Left,_W("Body: NULL"));
-		}
-		mpFont->Draw(cVector3f(5,46,0),12,cColor(1,1,1,1),eFontAlign_Left,_W("Dist: %f"),
-			mpPickRayCallback->mfPickedDist);
-
-		tWString sCState = _W("Unknown");
-		if(mCrossHairState == eCrossHairState_Inactive)sCState = _W("Inactive");
-		if(mCrossHairState == eCrossHairState_Active)sCState = _W("Active");
-		if(mCrossHairState == eCrossHairState_Invalid)sCState = _W("Invalid");
-		if(mCrossHairState == eCrossHairState_Grab)sCState = _W("Grab");
-		if(mCrossHairState == eCrossHairState_Examine)sCState = _W("Examine");
-		if(mCrossHairState == eCrossHairState_Pointer)sCState = _W("Pointer");
-		if(mCrossHairState == eCrossHairState_Item)sCState = _W("Item");
-		if(mCrossHairState == eCrossHairState_DoorLink)sCState = _W("DoorLink");
-		if(mCrossHairState == eCrossHairState_PickUp)sCState = _W("PickUp");
-		if(mCrossHairState == eCrossHairState_Ladder)sCState = _W("Ladder");
-		if(mCrossHairState == eCrossHairState_None)sCState = _W("None");
-		mpFont->Draw(	cVector3f(5,66,0),12,cColor(1,1,1,1),eFontAlign_Left,
-						_W("CState: %s"),sCState.c_str());
-
-	}*/
 
 	//DEBUG: On ground and step material
 	/*mpFont->Draw(cVector3f(5,17,0),12,cColor(1,1,1,1),eFontAlign_Left,"Position: %f ClimbPos: %f ClimbCount: %f\n",
@@ -1913,16 +1841,6 @@ void cPlayer::OnDraw()
 								mfHealth);
 	}
 	
-	//DEBUG: misc
-	//mpFont->Draw(cVector3f(5,20,0),12,cColor(1,1,1,1),eFontAlign_Left,
-	//			_W("Ground: %d Speed: %f ForceSpeed: %f"),
-	//													mpCharBody->IsOnGround()?1:0,
-	//													mpCharBody->GetMoveSpeed(eCharDir_Forward),
-	//													mpCharBody->GetForceVelocity().Length()	
-	//												);
-	//cVector3f vGravity = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld()->GetGravity();
-	//mpFont->Draw(cVector3f(5,20,0),12,cColor(1,1,1,1),eFontAlign_Left,"Gravity: %s",
-	//														vGravity.ToString().c_str());
 				
 	//DEBUG: sounds playing
 	if(mbShowSoundsPlaying)
@@ -2005,16 +1923,6 @@ void cPlayer::OnDraw()
 	}
 	
 	//DEBUG: Portals
-	/*tString sPortals = "Portals: ";
-	cPortalContainer *pContainer = mpInit->mpGame->GetScene()->GetWorld3D()->GetPortalContainer();
-    tStringList* pStringList = pContainer->GetVisibleSectorsList();
-	for(tStringListIt it=pStringList->begin(); it != pStringList->end(); ++it)
-	{
-		sPortals += *it + ", ";
-	}
-
-	mpFont->Draw(cVector3f(5,5,0),12,cColor(1,1,1,1),eFontAlign_Left,"%s",
-															sPortals.c_str());*/
 	
 	mvStates[mState]->OnDraw();
 }
@@ -2073,7 +1981,7 @@ void cPlayer::OnPostSceneDraw()
     auto ofs = crosshairMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
     tVertexVec vtx;
-    vtx.reserve(4);
+    vtx.resize(4);
 
     cColor color(1.0f, 1.0f);
 

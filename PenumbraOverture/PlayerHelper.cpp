@@ -281,72 +281,6 @@ bool cPlayerPickRayCallback::OnIntersect(iPhysicsBody *apBody,cPhysicsRayParams 
 	}
 
 	return true;
-	
-	/*float &fDist = apParams->mfDist;
-	
-	iGameEntity *pEntity = NULL;
-	if(apBody->GetUserData()) pEntity = (iGameEntity*)apBody->GetUserData();
-
-	//Don't wanna pick characters
-	if(apBody->IsCharacter() && apBody->GetUserData()==NULL) return true;
-
-	if(pEntity && pEntity->IsActive()==false) return true;
-	
-	//If it is outside of the examine distance skip
-	if(pEntity && pEntity->GetMaxExamineDist() < fDist) return true;
-    
-	////////////////////////////
-	//Not picked
-	bool bStatic = false;
-	if(pEntity && pEntity->GetType()== eGameEntityType_Object)
-	{
-		cGameObject* pObject = static_cast<cGameObject*>(pEntity);
-		if(pObject->GetInteractMode() == eObjectInteractMode_Static)
-		{
-			bStatic = true;
-		}
-	}
-
-	if(	 pEntity==NULL || bStatic)
-	{
-		if(fDist < mfPickedDist)
-		{
-			mfMinStaticDist = fDist;
-			mfPickedDist = fDist;
-			mpPickedBody = NULL;
-			mvPickedPos = apParams->mvPoint;
-			mLastEntityType = eGameEntityType_LastEnum;
-		}
-	}
-	////////////////////////////
-	//Picked
-	else
-	{
-		if(pEntity->GetType() == eGameEntityType_Area)
-		{
-			if(fDist < mfPickedDist)
-			{
-				mpPickedBody = apBody;
-				mLastEntityType = pEntity->GetType();
-				mvPickedPos = apParams->mvPoint;
-				mfPickedDist = fDist;
-			}
-		}
-		else
-		{
-			if	(fDist < mfPickedDist || 
-				(mLastEntityType == eGameEntityType_Area))
-			{
-				mpPickedBody = apBody;
-				mLastEntityType = pEntity->GetType();
-				mvPickedPos = apParams->mvPoint;
-				mfPickedDist = fDist;
-			}
-		}
-
-	}
-
-	return true;*/
 }
 
 void cPlayerPickRayCallback::CalculateResults()
@@ -671,7 +605,6 @@ void cPlayerHeadMove::Update(float afTimeStep)
 	///////////////////////////////
 	//Climb count
 	iCharacterBody *pBody = mpPlayer->GetCharacterBody();
-	/*float fUpVel = (pBody->GetPosition().y - pBody->GetLastPosition().y) / afTimeStep;*/
 
     if(pBody->IsClimbing() && mfClimbCount==0)
 	{
@@ -896,91 +829,6 @@ void cPlayerHealth::Update(float afTimeStep)
 		pPlayer->AddHealth(afTimeStep * 0.14f); break;
 	}
 	
-
-	////////////////////////////
-	//Check for enemies.
-	/*if(mfTerrorCheckCount <=0)
-	{
-		//Check the current terror level.
-		int lTerrorLevel =0;
-		tGameEnemyIterator it = mpInit->mpMapHandler->GetGameEnemyIterator();
-		while(it.HasNext())
-		{
-			iGameEnemy *pEnemy = it.Next();
-			
-			if(pEnemy->IsActive()==false || pEnemy->GetHealth() <=0) continue;
-
-			int lState = pEnemy->GetStateMachine()->CurrentState()->GetId();
-
-			if(lState == eGameEnemyState_Hunt || lState == eGameEnemyState_Attack)
-			{
-				lTerrorLevel = 3;	
-			}
-			else if(lTerrorLevel < 2 && lState == eGameEnemyState_Investigate)
-			{
-				lTerrorLevel = 2;
-			}
-			else if(lTerrorLevel < 1)
-			{
-				lTerrorLevel = 1;
-			}
-		}
-		
-        if(mlTerrorLevel != lTerrorLevel)
-		{
-			mlTerrorLevel = lTerrorLevel;
-
-			cSoundHandler *pSoundHandler = mpInit->mpGame->GetSound()->GetSoundHandler();
-			
-			//Fade out the current sound if there is any.
-			if(mpSoundEntry)
-			{
-				mpSoundEntry->mfNormalVolumeFadeDest = 0;
-				mpSoundEntry->mfNormalVolumeFadeSpeed = -0.25f;
-				mpSoundEntry = NULL;
-			}
-			mpSoundEntry = NULL;
-
-			tString sSound="";
-			float fVolume;
-			
-			if(mlTerrorLevel==0)
-			{
-			}
-			else if(mlTerrorLevel==1)
-			{
-				sSound = "horror_roach_idle";
-				fVolume = 0.3f;
-			}
-			else if(mlTerrorLevel==2)
-			{
-				sSound = "horror_roach_notice";
-				fVolume = 0.45f;
-			}
-			else if(mlTerrorLevel==3)
-			{
-				sSound = "horror_roach_attack";
-				fVolume = 0.6f;
-			}
-		
-			if(sSound != "")
-			{
-				iSoundChannel *pChannel = pSoundHandler->PlayGui(sSound, true, fVolume);
-				pChannel->SetPriority(200);
-				mpSoundEntry = pSoundHandler->GetEntryFromSound(pChannel);
-
-				mpSoundEntry->mfNormalVolumeMul =0;
-				mpSoundEntry->mfNormalVolumeFadeDest =1;
-				mpSoundEntry->mfNormalVolumeFadeSpeed = 0.55f;
-			}
-		}
-
-		mfTerrorCheckCount = 0.2f;
-	}
-	else
-	{
-		mfTerrorCheckCount -= afTimeStep;
-	}*/
 }
 
 void cPlayerHealth::Draw()
@@ -1593,6 +1441,8 @@ void cPlayerFlashLight::OnWorldLoad()
 
 void cPlayerFlashLight::Update(float afTimeStep)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive)
 	{
 		//////////////////////////
@@ -1614,7 +1464,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 										cVector3f(0,-1,0));
 			}
 			
-			if(pHudModel == mpInit->mpPlayerHands->GetCurrentModel(0))
+			if(pHudModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
 			{
 				tGameEnemyIterator it = mpInit->mpMapHandler->GetGameEnemyIterator();
 				while(it.HasNext())
@@ -1653,50 +1503,6 @@ void cPlayerFlashLight::Update(float afTimeStep)
 						}
 					}
 				}
-				
-				//////////////////////////////
-				//Get forward
-				//cVector3f vForward = pCam->GetForward();
-				
-				/*float fAngleX = cMath::RandRectf(cMath::ToRad(-3),cMath::ToRad(3));
-				float fAngleY = cMath::RandRectf(0,k2Pif);
-				cVector3f vForward = cMath::MatrixMul(
-									cMath::MatrixRotate(cVector3f(fAngleX,fAngleY,0),eEulerRotationOrder_XYZ),
-									cVector3f(0,1,0));
-				
-				vForward =	cMath::MatrixMul(
-							pHudModel->GetEntity()->GetWorldMatrix().GetRotation(),
-							//cMath::MatrixInverse(pCam->GetViewMatrix().GetRotation()),
-							//cMath::MatrixRotate(cVector3f(pCam->GetPitch(),pCam->GetYaw(),pCam->GetRoll()),
-							//					eEulerRotationOrder_YXZ),
-											vForward*-1);
-
-				//////////////////////////////
-				//Get start and end
-				cVector3f vStart = pCam->GetPosition();
-				cVector3f vEnd = pCam->GetPosition() +  vForward* 20.0f;
-
-				mvStart =vStart;
-				mvEnd = vEnd;
-				
-				mpClosestBody = NULL; mfClosestDist = 10000.0f;
-				pPhysicsWorld->CastRay(this,vStart,vEnd,true,false,false,false);
-
-				if(mpClosestBody)
-				{
-					iGameEntity *pEntity = (iGameEntity*)mpClosestBody->GetUserData();
-
-					if( pEntity && pEntity->GetType() == eGameEntityType_Enemy &&
-						pEntity->IsActive() && pEntity->GetHealth() >0)
-					{
-						iGameEnemy *pEnemy = static_cast<iGameEnemy*>(pEntity);
-
-						if(pEnemy->GetUsesTriggers())
-							pEnemy->OnFlashlight(vStart);
-					}
-				}*/
-
-				//mpInit->mpEffectHandler->GetSubTitle()->Add("Cast rays!\n",0.5f);
 			}
 		}
 		else
@@ -1706,7 +1512,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 	}
 	
 	
-	iHudModel *pHudModel = mpInit->mpPlayerHands->GetCurrentModel(0);
+	iHudModel *pHudModel = mpInit->mpPlayerHands->GetCurrentModel(offSlot);
 	
 	//////////////////////////
 	//Player power
@@ -1762,6 +1568,8 @@ void cPlayerFlashLight::Update(float afTimeStep)
 
 void cPlayerFlashLight::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	cSoundHandler *pSoundHanlder = mpInit->mpGame->GetSound()->GetSoundHandler();
 
 	if(abX && (mpInit->mpPlayer->GetPower()==0 || mbDisabled)) {
@@ -1776,18 +1584,18 @@ void cPlayerFlashLight::SetActive(bool abX)
 	//Active
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Flashlight");
-    mpInit->mpPlayerHands->GetCurrentModel(0)->SetHandIndex(0);
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flashlight");
+    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
 		
 		//pSoundHanlder->PlayGui("item_flashlight_on",false,1);
 	}
 	/////////////////////////////
 	//Not active
-	else if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Flashlight" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flashlight" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		
 		if(mpInit->mpPlayer->GetPower()==0)
 			pSoundHanlder->PlayGui("item_flashlight_nopower",false,1);
@@ -1874,6 +1682,8 @@ void cPlayerGlowStick::Update(float afTimeStep)
 
 void cPlayerGlowStick::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive == abX) return;
 	mbActive = abX;
 
@@ -1882,16 +1692,16 @@ void cPlayerGlowStick::SetActive(bool abX)
 	if(mbActive)
 	{
 		//Log("Setting the glowstick to TRUE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Glowstick");
-    mpInit->mpPlayerHands->GetCurrentModel(0)->SetHandIndex(0);
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Glowstick");
+    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
 		//pSoundHanlder->PlayGui("item_glowstick_on",false,1);
 	}
-	else if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Glowstick" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Glowstick" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 	{
 		//Log("Setting the glowstick to FALSE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(0,"");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		//pSoundHanlder->PlayGui("item_glowstick_off",false,1);
 	}
 }
@@ -1958,12 +1768,16 @@ void cPlayerVRHand::Destroy()
 
 void cPlayerVRHand::Update(float afTimeStep)
 {
-  if (!mpInit->mpPlayerHands->GetCurrentModel(mHandIndex))
+  iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
+  if (pHandModel)
+  {
+    pHandModel->SetHandIndex(mHandIndex);
+  }
+
+  if (pHandModel == NULL)
   {
     mpInit->mpPlayerHands->SetCurrentModel(mHandIndex, hudModelName);
   }
-
-  mpInit->mpPlayerHands->GetCurrentModel(mHandIndex)->SetHandIndex(mHandIndex);
 }
 
 //-----------------------------------------------------------------------
@@ -2147,101 +1961,16 @@ void cPlayerVRTeleport::Destroy()
 
 void cPlayerVRTeleport::Update(float afTimeStep)
 {
-  return;
-
-  mvDrawPoints.clear();
-
-  auto plstate = mpInit->mpPlayer->GetState();
-
-  if ((plstate == ePlayerState_Normal ||
-      plstate == ePlayerState_Grab ||
-      plstate == ePlayerState_Throw ||
-      plstate == ePlayerState_WeaponMelee) &&
-      !mpInit->mpPlayer->GetLookAt()->IsActive() &&
-      !mpInit->mpInventory->IsActive()) {
-
-    for (int i = 0; i < 2; ++i) {
-      if (mlTeleportHandIndex != -1 && mlTeleportHandIndex != i)
-        continue;
-
-      auto hand = i == 0 ? mpInit->mpGame->vr_left_hand : mpInit->mpGame->vr_right_hand;
-
-      auto state = hand.GetButtonState();
-
-      if (state.padPressed) {
-        mlTeleportHandIndex = i;
-
-        //mpMarkerEntity->SetVisible(true);
-
-        // Solve parabola
-        auto scene = mpInit->mpGame->GetScene();
-        auto physicsWorld = scene->GetWorld3D()->GetPhysicsWorld();
-
-        auto handWorldMat = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
-
-        cVector3f start = handWorldMat.GetTranslation();
-        cVector3f current = start;
-
-        cVector3f delta = cMath::MatrixInverse(hand.GetMatrix()).GetForward() * -0.5f + cVector3f(0.0f, -0.0375f, 0.0f);
-
-        mvDrawPoints.clear();
-        for (int i = 0; i < 42; ++i) {
-          cVector3f next = current + delta;
-
-          mbHit = false;
-          mbCanTeleport = false;
-
-          physicsWorld->CastRay(this, current, next, true, true, true);
-
-          if (mbHit) {
-            mvDrawPoints.push_back(mvHitPos);
-
-            break;
-          }
-          else {
-            mvDrawPoints.push_back(cVector3f(current));
-          }
-
-          current = next;
-
-          delta += cVector3f(0.0f, -0.01f, 0.0f);
-        }
-      }
-
-      if (!state.padPressed) {
-        mlTeleportHandIndex = -1;
-
-        if (mbCanTeleport) {
-          mbCanTeleport = false;
-
-          mpInit->mpPlayer->GetCharacterBody()->SetFeetPosition(mvHitPos);
-          teleportBlackFrames = 40;
-
-          mpInit->mpPlayer->FootStep(1.0f);
-        }
-      }
-    }
-  } else {
-    mbHit = false;
-    mbCanTeleport = false;
-  }
 }
 
 //-----------------------------------------------------------------------
 
 bool cPlayerVRTeleport::OnIntersect(iPhysicsBody *pBody, cPhysicsRayParams *apParams)
 {
-  if (pBody->IsCharacter() || !pBody->GetCollide()) return true;
-
-  mbHit = true;
-  mbCanTeleport = true;
-  mvHitPos = apParams->mvPoint;
-
-  return false;
+  return true;
 }
 
 //-----------------------------------------------------------------------
-
 
 void cPlayerVRTeleport::OnPostSceneDraw()
 {
@@ -2328,6 +2057,7 @@ void cPlayerFlare::OnWorldLoad()
 
 void cPlayerFlare::Update(float afTimeStep)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
 	if(mbActive)
 	{
 		//////////////////////////////////////
@@ -2378,7 +2108,7 @@ void cPlayerFlare::Update(float afTimeStep)
 		// Model entities not loaded yet
 		else
 		{
-			if(mpModel == mpInit->mpPlayerHands->GetCurrentModel(0))
+			if(mpModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
 			{
 				if(mpModel->mvLights.empty()==false)
 				{
@@ -2400,6 +2130,8 @@ void cPlayerFlare::Update(float afTimeStep)
 
 void cPlayerFlare::SetActive(bool abX)
 {
+	const int offSlot = VRHelper::OffHandSlot(mpInit->mpGame);
+
 	if(mbActive == abX) return;
 	mbActive = abX;
 
@@ -2407,7 +2139,7 @@ void cPlayerFlare::SetActive(bool abX)
 
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(0,"Flare");
+		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flare");
 
 		if(mpInit->mpPlayer->GetFlashLight()->IsActive())
 			mpInit->mpPlayer->GetFlashLight()->SetActive(false);
@@ -2423,11 +2155,11 @@ void cPlayerFlare::SetActive(bool abX)
 	{
 		///////////////////////////////
 		//Check if hud model should be put down.
-		if(mpInit->mpPlayerHands->GetCurrentModel(0) &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->msName == "Flare" &&
-			mpInit->mpPlayerHands->GetCurrentModel(0)->GetState() != eHudModelState_Unequip)
+		if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flare" &&
+			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
 		{
-			mpInit->mpPlayerHands->SetCurrentModel(0,"");
+			mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
 		}
 
 		///////////////////////////////
@@ -2793,39 +2525,6 @@ void cPlayerHidden::OnWorldExit()
 
 void cPlayerHidden::Draw()
 {
-	/*if(mfLight <= mfMaxLight)
-	{
-		mpFont->Draw(5,12,cColor(0.3f,1,0.3f),eFontAlign_Left,_W("Light: %f\n"),mfLight);
-		if(!mbHidden)
-			mpFont->Draw(cVector3f(5,19,5),12,cColor(1,1,1),eFontAlign_Left,_W("Hidden count: %f"),mfHiddenCount);
-	}
-	else
-	{
-		mpFont->Draw(5,12,cColor(1,0.3f,0.3f),eFontAlign_Left,_W("Light: %f\n"),mfLight);
-	}
-	
-	if(mbHidden)
-		mpFont->Draw(cVector3f(5,19,5),12,cColor(1,1,1),eFontAlign_Left,_W("Hidden\n"));
-	*/
-	/*float fAdd =0;
-	if(mfCloseEffectFov >= 0)
-	{
-		float fT = mfCloseEffectFov / mfCloseEffectFovMax;
-		fAdd = sin(fT * kPi2f) * mfCloseEffectFovMax;
-	}
-	else
-	{
-		float fT = mfCloseEffectFov / mfCloseEffectFovMin;
-		fAdd = sin(fT * kPi2f) * mfCloseEffectFovMin;
-	}
-
-	mpFont->Draw(5,12,cColor(1,1,1),eFontAlign_Left,"CloseCount: %f TooClose: %d\n",
-													mfEnemyTooCloseCount,
-													mbEnemyTooClose);
-
-	mpFont->Draw(cVector3f(5,19,5),12,cColor(1,1,1),eFontAlign_Left,"Fov: %f Add: %f\n",
-													mfCloseEffectFov,fAdd);*/
-	
 	//Draw in shadow effect
 	if(mfInShadowAlpha>0)
 	{
