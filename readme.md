@@ -18,9 +18,19 @@ rendering keeps the established OpenVR compositor path.
 
 ## Project status
 
-The active development branch is `development`. It is an alpha/development
-build: the game is playable, but it is not a stable release and may contain
-bugs.
+The active development branch is `development`. **This is an experimental
+public alpha** (`v0.1.0-alpha.1`, 20 August 2026): the game is playable end to
+end, but the port is a work in progress and may contain bugs, crashes, or
+incorrect behaviours. Play it with the expectation that something can go
+wrong. There is no save corruption risk on top of the stock game, and the
+installer keeps a full backup of every file it replaces, so the mod is
+reversible (see [Install a packaged build](#install-a-packaged-build)).
+
+Please test it and report problems through the GitHub issue tracker
+(<https://github.com/rubocopter/penumbra_vr_rework/issues>) — include the
+`hpl.log` file from the game folder and, for installer problems, the output of
+`Install-PenumbraVR.ps1`. Known limitations and the current state are listed in
+[docs/RELEASES.md](docs/RELEASES.md).
 
 PS VR2 (SteamVR on PC) is the primary development platform. The bundled
 bindings for other controllers (HTC Vive, Valve Index, Meta Quest/Oculus
@@ -157,8 +167,12 @@ and VR settings](docs/INPUT.md) describe the complete current layout.
 
 1. Install Penumbra: Overture through Steam. If an older mod or installer has
    changed that copy, first use Steam's **Verify integrity of game files**.
-2. Extract the complete `PenumbraVR` package to a normal writable folder.
-3. Open PowerShell in the extracted folder and run:
+2. Download the release package (a `.zip`), extract it completely to a normal
+   writable folder, and double-click `Install-PenumbraVR.bat`. That runs the
+   installer without needing to open PowerShell; wait for the "Done" message.
+
+   If you prefer the command line, open PowerShell in the extracted folder and
+   run:
 
    ```powershell
    .\Install-PenumbraVR.ps1
@@ -170,11 +184,11 @@ and VR settings](docs/INPUT.md) describe the complete current layout.
    powershell -ExecutionPolicy Bypass -File .\Install-PenumbraVR.ps1
    ```
 
-4. Install and configure SteamVR. PS VR2 users also need Sony's PlayStation VR2
+3. Install and configure SteamVR. PS VR2 users also need Sony's PlayStation VR2
    App and the required PC hardware.
-5. Install the Microsoft Visual C++ 2015–2022 Redistributable (x86) if it is not
+4. Install the Microsoft Visual C++ 2015–2022 Redistributable (x86) if it is not
    already present.
-6. Start SteamVR and launch **Penumbra: Overture** with Steam's normal **Play**
+5. Start SteamVR and launch **Penumbra: Overture** with Steam's normal **Play**
    button.
 
 The installer detects Steam libraries and merges the mod directly into the
@@ -197,6 +211,9 @@ the installer from the extracted package again with:
 ```powershell
 .\Install-PenumbraVR.ps1 -Restore
 ```
+
+or double-click `Install-PenumbraVR.bat -Restore` (drag the bat onto a console
+window to pass arguments).
 
 Do not install from `build\bin\Release`: that directory contains only native
 build output. Use the complete package so the executable, OpenVR loader,
