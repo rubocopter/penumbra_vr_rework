@@ -11,6 +11,19 @@ Fixed installer compatibility on systems where the underlying .NET Framework
 does not provide System.IO.Path.GetRelativePath (Windows PowerShell 5.1 /
 legacy .NET Framework).
 
+Fixed after the initial alpha download (included in this package):
+
+- Interaction ray uses the SteamVR aim pose on every controller profile, with
+  automatic grip-pose fallback; a missing aim binding can no longer break hand
+  tracking.
+- Thrown and released objects inherit the real hand velocity rotated into
+  world space, so throws go where the gesture points instead of whipping
+  backwards.
+- The death screen, examine/gameplay messages, and radio subtitles are
+  anchored at the UI Distance setting instead of glued to the headset.
+- Equipped HUD items no longer render collision-only submeshes; flashlight
+  beam origin sits at the lens instead of floating ahead.
+
 ### What is in this build
 
 - Device-independent SteamVR Input actions (gameplay, UI, and global action

@@ -22,6 +22,9 @@
 #include "Init.h"
 #include "Player.h"
 #include "EffectHandler.h"
+#include "Notebook.h"
+#include "Inventory.h"
+#include "NumericalPanel.h"
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS

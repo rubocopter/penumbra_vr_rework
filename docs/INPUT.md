@@ -213,7 +213,7 @@ threshold) instead of the viewpoint-lowering depth.
 | `SnapTurnAngle` | `45` | `15`–`90` degrees | Angle applied for each snap turn |
 | `SmoothTurnSpeed` | `90` | `30`–`360` degrees/s | Maximum continuous turn speed |
 | `TurnDeadZone` | `0.20` | `0.0`–`0.9` | Horizontal right-stick dead zone |
-| `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored main menus and cinematics |
+| `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored main menus, cinematics, the death screen, examine/gameplay messages, radio subtitles, and cinematic subtitles |
 | `UIScale` | `1.0` | `0.5`–`2.0` | Size multiplier for that frontal UI surface |
 | `CrouchMode` | `Hybrid` | `Physical`, `Button`, `Hybrid` | Chooses body movement, the bound crouch action, or either |
 | `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Headset descent below the standing baseline that enters physical crouch; also the view offset applied by button crouch |
@@ -226,6 +226,12 @@ look sequences; recenter remains bound to the dominant Create (or equivalent
 per-hand control) in each action set. UI distance and scale are independent so the
 surface can be moved farther away without forcing it to occupy less of the
 view.
+
+The world-interaction ray uses the SteamVR `aim` pose (`/user/hand/*/pose/aim`,
+bound as `left_aim`/`right_aim` in every bundled profile) instead of the grip
+pose, so pointing matches where the controller naturally aims on each device.
+Drivers or bindings that do not expose an aim pose fall back to the grip pose
+automatically; a missing aim binding never invalidates hand tracking.
 
 Hybrid crouch is the default. The physical path calibrates a standing HMD
 baseline during gameplay, rejects samples outside the plausible height band
