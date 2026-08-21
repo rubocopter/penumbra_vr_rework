@@ -21,12 +21,18 @@ namespace VRHelper {
       ? game->vr_left_hand : game->vr_right_hand;
   }
 
+  // Aim pose of any tracked controller with grip fallback: drivers or
+  // bindings without /pose/aim leave the aim matrix stale, and an identity
+  // matrix would cast a ray from the playspace origin.
+  static inline cMatrixf ControllerAimMatrix(TrackedController& hand) {
+    return hand.IsAimValid() ? hand.GetAimMatrix() : hand.GetMatrix();
+  }
+
   // Aim pose of the dominant hand with grip fallback: drivers or bindings
   // without /pose/aim leave the aim matrix stale, and an identity matrix
   // would cast the interaction ray from the playspace origin.
   static inline cMatrixf DominantAimMatrix(cGame* game) {
-    TrackedController& hand = DominantHand(game);
-    return hand.IsAimValid() ? hand.GetAimMatrix() : hand.GetMatrix();
+    return ControllerAimMatrix(DominantHand(game));
   }
 
   static inline TrackedController& OffHand(cGame* game) {
@@ -131,11 +137,13 @@ namespace VRHelper {
     cMatrixf handMatrix;
     bool leftHand = false;
 
+    // Aim pose with grip fallback on either hand: the laser must originate
+    // where the controller naturally points, not where its grip sits.
     if(DominantHand(game).IsPoseValid())
-      handMatrix = DominantHand(game).GetMatrix();
+      handMatrix = ControllerAimMatrix(DominantHand(game));
     else if(OffHand(game).IsPoseValid())
     {
-      handMatrix = OffHand(game).GetMatrix();
+      handMatrix = ControllerAimMatrix(OffHand(game));
       leftHand = game->vr_dominant_hand != eSteamVRHand_Left;
     }
     else
