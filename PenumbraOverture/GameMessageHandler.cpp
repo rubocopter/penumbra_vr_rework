@@ -159,8 +159,10 @@ void cGameMessageHandler::Add(const tWString& asText)
       cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
       auto centerPos = pCamera3D->GetPosition();
 
-      cMatrixf camInverse = cMath::MatrixInverse(pCamera3D->GetViewMatrix());
-      cVector3f uiPos = centerPos + pCamera3D->GetViewMatrix().GetRotation().GetForward() * -0.75f;
+      // Respect the user's UI distance so examine/message text is readable
+      // instead of glued to the headset.
+      float fDistance = mpInit->mVRSettings.GetUIDistance();
+      cVector3f uiPos = centerPos + pCamera3D->GetViewMatrix().GetRotation().GetForward() * -fDistance;
 
       auto translateMat = cMath::MatrixTranslate(uiPos);
       auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));

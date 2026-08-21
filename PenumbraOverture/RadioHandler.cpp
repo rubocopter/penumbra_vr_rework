@@ -132,6 +132,50 @@ void cRadioHandler::Update(float afTimeStep)
 			msPrevText = msCurrentText;
 		}
 	}
+
+	////////////////////////
+	//VR: anchor radio subtitles to world space at the UI distance while no
+	//other menu owns the overlay state. With a menu open (notebook, inventory,
+	//numerical panel) the subtitles inherit that surface instead — which is
+	//the behaviour testers already consider correct.
+	if(mpInit->mbHasHaptics)
+	{
+		auto scene = mpInit->mpGame->GetScene();
+		bool menuOwnsState = mpInit->mpNotebook->IsActive() ||
+			mpInit->mpInventory->IsActive() ||
+			mpInit->mpNumericalPanel->IsActive();
+
+		if(IsActive() && menuOwnsState==false)
+		{
+			cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
+			float fDistance = mpInit->mVRSettings.GetUIDistance();
+			cVector3f uiPos = pCamera3D->GetPosition() +
+				pCamera3D->GetViewMatrix().GetRotation().GetForward() * -fDistance;
+
+			auto translateMat = cMath::MatrixTranslate(uiPos);
+			auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
+
+			cMatrixf transMat = cMatrixf::Identity;
+			transMat = cMath::MatrixMul(cMath::MatrixTranslate(cVector3f(-400.0f, -300.0f, 0.0f)), transMat);
+			transMat = cMath::MatrixMul(scaleMat, transMat);
+			transMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), transMat);
+			transMat = cMath::MatrixMul(translateMat, transMat);
+
+			scene->SetVRMenuState(MenuState_WorldPosition, transMat);
+			mbVRAnchored = true;
+		}
+		else if(mbVRAnchored)
+		{
+			// Restore facelock only when the radio finished AND no menu took
+			// over the overlay meanwhile; menus assert their own state once,
+			// so writing here would clobber it.
+			if(IsActive()==false && menuOwnsState==false)
+			{
+				scene->SetVRMenuState(MenuState_Facelock, cMatrixf::Identity);
+			}
+			mbVRAnchored = false;
+		}
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -182,10 +226,10 @@ void cRadioHandler::Reset()
 	msPrevText = _W("");
 	
 	mfAlpha =0;
-
 	mpCurrentMessage = NULL;
 
 	msOnEndCallback = "";
+	mbVRAnchored = false;
 }
 
 //-----------------------------------------------------------------------

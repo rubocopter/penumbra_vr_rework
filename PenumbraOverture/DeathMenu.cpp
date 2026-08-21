@@ -210,32 +210,32 @@ void cDeathMenu::OnDraw()
 {
 	if(mfAlpha == 0) return;
 
-	// In VR, use world-space UI positioning like other menus
-	if(mpInit->mpGame->IsVREnabled())
+	// In VR, anchor the death screen to world space at the configured UI
+	// distance (same chain as the inventory and numerical panel), so the text
+	// is readable instead of glued to the headset. Only while active: the
+	// fade-out must not re-assert this over the Facelock restore done in
+	// SetActive(false).
+	if(mpInit->mbHasHaptics && mbActive)
 	{
 		auto scene = mpInit->mpGame->GetScene();
 		cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
-		
-		cMatrixf scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
-		
-		// Move the UI in front of the player's eyes at UI Distance
+		auto centerPos = pCamera3D->GetPosition();
+
+		float fDistance = mpInit->mVRSettings.GetUIDistance();
+		cVector3f uiPos = centerPos +
+			pCamera3D->GetViewMatrix().GetRotation().GetForward() * -fDistance;
+
+		auto translateMat = cMath::MatrixTranslate(uiPos);
+		auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
+
 		cMatrixf transMat = cMatrixf::Identity;
-		auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
-		transMat = cMath::MatrixMul(centerTranslationMat, transMat);
+		transMat = cMath::MatrixMul(cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f)), transMat);
 		transMat = cMath::MatrixMul(scaleMat, transMat);
 		transMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), transMat);
-		
-		// Use UI Distance setting
-		cMatrixf transMat2 = cMatrixf::Identity;
-		auto translateMat = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -mpInit->mVRSettings.GetUIDistance()));
-		transMat2 = cMath::MatrixMul(translateMat, transMat2);
-		transMat = cMath::MatrixMul(transMat2, transMat);
-		
-		auto scene = mpInit->mpGame->GetScene();
+		transMat = cMath::MatrixMul(translateMat, transMat);
+
 		scene->SetVRMenuState(MenuState_WorldPosition, transMat);
 	}
-	
-	if(mfAlpha == 0) return;
 
 	mpDrawer->DrawGfxObject(mpGfxBackground,cVector3f(0,0,0),cVector2f(800,600),cColor(1,mfAlpha));
 
@@ -250,7 +250,6 @@ void cDeathMenu::OnDraw()
 		cDeathMenuButton *pButton = *it;
 		pButton->OnDraw();
 	}
-}
 }
 
 //-----------------------------------------------------------------------
@@ -389,9 +388,9 @@ void cDeathMenu::SetActive(bool abX)
 
 		mpInit->mpPlayer->SetCrossHairState(mLastCrossHairState);
 		mpInit->mpPlayer->SetCrossHairPos(cVector2f(400,300));
-		
-		// Reset VR menu state
-		if(mpInit->mpGame->IsVREnabled())
+
+		// Restore the default facelock overlay when the death screen closes.
+		if(mpInit->mbHasHaptics)
 		{
 			auto scene = mpInit->mpGame->GetScene();
 			scene->SetVRMenuState(MenuState_Facelock, cMatrixf::Identity);

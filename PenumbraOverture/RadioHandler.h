@@ -75,6 +75,7 @@ private:
 	tString msOnEndCallback;
 
 	float mfAlpha;
+	bool mbVRAnchored;
 	
 	tRadioMessageList mlstMessages;
 };

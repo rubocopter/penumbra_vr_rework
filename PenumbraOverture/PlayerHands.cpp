@@ -152,15 +152,15 @@ void iHudModel::LoadEntities()
 
 	LoadExtraEntites();
 
-	// Hide collision submeshes (named *collision*, *collider*, *collider_*, etc.) in HUD models
-	// to prevent collision geometry from being rendered as visible geometry.
+	// Hide collision submeshes (named *collision*, *collider*, etc., case
+	// insensitive) so physics-only geometry never renders in HUD models.
 	for(int i=0; i<mpEntity->GetSubMeshEntityNum(); ++i)
 	{
 		cSubMeshEntity *pSubEntity = mpEntity->GetSubMeshEntity(i);
 		if(pSubEntity)
 		{
-			tString sName = pSubEntity->GetSubMesh()->GetName();
-			if(sName.find("collision") != tString::npos || sName.find("collider") != tString::npos)
+			tString sLower = cString::ToLowerCase(pSubEntity->GetSubMesh()->GetName());
+			if(sLower.find("collision") != tString::npos || sLower.find("collider") != tString::npos)
 			{
 				pSubEntity->SetVisible(false);
 			}
