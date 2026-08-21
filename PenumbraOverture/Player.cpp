@@ -1038,9 +1038,9 @@ void cPlayer::OnWorldLoad()
 	/////////////////////////////////////////////////////////
 	// Both hand queries reuse immutable collision geometry for the lifetime
 	// of this physics world instead of allocating a shape every frame.
-	if(mpVRHandInteractionShape == NULL)
+if(mpVRHandInteractionShape == NULL)
 		mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
-			cVector3f(40.0f, 15.0f, 23.5f), NULL);
+			cVector3f(50.0f, 20.0f, 30.0f), NULL);
 
 	// Create body
 	// mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", mvSize);

@@ -692,9 +692,10 @@ void cEffect_SubTitle::Add(const tWString& asMessage, float afTime, bool abRemov
     // Rotate to face eyes
     transform = cMath::MatrixMul(cMath::MatrixInverse(camera->GetViewMatrix().GetRotation()), transform);
 
-    // Move in front of eyes
+    // Move in front of eyes: use UIDistance setting instead of hardcoded 0.75m
+    const float fUIDistance = mpInit->mVRSettings.GetUIDistance();
     cMatrixf headInverse = cMath::MatrixInverse(camera->GetViewMatrix());
-    cVector3f pos = headInverse.GetTranslation() + camera->GetViewMatrix().GetRotation().GetForward() * -0.75f + cVector3f(0.0f, -0.4f, 0.0f);
+    cVector3f pos = headInverse.GetTranslation() + camera->GetViewMatrix().GetRotation().GetForward() * -fUIDistance + cVector3f(0.0f, -0.4f, 0.0f);
     auto translateMat = cMath::MatrixTranslate(pos);
 
     transform = cMath::MatrixMul(translateMat, transform);

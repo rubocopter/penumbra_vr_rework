@@ -73,6 +73,9 @@ struct HandSummary {
     void SetPoseValid(bool valid);
     bool IsPoseValid() const { return pose_valid_; }
 
+    cMatrixf GetAimMatrix() const { return aim_matrix_; }
+    void SetAimMatrix(const cMatrixf& matrix);
+
     void SetDeviceIndex(vr::TrackedDeviceIndex_t device_index);
     vr::TrackedDeviceIndex_t GetDeviceIndex() const { return device_index_; }
 
@@ -95,6 +98,7 @@ struct HandSummary {
     vr::TrackedDeviceIndex_t device_index_;
     bool pose_valid_;
     cMatrixf matrix_;
+    cMatrixf aim_matrix_;
     cVector3f velocity_;
     cVector3f angular_velocity_;
     HandSummary hand_summary_;

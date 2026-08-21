@@ -403,7 +403,12 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
   
   mlThrowHistoryCnt = 0;
 
-  mpPushBody->SetCollidePlayer(false);
+mpPushBody->SetCollidePlayer(false);
+
+  // Increase mass while grabbed to make object "stick to palm" better
+  // and resist being pushed by environment collisions
+  mfOriginalMass = mpPushBody->GetMass();
+  mpPushBody->SetMass(mfOriginalMass * 5.0f);
 
   cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
@@ -773,11 +778,10 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	{
 		bPausedGravity = false;
 	}
-
-	cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
+cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
 	mvRelPickPoint = cMath::MatrixMul(mtxInvModel, mvPickPoint);
 
-  localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), cMath::MatrixTranslate(mvPickPoint));
+	localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), cMath::MatrixTranslate(mvPickPoint));
 
 	//Set cross hair image.
 	//mpPlayer->SetCrossHairState(eCrossHairState_Grab);
@@ -787,6 +791,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	{
 	mpPushBody->AddBodyCallback(mpCallback);
 	}*/
+
 	mpCallback->mlBackCount =0;
 
 	mlMoveCount = 0;
@@ -797,11 +802,11 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
   if(pEntity != NULL && pEntity->GetType() == eGameEntityType_SwingDoor)
   {
     mpPushBody->SetCollidePlayer(true);
-    Log(" [VR collision +%lu ms] swing-door interaction kept player collision enabled.\n",
-      GetApplicationTime());
+      Log(" [VR collision +%lu ms] swing-door interaction kept player collision enabled.\n",
+        GetApplicationTime());
   }
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
+	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
 
 //-----------------------------------------------------------------------

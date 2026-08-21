@@ -87,6 +87,7 @@ private:
 	float mfGrabDist;
 
 	float mfDefaultMass;
+    float mfOriginalMass;
 
 	bool mbHasPlayerGravityPush;
 

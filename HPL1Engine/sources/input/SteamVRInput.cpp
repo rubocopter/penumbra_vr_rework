@@ -129,6 +129,8 @@ namespace hpl {
 
     resolved = ResolveAction("/actions/global/in/left_pose", mLeftPoseAction) && resolved;
     resolved = ResolveAction("/actions/global/in/right_pose", mRightPoseAction) && resolved;
+    resolved = ResolveAction("/actions/global/in/left_aim", mLeftAimAction) && resolved;
+    resolved = ResolveAction("/actions/global/in/right_aim", mRightAimAction) && resolved;
     resolved = ResolveAction("/actions/global/out/left_haptic", mLeftHapticAction) && resolved;
     resolved = ResolveAction("/actions/global/out/right_haptic", mRightHapticAction) && resolved;
 
@@ -180,8 +182,10 @@ namespace hpl {
     // Pose actions follow their bound hand rather than a transient tracked-device
     // index. A reconnect can assign a different index, so action origins are the
     // authoritative controller identity whenever the pose action is active.
-    UpdatePoseAction(mLeftPoseAction, leftHand, "left", mbLeftPoseStateKnown, mbLeftPoseWasValid);
-    UpdatePoseAction(mRightPoseAction, rightHand, "right", mbRightPoseStateKnown, mbRightPoseWasValid);
+    UpdatePoseAction(mLeftPoseAction, leftHand, "left", mbLeftPoseStateKnown, mbLeftPoseWasValid, false);
+    UpdatePoseAction(mRightPoseAction, rightHand, "right", mbRightPoseStateKnown, mbRightPoseWasValid, false);
+    UpdatePoseAction(mLeftAimAction, leftHand, "left aim", mbLeftAimStateKnown, mbLeftAimWasValid, true);
+    UpdatePoseAction(mRightAimAction, rightHand, "right aim", mbRightAimStateKnown, mbRightAimWasValid, true);
 
     // Per-hand skeletal summary drives future hand-pose animation (open, grab,
     // trigger). Devices without skeletal support leave the summary invalid and
@@ -493,61 +497,66 @@ namespace hpl {
     return true;
   }
 
-  bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
-    const char* handName, bool& stateKnown, bool& wasValid) {
-    vr::InputPoseActionData_t data;
-    memset(&data, 0, sizeof(data));
+bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
+    const char* handName, bool& stateKnown, bool& wasValid, bool isAim) {
+  vr::InputPoseActionData_t data;
+  memset(&data, 0, sizeof(data));
 
-    const vr::ETrackingUniverseOrigin trackingSpace = vr::VRCompositor()->GetTrackingSpace();
-    vr::EVRInputError error = vr::VRInput()->GetPoseActionDataForNextFrame(
-      handle, trackingSpace, &data, sizeof(data), vr::k_ulInvalidInputValueHandle);
+  const vr::ETrackingUniverseOrigin trackingSpace = vr::VRCompositor()->GetTrackingSpace();
+  vr::EVRInputError error = vr::VRInput()->GetPoseActionDataForNextFrame(
+    handle, trackingSpace, &data, sizeof(data), vr::k_ulInvalidInputValueHandle);
 
-    // An inactive pose has no binding for the current controller. Leave the
-    // compositor/device-role result in place so legacy bindings still work.
-    if (error != vr::VRInputError_None || !data.bActive) {
-      if (stateKnown && wasValid) {
-        Log(" [VR input +%lu ms] %s pose action lost (%s, error %d).\n", GetApplicationTime(),
-          handName, data.bActive ? "read failure" : "inactive", (int)error);
-        wasValid = false;
-      }
-      return false;
+  // An inactive pose has no binding for the current controller. Leave the
+  // compositor/device-role result in place so legacy bindings still work.
+  if (error != vr::VRInputError_None || !data.bActive) {
+    if (stateKnown && wasValid) {
+      Log(" [VR input +%lu ms] %s pose action lost (%s, error %d).\n", GetApplicationTime(),
+        handName, data.bActive ? "read failure" : "inactive", (int)error);
+      wasValid = false;
     }
+    return false;
+  }
 
-    const bool valid = data.pose.bPoseIsValid && data.pose.bDeviceIsConnected;
-    if (!stateKnown || valid != wasValid) {
-      Log(" [VR input +%lu ms] %s pose action %s.\n", GetApplicationTime(), handName,
-        valid ? "acquired" : "lost");
-      stateKnown = true;
-      wasValid = valid;
+  const bool valid = data.pose.bPoseIsValid && data.pose.bDeviceIsConnected;
+  if (!stateKnown || valid != wasValid) {
+    Log(" [VR input +%lu ms] %s pose action %s.\n", GetApplicationTime(), handName,
+      valid ? "acquired" : "lost");
+    stateKnown = true;
+    wasValid = valid;
+  }
+
+  if (!valid) {
+    hand.SetPoseValid(false);
+    return true;
+  }
+
+  vr::TrackedDeviceIndex_t deviceIndex = hand.GetDeviceIndex();
+  if (data.activeOrigin != vr::k_ulInvalidInputValueHandle) {
+    vr::InputOriginInfo_t originInfo;
+    memset(&originInfo, 0, sizeof(originInfo));
+    if (vr::VRInput()->GetOriginTrackedDeviceInfo(data.activeOrigin, &originInfo, sizeof(originInfo)) ==
+      vr::VRInputError_None) {
+      deviceIndex = originInfo.trackedDeviceIndex;
     }
+  }
 
-    if (!valid) {
-      hand.SetPoseValid(false);
-      return true;
-    }
+  static const cMatrixf heightAdd = cMath::MatrixTranslate(cVector3f(0.0f, 0.02f, 0.0f));
+  const vr::HmdMatrix34_t& poseMatrix = data.pose.mDeviceToAbsoluteTracking;
+  const vr::HmdVector3_t& velocity = data.pose.vVelocity;
+  const vr::HmdVector3_t& angularVelocity = data.pose.vAngularVelocity;
 
-    vr::TrackedDeviceIndex_t deviceIndex = hand.GetDeviceIndex();
-    if (data.activeOrigin != vr::k_ulInvalidInputValueHandle) {
-      vr::InputOriginInfo_t originInfo;
-      memset(&originInfo, 0, sizeof(originInfo));
-      if (vr::VRInput()->GetOriginTrackedDeviceInfo(data.activeOrigin, &originInfo, sizeof(originInfo)) ==
-        vr::VRInputError_None) {
-        deviceIndex = originInfo.trackedDeviceIndex;
-      }
-    }
-
-    static const cMatrixf heightAdd = cMath::MatrixTranslate(cVector3f(0.0f, 0.02f, 0.0f));
-    const vr::HmdMatrix34_t& poseMatrix = data.pose.mDeviceToAbsoluteTracking;
-    const vr::HmdVector3_t& velocity = data.pose.vVelocity;
-    const vr::HmdVector3_t& angularVelocity = data.pose.vAngularVelocity;
-
+  if (isAim) {
+    hand.SetAimMatrix(
+      cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(poseMatrix)));
+  } else {
     hand.SetPose(
       cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(poseMatrix)),
       cVector3f(velocity.v[0], velocity.v[1], velocity.v[2]),
       cVector3f(angularVelocity.v[0], angularVelocity.v[1], angularVelocity.v[2]),
       deviceIndex);
-    return true;
   }
+  return true;
+}
 
   cVRButtonState cSteamVRInput::ReadDigital(vr::VRActionHandle_t handle) const {
     cVRButtonState state;

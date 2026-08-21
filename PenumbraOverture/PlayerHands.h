@@ -111,7 +111,9 @@ public:
 
   virtual bool UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep);
 
-  void SetHandIndex(int handIndex) {
+	virtual void Update(float afTimeStep) {}
+
+	void SetHandIndex(int handIndex) {
     mlHandIndex = handIndex;
   }
 

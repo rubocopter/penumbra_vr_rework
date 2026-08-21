@@ -22,6 +22,14 @@
         {
           "output": "/actions/global/in/right_pose",
           "path": "/user/hand/right/pose/grip"
+        },
+        {
+          "output": "/actions/global/in/left_aim",
+          "path": "/user/hand/left/pose/aim"
+        },
+        {
+          "output": "/actions/global/in/right_aim",
+          "path": "/user/hand/right/pose/aim"
         }
       ],
       "skeleton": [
@@ -137,6 +145,24 @@
           },
           "mode": "button",
           "path": "/user/hand/left/input/system"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/x"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/x"
         }
       ]
     },
@@ -303,6 +329,24 @@
           },
           "mode": "button",
           "path": "/user/hand/left/input/system"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/x"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/right/input/x"
         }
       ]
     },

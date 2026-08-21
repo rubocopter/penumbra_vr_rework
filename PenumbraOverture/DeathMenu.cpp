@@ -210,6 +210,33 @@ void cDeathMenu::OnDraw()
 {
 	if(mfAlpha == 0) return;
 
+	// In VR, use world-space UI positioning like other menus
+	if(mpInit->mpGame->IsVREnabled())
+	{
+		auto scene = mpInit->mpGame->GetScene();
+		cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
+		
+		cMatrixf scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
+		
+		// Move the UI in front of the player's eyes at UI Distance
+		cMatrixf transMat = cMatrixf::Identity;
+		auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
+		transMat = cMath::MatrixMul(centerTranslationMat, transMat);
+		transMat = cMath::MatrixMul(scaleMat, transMat);
+		transMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), transMat);
+		
+		// Use UI Distance setting
+		cMatrixf transMat2 = cMatrixf::Identity;
+		auto translateMat = cMath::MatrixTranslate(cVector3f(0.0f, 0.0f, -mpInit->mVRSettings.GetUIDistance()));
+		transMat2 = cMath::MatrixMul(translateMat, transMat2);
+		transMat = cMath::MatrixMul(transMat2, transMat);
+		
+		auto scene = mpInit->mpGame->GetScene();
+		scene->SetVRMenuState(MenuState_WorldPosition, transMat);
+	}
+	
+	if(mfAlpha == 0) return;
+
 	mpDrawer->DrawGfxObject(mpGfxBackground,cVector3f(0,0,0),cVector2f(800,600),cColor(1,mfAlpha));
 
 	mpFont->DrawWordWrap(	cVector3f(400,210,40),500,25,24,cColor(0.7f,0.3f,0.3f),eFontAlign_Center,
@@ -221,9 +248,9 @@ void cDeathMenu::OnDraw()
 	for(; it != mlstButtons.end(); ++it)
 	{
 		cDeathMenuButton *pButton = *it;
-
 		pButton->OnDraw();
 	}
+}
 }
 
 //-----------------------------------------------------------------------
@@ -362,6 +389,13 @@ void cDeathMenu::SetActive(bool abX)
 
 		mpInit->mpPlayer->SetCrossHairState(mLastCrossHairState);
 		mpInit->mpPlayer->SetCrossHairPos(cVector2f(400,300));
+		
+		// Reset VR menu state
+		if(mpInit->mpGame->IsVREnabled())
+		{
+			auto scene = mpInit->mpGame->GetScene();
+			scene->SetVRMenuState(MenuState_Facelock, cMatrixf::Identity);
+		}
 	}
 }
 

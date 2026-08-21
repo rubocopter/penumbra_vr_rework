@@ -25,6 +25,10 @@ cMatrixf TrackedController::GetMatrix() {
   return matrix_;
 }
 
+void TrackedController::SetAimMatrix(const cMatrixf& matrix) {
+  aim_matrix_ = matrix;
+}
+
 void TrackedController::SetVelocity(const cVector3f& velocity) {
   velocity_ = velocity;
 }

@@ -21,6 +21,10 @@ namespace VRHelper {
       ? game->vr_left_hand : game->vr_right_hand;
   }
 
+  static inline cMatrixf DominantAimMatrix(cGame* game) {
+    return VRHelper::DominantHand(game).GetAimMatrix();
+  }
+
   static inline TrackedController& OffHand(cGame* game) {
     return game->vr_dominant_hand == eSteamVRHand_Left
       ? game->vr_right_hand : game->vr_left_hand;

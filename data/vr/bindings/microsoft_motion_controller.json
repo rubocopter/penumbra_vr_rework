@@ -22,6 +22,14 @@
         {
           "output": "/actions/global/in/right_pose",
           "path": "/user/hand/right/pose/grip"
+        },
+        {
+          "output": "/actions/global/in/left_aim",
+          "path": "/user/hand/left/pose/aim"
+        },
+        {
+          "output": "/actions/global/in/right_aim",
+          "path": "/user/hand/right/pose/aim"
         }
       ],
       "skeleton": [],
@@ -303,6 +311,15 @@
           },
           "mode": "trackpad",
           "path": "/user/hand/left/input/trackpad"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "trackpad",
+          "path": "/user/hand/right/input/trackpad"
         }
       ]
     },

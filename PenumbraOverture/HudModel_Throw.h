@@ -45,7 +45,7 @@ public:
 
 	bool OnMouseMove(const cVector2f &avMovement);
 
-	//bool UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep);
+	void Update(float afTimeStep);
 
 	void SetItem(cInventoryItem *apItem){ mpItem = apItem;}
 private:
@@ -54,7 +54,14 @@ private:
 	bool mbButtonDown;
 	float mfChargeCount;
 
+	// Throw velocity tracking
+	cVector3f mvPeakVelocity;
+	float mfPeakSpeed;
+
 	cHudModelPose mChargePose;
+
+	// Track if we're in the throwing motion
+	bool mbTrackingVelocity;
 
 	float mfChargeTime;
 	float mfMinImpulse;

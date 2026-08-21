@@ -152,6 +152,21 @@ void iHudModel::LoadEntities()
 
 	LoadExtraEntites();
 
+	// Hide collision submeshes (named *collision*, *collider*, *collider_*, etc.) in HUD models
+	// to prevent collision geometry from being rendered as visible geometry.
+	for(int i=0; i<mpEntity->GetSubMeshEntityNum(); ++i)
+	{
+		cSubMeshEntity *pSubEntity = mpEntity->GetSubMeshEntity(i);
+		if(pSubEntity)
+		{
+			tString sName = pSubEntity->GetSubMesh()->GetName();
+			if(sName.find("collision") != tString::npos || sName.find("collider") != tString::npos)
+			{
+				pSubEntity->SetVisible(false);
+			}
+		}
+	}
+
 	SetupHandAnimation();
 }
 
@@ -554,6 +569,9 @@ void cPlayerHands::Update(float afTimeStep)
       pHudModel->mpEntity->SetMatrix(mtxPose);
 
     pHudModel->UpdateHandAnimation();
+
+		// Call per-model update for things like throw velocity tracking
+		pHudModel->Update(afTimeStep);
 	}
 }
 

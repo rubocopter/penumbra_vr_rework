@@ -757,14 +757,14 @@ cPlayerState_UseItem_VR::cPlayerState_UseItem_VR(cInit *apInit, cPlayer *apPlaye
 void cPlayerState_UseItem_VR::OnUpdate(float afTimeStep)
 {
   /////////////////////////////////////////////////
-  // Cast ray to see if anything is picked.
+// Cast ray to see if anything is picked.
   iPhysicsWorld *pPhysicsWorld = mpInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
   cVector3f vStart, vEnd;
 
-auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
+  cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantAimMatrix(mpInit->mpGame), mpInit->mpGame);
 
   vStart = handMat.GetTranslation();
-  vEnd = vStart + cMath::MatrixInverse(handMat.GetRotation()).GetForward() * -1.0f;
+  vEnd = vStart + cMath::MatrixMul(cMath::MatrixInverse(handMat.GetRotation()), cVector3f(0.0f, 0.0f, -1.0f));
 
   mvUseLineStart = vStart;
   mvUseLineEnd = vEnd;

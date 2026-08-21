@@ -87,7 +87,7 @@ namespace hpl {
     bool ResolveActionSet(const char* path, vr::VRActionSetHandle_t& handle);
     bool ResolveAction(const char* path, vr::VRActionHandle_t& handle);
     bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
-      const char* handName, bool& stateKnown, bool& wasValid);
+      const char* handName, bool& stateKnown, bool& wasValid, bool isAim);
     void UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand, const char* handName);
     cVRButtonState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
@@ -106,8 +106,12 @@ namespace hpl {
     bool mbHasActiveContext;
     bool mbLeftPoseStateKnown;
     bool mbRightPoseStateKnown;
+    bool mbLeftAimStateKnown;
+    bool mbRightAimStateKnown;
     bool mbLeftPoseWasValid;
     bool mbRightPoseWasValid;
+    bool mbLeftAimWasValid;
+    bool mbRightAimWasValid;
     eSteamVRInputContext mActiveContext;
     eSteamVRHand mActiveHandedness;
     cVRInputState mState;
@@ -160,6 +164,8 @@ namespace hpl {
 
     vr::VRActionHandle_t mLeftPoseAction;
     vr::VRActionHandle_t mRightPoseAction;
+    vr::VRActionHandle_t mLeftAimAction;
+    vr::VRActionHandle_t mRightAimAction;
     vr::VRActionHandle_t mLeftHapticAction;
     vr::VRActionHandle_t mRightHapticAction;
 
