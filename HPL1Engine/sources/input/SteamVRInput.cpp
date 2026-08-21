@@ -213,7 +213,9 @@ namespace hpl {
       nextState.moveX = move.x;
       nextState.moveY = move.y;
       nextState.moveActive = move.active;
-      anyActionActive = move.active;
+      // OR, never overwrite: recenter was counted above and is frequently the
+      // only active input while standing still.
+      anyActionActive = anyActionActive || move.active;
 
       AnalogState turn = ReadAnalog(ActionFor(mTurnAction, mTurnActionLeft));
       nextState.turnX = turn.x;
