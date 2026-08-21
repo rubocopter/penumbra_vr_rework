@@ -40,6 +40,9 @@ cHudModel_Throw::cHudModel_Throw() : iHudModel(ePlayerHandType_Throw)
 	mbButtonDown = false;
 
 	mfChargeCount = 0;
+	mfPeakSpeed = 0.0f;
+	mvPeakVelocity = cVector3f(0, 0, 0);
+	mbTrackingVelocity = false;
 }
 
 //-----------------------------------------------------------------------
@@ -63,8 +66,6 @@ void cHudModel_Throw::LoadData(TiXmlElement *apRootElem)
 
 	mfReloadTime = cString::ToFloat(pMeleeElem->Attribute("ReloadTime"),0);
 
-	mvTorque = cString::ToVector3f(pMeleeElem->Attribute("Torque"),0);
-
 	msThrowEntity = cString::ToString(pMeleeElem->Attribute("ThrowEntity"),"");
 
 	msChargeSound = cString::ToString(pMeleeElem->Attribute("ChargeSound"),"");
@@ -79,6 +80,9 @@ void cHudModel_Throw::OnStart()
 {
 	mbButtonDown = false;
 	mfChargeCount = 0;
+	mfPeakSpeed = 0.0f;
+	mvPeakVelocity = cVector3f(0, 0, 0);
+	mbTrackingVelocity = false;
 }
 
 //-----------------------------------------------------------------------
@@ -156,37 +160,54 @@ void cHudModel_Throw::OnAttackUp()
 
 ///////////////////////////////
 	//Create entity
-	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
+	cMatrixf mtxStart = cMatrixf::Identity;
+	iHudModel *pHand = mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame));
+	if(pHand == NULL || pHand->UpdatePoseMatrix(mtxStart, 0.0f) == false)
+	{
+		// No valid hand pose: aborting is safer than spawning at a garbage
+		// transform (UpdatePoseMatrix leaves the matrix untouched on failure).
+		mfChargeCount = 0;
+		return;
+	}
 
-	cMatrixf mtxStart;
-	mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->UpdatePoseMatrix(mtxStart, 0.0f);
-	
 	iEntity3D *pEntity = mpInit->mpGame->GetScene()->GetWorld3D()->CreateEntity("Throw",mtxStart,
 																				msThrowEntity, true);
 	if(pEntity)
 	{
-		iGameEntity *pEntity = mpInit->mpMapHandler->GetLatestEntity();
-		
-		// Use peak velocity during throw motion for natural feel
-		// Direction is based on hand's forward at release, magnitude from peak speed
-		cMatrixf handMat = VRHelper::DominantHand(mpInit->mpGame).GetMatrix();
-		cVector3f handForward = cMath::MatrixMul(handMat.GetRotation(), cVector3f(0, 0, -1.0f));
-		
-		// Use peak speed with charge multiplier
-		float fImpulse = mfMinImpulse * (1 - mfChargeCount) + mfMaxImpulse * mfChargeCount;
-		float throwSpeed = mfPeakSpeed * fImpulse;
-		
-		// Apply velocity in hand's forward direction
-		cVector3f throwVel = handForward * throwSpeed;
-		
-		// Add some torque for realism
-		cVector3f vRot = cMath::MatrixMul(handMat.GetRotation(), mvTorque);
+		iGameEntity *pGameEnt = mpInit->mpMapHandler->GetLatestEntity();
 
-		for(int i=0; i< pEntity->GetBodyNum(); ++i)
+		// Raw hand velocities live in tracking space; rotate them into world
+		// space with the pure direction transform (the full T2W would add the
+		// player's world position to the velocity vector).
+		cVector3f vWorldPeakVel = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(mvPeakVelocity);
+		float peakSpeed = vWorldPeakVel.Length();
+
+		// Direction of the throw: the dominant motion arc when it was fast
+		// enough to be meaningful, otherwise where the hand is pointing.
+		cVector3f throwDir;
+		if(peakSpeed > 0.3f)
 		{
-			iPhysicsBody *pBody = pEntity->GetBody(i);
+			throwDir = cMath::Vector3Normalize(vWorldPeakVel);
+		}
+		else
+		{
+			throwDir = cMath::Vector3Normalize(
+				cMath::MatrixMul(mtxStart.GetRotation(), cVector3f(0, -1, 0)));
+		}
+
+		// Magnitude: real gesture speed slightly amplified, plus a small push
+		// from the charge so a held release throws harder than a flick.
+		float fChargeBoost = mfMinImpulse * (1 - mfChargeCount) + mfMaxImpulse * mfChargeCount;
+		cVector3f throwVel = vWorldPeakVel * 1.15f + throwDir * fChargeBoost;
+
+		cVector3f vWorldAngVel = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(
+			VRHelper::DominantHand(mpInit->mpGame).GetAngularVelocity());
+
+		for(int i=0; i< pGameEnt->GetBodyNum(); ++i)
+		{
+			iPhysicsBody *pBody = pGameEnt->GetBody(i);
 			pBody->SetLinearVelocity(throwVel);
-			pBody->SetAngularVelocity(VRHelper::DominantHand(mpInit->mpGame).GetAngularVelocity());
+			pBody->SetAngularVelocity(vWorldAngVel * 0.5f);
 			pBody->SetActive(true);
 			pBody->SetEnabled(true);
 		}

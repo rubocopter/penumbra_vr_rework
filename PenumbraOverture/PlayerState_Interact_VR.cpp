@@ -35,26 +35,6 @@ float cPlayerState_Grab_VR::mfMassDiv = 5.0f;
 cPlayerState_Grab_VR::cPlayerState_Grab_VR(cInit *apInit,cPlayer *apPlayer) : iPlayerState(apInit,apPlayer,ePlayerState_Grab)
 {
 	mpPushBody = NULL;
-
-	//Init controllers
-	mGrabPid.SetErrorNum(10);
-	mRotatePid.SetErrorNum(10);
-
-	
-	//Get variables
-	mfMaxPidForce =  mpInit->mpGameConfig->GetFloat("Interaction_Grab","MaxPidForce",0);
-
-	mfMinThrowMass =  mpInit->mpGameConfig->GetFloat("Interaction_Grab","MinThrowMass",0);
-	mfMaxThrowMass =  mpInit->mpGameConfig->GetFloat("Interaction_Grab","MaxThrowMass",0);
-
-	mfMinThrowImpulse =  mpInit->mpGameConfig->GetFloat("Interaction_Grab","MinThrowImpulse",0);
-	mfMaxThrowImpulse =  mpInit->mpGameConfig->GetFloat("Interaction_Grab","MaxThrowImpulse",0);
-	
-
-	//Get font
-	mpFont = mpInit->mpGame->GetResources()->GetFontManager()->CreateFontData("verdana.fnt");
-
-  mlThrowHistoryCnt = 0;
 }
 
 //-----------------------------------------------------------------------
@@ -81,24 +61,6 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 		}
 	}
 
-
-	///////////////////////////////////
-	//Get the current position.
-	float fAngleDist = cMath::GetAngleDistanceRad(mfStartYaw,mpPlayer->GetCamera()->GetYaw());
-
-	//Det the desired position
-	cVector3f vCurrentPoint;
-	if(mbPickAtPoint)
-	{
-		vCurrentPoint = cMath::MatrixMul(mpPushBody->GetLocalMatrix(), mvRelPickPoint);
-	}
-	else 
-	{
-		vCurrentPoint = cMath::MatrixMul(cMath::MatrixRotateY(fAngleDist), mvRelPickPoint);
-		vCurrentPoint = cMath::MatrixMul(mpPushBody->GetWorldMatrix(),mpPushBody->GetMassCentre())
-						+ vCurrentPoint;
-	}
-
   // Move relative to the player's hand
 
   auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
@@ -111,16 +73,6 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 
   mpPushBody->SetWorldMatrix(destMatrix);
   // mpPushBody->SetCollidePlayer(false);
-
-  if (mlThrowHistoryCnt < NUM_THROW_HISTORY_FRAMES - 1) {
-    mlThrowHistoryCnt++;
-  }
-  else {
-    for (int i = 0; i < NUM_THROW_HISTORY_FRAMES - 1; ++i)
-      mmThrowHistory[i] = mmThrowHistory[i + 1];
-  }
-
-  mmThrowHistory[mlThrowHistoryCnt] = handMat;
 
   /////////////////////////////////////////////////
   // Cast ray to see if anything could be examined.
@@ -171,20 +123,12 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 
 void cPlayerState_Grab_VR::OnDraw()
 {
-	//mpFont->Draw(cVector3f(5,30,0),12,cColor(1,1),eFontAlign_Left,"YRotate: %f",mfYRotation);
 }
 
 //-----------------------------------------------------------------------
 
-
 void cPlayerState_Grab_VR::OnPostSceneDraw()
 {
-	iLowLevelGraphics *pLowGfx = mpInit->mpGame->GetGraphics()->GetLowLevel();
-
-	cVector3f vPickPoint = cMath::MatrixMul(mpPushBody->GetWorldMatrix(), mvRelPickPoint);
-
-	//pLowGfx->DrawSphere(vPickPoint, 0.2f, cColor(1,1,1,1));
-	//pLowGfx->DrawSphere(mvCurrentDisered, 0.2f, cColor(1,1,1,1));
 }
 
 //-----------------------------------------------------------------------
@@ -236,7 +180,7 @@ void cPlayerState_Grab_VR::OnStartExamine()
 //-----------------------------------------------------------------------
 
 bool cPlayerState_Grab_VR::OnAddYaw(float afVal)
-{ 
+{
 	afVal *= mfSpeedMul*0.75f;
 	if(mbMoveHand)
 	{
@@ -244,8 +188,6 @@ bool cPlayerState_Grab_VR::OnAddYaw(float afVal)
 		{
 			mpPlayer->GetCamera()->AddYaw( -afVal * mpPlayer->GetLookSpeed());
 			mpPlayer->GetCharacterBody()->SetYaw(mpPlayer->GetCamera()->GetYaw());
-
-			mfYRotation += -afVal * mpPlayer->GetLookSpeed();
 		}
 
 		return false;
@@ -254,8 +196,6 @@ bool cPlayerState_Grab_VR::OnAddYaw(float afVal)
 	{
 		mpPlayer->GetCamera()->AddYaw( -afVal * mpPlayer->GetLookSpeed());
 		mpPlayer->GetCharacterBody()->SetYaw(mpPlayer->GetCamera()->GetYaw());
-
-		mfYRotation += -afVal * mpPlayer->GetLookSpeed();
 
 		return false;
 	}
@@ -326,9 +266,8 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 	if(apPrevState->mType != ePlayerState_Message) mPrevState = apPrevState->mType;
 
 	mbPickAtPoint = mpPlayer->mbPickAtPoint;
-	mbRotateWithPlayer = mpPlayer->mbRotateWithPlayer;
 
-	if(mPrevState == ePlayerState_InteractMode) 
+	if(mPrevState == ePlayerState_InteractMode)
 		mbMoveHand = true;
 	else 
 		mbMoveHand = false;
@@ -367,21 +306,16 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 
 	//Get the orientation of the body
 	cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
-	mvObjectUp = mtxInvModel.GetUp();
-	mvObjectRight = mtxInvModel.GetRight();
 
 	mfGrabDist = cMath::Vector3Dist(mpPlayer->GetCamera()->GetPosition(),
 									mpPlayer->GetPickedPos());
 	//mfGrabDist = mpPlayer->GetPickedDist();
 
-	//reset PID controller
-	mGrabPid.Reset();
-
 	//The pick point relative to the body
 	if(mbPickAtPoint)
 		mvRelPickPoint = cMath::MatrixMul(mtxInvModel, mpPlayer->GetPickedPos());
 	else
-		mvRelPickPoint =	mpPlayer->GetPickedPos() - 
+		mvRelPickPoint =	mpPlayer->GetPickedPos() -
 							cMath::MatrixMul(	mpPushBody->GetWorldMatrix(),
 												mpPushBody->GetMassCentre());
 
@@ -391,24 +325,9 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 	//Set cross hair image.
 	//mpPlayer->SetCrossHairState(eCrossHairState_Grab);
 
-	//The amount of rotation we wanna apply to the object, increases/decrease 
-	//when the player turn left/right
-	mfYRotation =0;
-
-	//Reset pid controllers
-	mRotatePid.Reset();
-	mGrabPid.Reset();
-
 	mfStartYaw = pCamera->GetYaw();
-  
-  mlThrowHistoryCnt = 0;
 
 mpPushBody->SetCollidePlayer(false);
-
-  // Increase mass while grabbed to make object "stick to palm" better
-  // and resist being pushed by environment collisions
-  mfOriginalMass = mpPushBody->GetMass();
-  mpPushBody->SetMass(mfOriginalMass * 5.0f);
 
   cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
 }
@@ -436,17 +355,19 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 
 	mpPlayer->SetSpeedMul(1.0f);
 
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
-  cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
+  // Hand velocities live in tracking space; rotate them into world space
+  // before applying them to the body, otherwise the throw whips backwards
+  // whenever the player faces away from the tracking origin's forward axis.
+  // TrackingDirectionToWorld applies only orientation: adding the full T2W
+  // translation would add the player's world position to the velocity.
+  TrackedController& hand = VRHelper::DominantHand(mpInit->mpGame);
+  cVector3f vWorldHandVel =
+    mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetVelocity());
+  cVector3f vWorldAngVel =
+    mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetAngularVelocity());
 
-  auto destTranslation = destMatrix.GetTranslation();
-  auto destRotation = destMatrix.GetRotation();
-
-  auto firstFrame = max(min(mlThrowHistoryCnt, 2) - 1, 0);
-  auto lastFrame = min(mlThrowHistoryCnt, 9);
-
-  mpPushBody->SetLinearVelocity(VRHelper::DominantHand(mpInit->mpGame).GetVelocity());
-  mpPushBody->SetAngularVelocity(VRHelper::DominantHand(mpInit->mpGame).GetAngularVelocity() * 0.5f);
+  mpPushBody->SetLinearVelocity(vWorldHandVel * 1.15f);
+  mpPushBody->SetAngularVelocity(vWorldAngVel * 0.5f);
 
   mpPushBody->SetCollidePlayer(true);
 

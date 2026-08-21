@@ -2176,13 +2176,21 @@ void cPlayerFlare::SetActive(bool abX)
 		{
 			iGameEntity *pEntity = mpInit->mpMapHandler->GetLatestEntity();
 
-			cVector3f vRot =cMath::MatrixMul(mtxStart.GetRotation(),cVector3f(1,0.3f,0));
+			// Blend the aiming direction with the real hand motion so the
+			// throw strength follows the gesture, not a fixed nudge. Velocity
+			// vectors use the pure direction transform: the full T2W would add
+			// the player's world position to them.
+			TrackedController& hand = VRHelper::DominantHand(mpInit->mpGame);
+			cVector3f vWorldHandVel = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetVelocity());
+			cVector3f vWorldAngVel = mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetAngularVelocity());
 
 			for(int i=0; i< pEntity->GetBodyNum(); ++i)
 			{
 				iPhysicsBody *pBody = pEntity->GetBody(i);
-				pBody->AddImpulse(pCam->GetForward() * 3.0f);
-				pBody->AddTorque(vRot);
+				pBody->SetLinearVelocity(pCam->GetForward() * 2.0f + vWorldHandVel * 1.15f);
+				pBody->SetAngularVelocity(vWorldAngVel * 0.5f);
+				pBody->SetActive(true);
+				pBody->SetEnabled(true);
 			}
 
 			//setup light

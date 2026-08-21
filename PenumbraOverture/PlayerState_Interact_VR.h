@@ -32,8 +32,6 @@ using namespace hpl;
 
 //-----------------------------------------------------------------
 
-#define NUM_THROW_HISTORY_FRAMES 10
-
 class cPlayerState_Grab_VR : public iPlayerState
 {
 public:
@@ -75,11 +73,6 @@ private:
 	ePlayerMoveState mPrevMoveState;
 	ePlayerState mPrevState;
 
-	cSpringVec3 mGrabSpring;
-	cPidControllerVec3 mGrabPid;
-	cSpringVec3 mRotateSpring;
-	cPidControllerVec3 mRotatePid;
-
 	bool mbHasGravity;
 
 	bool mbMoveHand;
@@ -87,41 +80,16 @@ private:
 	float mfGrabDist;
 
 	float mfDefaultMass;
-    float mfOriginalMass;
 
 	bool mbHasPlayerGravityPush;
 
 	bool mbPickAtPoint;
-	bool mbRotateWithPlayer;
-
-	cVector3f mvObjectUp;
-	cVector3f mvObjectRight;
-
-	cVector3f mvCurrentUp;
-	cVector3f mvCurrentUpAxis;
 
 	float mfStartYaw;
 
-	cVector3f mvCurrentDisered;
-
 	float mfSpeedMul;
 
-	float mfYRotation;
-
-	float mfMaxPidForce;
-
-	float mfMinThrowMass;
-	float mfMaxThrowMass;
-
-	float mfMinThrowImpulse;
-	float mfMaxThrowImpulse;
-
-	iFontData *mpFont;
-
   cMatrixf localPickMatrix;
-
-  cMatrixf mmThrowHistory[NUM_THROW_HISTORY_FRAMES];
-  int mlThrowHistoryCnt;
 };
 
 //-----------------------------------------------------------------

@@ -69,8 +69,6 @@ private:
 
 	float mfReloadTime;
 
-	cVector3f mvTorque;
-
 	tString msChargeSound;
 	tString msThrowSound;
 
