@@ -21,8 +21,12 @@ namespace VRHelper {
       ? game->vr_left_hand : game->vr_right_hand;
   }
 
+  // Aim pose of the dominant hand with grip fallback: drivers or bindings
+  // without /pose/aim leave the aim matrix stale, and an identity matrix
+  // would cast the interaction ray from the playspace origin.
   static inline cMatrixf DominantAimMatrix(cGame* game) {
-    return VRHelper::DominantHand(game).GetAimMatrix();
+    TrackedController& hand = DominantHand(game);
+    return hand.IsAimValid() ? hand.GetAimMatrix() : hand.GetMatrix();
   }
 
   static inline TrackedController& OffHand(cGame* game) {

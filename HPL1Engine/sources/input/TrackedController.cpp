@@ -11,6 +11,7 @@ namespace hpl {
 TrackedController::TrackedController()
   : button_state_(false), device_index_(vr::k_unTrackedDeviceIndexInvalid),
     pose_valid_(false), matrix_(cMatrixf::Identity),
+    aim_matrix_(cMatrixf::Identity), aim_valid_(false),
     velocity_(0.0f), angular_velocity_(0.0f) {
 }
 

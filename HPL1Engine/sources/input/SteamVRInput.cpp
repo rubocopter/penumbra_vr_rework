@@ -526,7 +526,15 @@ bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedControl
   }
 
   if (!valid) {
-    hand.SetPoseValid(false);
+    // The aim pose is auxiliary: never invalidate the shared grip pose,
+    // otherwise a missing aim binding would hide the hands and drop the
+    // whole input path to legacy polling.
+    if (!isAim) {
+      hand.SetPoseValid(false);
+      hand.SetAimValid(false);
+    } else {
+      hand.SetAimValid(false);
+    }
     return true;
   }
 
@@ -548,6 +556,7 @@ bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedControl
   if (isAim) {
     hand.SetAimMatrix(
       cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(poseMatrix)));
+    hand.SetAimValid(true);
   } else {
     hand.SetPose(
       cMath::MatrixMul(heightAdd, cMatrixf::FromSteamVRMatrix34(poseMatrix)),

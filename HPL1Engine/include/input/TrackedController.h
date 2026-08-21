@@ -75,6 +75,10 @@ struct HandSummary {
 
     cMatrixf GetAimMatrix() const { return aim_matrix_; }
     void SetAimMatrix(const cMatrixf& matrix);
+    // True while the aim pose action is delivering valid data. When false the
+    // aim matrix is stale and callers must fall back to the grip pose.
+    bool IsAimValid() const { return aim_valid_; }
+    void SetAimValid(bool valid) { aim_valid_ = valid; }
 
     void SetDeviceIndex(vr::TrackedDeviceIndex_t device_index);
     vr::TrackedDeviceIndex_t GetDeviceIndex() const { return device_index_; }
@@ -99,6 +103,7 @@ struct HandSummary {
     bool pose_valid_;
     cMatrixf matrix_;
     cMatrixf aim_matrix_;
+    bool aim_valid_;
     cVector3f velocity_;
     cVector3f angular_velocity_;
     HandSummary hand_summary_;
