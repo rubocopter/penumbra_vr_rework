@@ -13,6 +13,9 @@ legacy .NET Framework).
 
 Fixed after the initial alpha download (included in this package):
 
+- Recenter with the Create button now also works in right-handed mode: the
+  movement input was silently overriding the recenter flag and dropping an
+  idle Create press into the legacy fallback, which has no Create on PS VR2.
 - Interaction ray uses the SteamVR aim pose on every controller profile, with
   automatic grip-pose fallback; a missing aim binding can no longer break hand
   tracking.
@@ -23,6 +26,8 @@ Fixed after the initial alpha download (included in this package):
   anchored at the UI Distance setting instead of glued to the headset.
 - Equipped HUD items no longer render collision-only submeshes; flashlight
   beam origin sits at the lens instead of floating ahead.
+- Easier grabbing: larger hand interaction volume and a firmer held-object
+  feel.
 
 ### What is in this build
 
