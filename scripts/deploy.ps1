@@ -156,6 +156,24 @@ function Resolve-PackageRoot([string]$requestedRoot, [string]$configuration) {
             throw "Package is incomplete; missing '$requiredFile' under $candidate"
         }
     }
+
+    # Guard against deploying a stale package: if any engine or game source
+    # file is newer than the packaged executable, packaging was skipped after
+    # the last build and this deploy would silently ship old code.
+    if ($candidate -like (Join-Path (Split-Path -Parent $PSScriptRoot) 'build*')) {
+        $packagedExe = Get-Item -LiteralPath (Join-Path $candidate 'Penumbra_vr.exe')
+        $sourceRoots = @('PenumbraOverture', 'HPL1Engine') | ForEach-Object {
+            Join-Path (Split-Path -Parent $PSScriptRoot) $_
+        }
+        $newestSource = Get-ChildItem $sourceRoots -Recurse -Include *.cpp, *.hpp, *.h -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if ($newestSource -and $newestSource.LastWriteTime -gt $packagedExe.LastWriteTime) {
+            throw ("Package is stale: '{0}' ({1}) is newer than the packaged exe ({2}). " +
+                   "Run scripts/build.ps1 -Deploy instead of deploy.ps1 alone.") -
+                  $newestSource.Name, $newestSource.LastWriteTime, $packagedExe.LastWriteTime
+        }
+    }
     return $candidate
 }
 

@@ -45,7 +45,7 @@ ButtonState(bool valid = false)
 
 struct HandSummary {
       HandSummary()
-        : grip(0.0f), trigger(0.0f), valid(false) {
+        : grip(0.0f), trigger(0.0f), valid(false), skeletal(false) {
         for (int i = 0; i < vr::VRFinger_Count; ++i) fingerCurl[i] = 0.0f;
       }
 
@@ -53,6 +53,9 @@ struct HandSummary {
       float trigger;
       float fingerCurl[vr::VRFinger_Count];
       bool valid;
+      // True while the summary comes from a skeletal action, so fingerCurl[]
+      // holds measured per-finger curls instead of zeros (legacy devices).
+      bool skeletal;
     };
 
     TrackedController();

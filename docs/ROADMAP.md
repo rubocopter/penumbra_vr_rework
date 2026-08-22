@@ -145,12 +145,42 @@ future comfort, controller-coverage, and rendering work.
 - [x] Assign the bone indices in both rig-construction sites so the first rig of a session also folds correctly.
 - [x] Retune the fold angles and axes from bind geometry (Middle/Ring 17/17/10, Little 30/30/20, Index 17/17/10 for trigger, thumb axis from the bind plane) so fingertips stay near the palm zone; state declared **experimental final** on 18 August 2026 and intentionally frozen for now.
 - [x] Fix the flare `.hud` so the flare renders at the right VR scale/orientation.
+- [x] Re-derive the fold axes and angles from bind geometry after hardware
+  feedback (21 August 2026, `scripts/tune_finger_pose.py`,
+  `scripts/verify_fold_directions.py`): grab angles rise to a fist-like wrap
+  with Middle/Ring/Little all at 60/70/40 (the pinky chain owns ~140 extra
+  web/hypothenar vertices, so any differential fold against Ring sheared that
+  skin toward the ring lane; exact parity keeps it coherent and L-R clearance
+  improves to 0.68), Index trigger 45/55/32, Thumb 75/40. The four fingers
+  share one plain ±Z axis flipped per hand — the left rig is a Y-mirror of
+  the right, so un-flipped axes curled the left fingers into the back of the
+  hand, and diverging anatomical axes stretched the fused Ring/Middle tube
+  into a visible double finger (seam stretch 3.66 -> 0.71). The thumb uses a
+  YZ-tilted per-hand axis sweeping it toward the index zone while descending,
+  and always follows the grip as well because devices without thumb tracking
+  report a constant ~0 thumb curl. Simulated adjacent-finger clearances stay
+  >= the bind-pose baseline. Hardware revalidation pending.
+- [x] Final hardware-feedback pass (22 August 2026): the pinky fold axis is
+  tilted 15 deg out of the shared sagittal plane so its deep curl drifts
+  ~1.2 units away from the Ring lane instead of bunching against it (tip
+  z: -5.15 -> -6.36 at full grip, L-R clearance stays above the bind pose).
+  The thumb pose is frozen at bind: its chain is too short to reach anything
+  meaningful and no sweep direction read as visible bending on hardware, so
+  per user decision it stays static rather than accumulating more
+  speculative patches.
+- [x] Split the two monolithic pose blends into one animation state per finger
+  chain and drive each finger independently (21 August 2026): on skeletal
+  controllers every finger follows its own measured curl; on legacy devices a
+  staggered closing sequence is synthesized from grip/trigger (pinky/ring
+  lead, middle follows, thumb opposes last, index tied to trigger). All
+  weights pass through an exponential smoother (~70 ms) so joints move with
+  slight inertia instead of snapping.
 
-Status: the hand animation work is frozen as an experimental state, not a
-finished feature, and the current fold state still shows incorrect visual
-behaviours. The final angle set (18 August) has no recorded full
-hardware-validation pass after the retuning; revalidation is expected whenever
-this area is touched again.
+Status: the hand animation work remains experimental. The 22 August 2026
+state (per-hand mirrored ±Z finger axes, pinky tilt, frozen thumb, per-finger
+dynamics) is the accepted stopping point after multiple hardware passes; the
+known mesh limits (fused Ring/Middle tube, short thumb chain) are model
+constraints, not tuning issues.
 
 Hand rig tooling (in `scripts/`):
 
@@ -176,7 +206,7 @@ Known residual issues:
 - Ring/Middle share one fused tube in the source geometry, so their tips cannot spread independently.
 - The Index has a limited free tube between the palm and its first joint, which restricts its clean bend range.
 - The thumb chain is short relative to the palm; its tip does not reach the palm flesh (model limitation).
-- Poses are still basic (grip/trigger blends only); per-finger curl shaping and finer grip profiles are future work.
+- Poses are still basic; per-finger curl shaping landed on 21 August 2026, but finer grip profiles (per-finger fold tables, splay) remain future work.
 
 ## Phase 4 — OpenXR evaluation
 

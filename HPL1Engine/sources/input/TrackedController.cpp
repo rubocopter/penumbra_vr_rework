@@ -165,6 +165,7 @@ TrackedController::ButtonState TrackedController::GetButtonState() {
 
 void TrackedController::SetSkeletonSummary(const float fingerCurl[vr::VRFinger_Count]) {
   hand_summary_.valid = true;
+  hand_summary_.skeletal = true;
   hand_summary_.grip = 0.0f;
   hand_summary_.trigger = 0.0f;
 
@@ -184,6 +185,7 @@ void TrackedController::SetSkeletonSummary(const float fingerCurl[vr::VRFinger_C
 }
 void TrackedController::SetLegacySummary(float grip, float trigger) {
   hand_summary_.valid = true;
+  hand_summary_.skeletal = false;
   if (grip < 0.0f) grip = 0.0f;
   else if (grip > 1.0f) grip = 1.0f;
   if (trigger < 0.0f) trigger = 0.0f;
@@ -195,6 +197,7 @@ void TrackedController::SetLegacySummary(float grip, float trigger) {
 
 void TrackedController::InvalidateHandSummary() {
   hand_summary_.valid = false;
+  hand_summary_.skeletal = false;
   hand_summary_.grip = 0.0f;
   hand_summary_.trigger = 0.0f;
   for (int i = 0; i < vr::VRFinger_Count; ++i) hand_summary_.fingerCurl[i] = 0.0f;

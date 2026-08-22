@@ -75,8 +75,11 @@ iHudModel::iHudModel(ePlayerHandType aType)
 {
 	mType = aType;
 	mState = eHudModelState_Idle;
-	mpHandAnimState[0] = NULL;
-	mpHandAnimState[1] = NULL;
+	for(int i=0; i<kFingerTrackNum; ++i)
+	{
+		mpFingerAnimState[i] = NULL;
+		mfFingerWeight[i] = 0.0f;
+	}
 	mbHandRigSetup = false;
 	mlHandIndex = 0;
 }
@@ -185,36 +188,38 @@ void iHudModel::SetupHandAnimation()
 		Log(" [hand-rig] %s: boneState[%d]='%s'\n", sHand, i, pBone->GetName());
 	}
 
-	//Own rotation per joint in degrees. Grab: middle/ring/little/thumb.
-	//Trigger: index. (Cumulative: Middle/Ring 70/140/175, Little 55/110/150,
-	//Index 55/110/155, Thumb 130/220. The grab angles were re-tuned for the
-	//grip=1 fold capped so the fingertips stay near the palm zone instead of
-	//~10 units below it (VR probe 2026-08-17: y=-10.2 at grip 0.7 with
-	//70/70/35; 17/17/10 gives y~-3.5, near the inner palm face at y~-2.2).
-	//M1/M2 are the long segments (6.75/4.54 u) and drive the drop; M3's lever
-	//is 0.81 u. Little reduced from 55/55/40 to 30/30/20: with 55/55/40 its
-	//tip crossed the ring base line (z=-0.93) into the ring zone by grip
-	//~0.55; 30/30/20 keeps it in the pinky zone (z>=-1.3 at grip 0.7) with a
-	//shallow curl toward the palm edge.
+	//Own rotation per joint in degrees (per-joint deltas; they accumulate
+	//down each chain). Grab: middle/ring/little/thumb. Trigger: index.
+	//Re-tuned 21 August 2026 (tune_finger_pose.py, engine-exact skinning):
+	//- Angles rise from the old capped 17/17/10 set (tips barely moved,
+	//  user-reported "poco agarre") to a fist-like wrap: Middle/Ring
+	//  60/70/40 (170 deg total), Little 50/60/35, Index 45/55/32. Simulated
+	//  adjacent-finger clearances stay >= the bind-pose baseline (Ring/
+	//  Middle tubes are fused and only 0.09 apart at rest).
+	//- Fold directions live in the axis block below: plain +/-Z for the
+	//  four fingers (flipped per hand), YZ-tilted per-hand axis for the
+	//  thumb.
 	static const float kfGrabAngles[lHandBoneNum] = {
-		17,17,10,	//Middle
-		17,17,10,	//Ring
-		30,30,20,	//Little
+		60,70,40,	//Middle
+		60,70,40,	//Ring
+		60,70,40,	//Little: exact Ring/Middle parity - the pinky chain owns
+					//~140 extra web/hypothenar vertices, and any differential
+					//fold against Ring sheared that skin toward the ring lane.
+					//Identical transforms keep the fused skin coherent; its
+					//fold axis below additionally steers the deep curl away
+					//from the Ring lane (tips bunching read as contortion).
 		0,0,0,		//Index
-		130,90,0	//Thumb
+		0,0,0		//Thumb frozen at bind pose: the chain is too short to reach
+					//anything meaningful, every sweep tried read as invisible
+					//(user-confirmed), so per user decision it stays static.
 	};
 	static const float kfTriggerAngles[lHandBoneNum] = {
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
-		17,17,10,	//Index
+		45,55,32,	//Index
 		0,0,0		//Thumb
 	};
-	//Index trigger folded with the same 17/17/10 discipline as the grab
-	//fingers: the old 55/55/45 (155 deg) plunged the tip ~7 units below the
-	//palm face at real grips (y=-7.1 at grip 0.7; face at its z is -2.6).
-	//Its (0,0,-1) axis is already within 1.9 deg of the anatomical vertical
-	//axis of the index chain, so only the amount changed.
 
 	int lBoneIdx[lHandBoneNum];
 	for(int i=0; i<lHandBoneNum; ++i)
@@ -231,50 +236,68 @@ void iHudModel::SetupHandAnimation()
 	}
 
 	const bool bLeft = (mlHandIndex == 0);
-	cVector3f vFingerAxis = cVector3f(0,0, bLeft ? 1.0f : -1.0f);
-	//Thumb axis derived from the bind geometry (plane through the thumb chain
-	//and the palm centre): the old (0,0.982,0.187) folded in a nearly
-	//horizontal plane, sweeping the short 3.5 u chain backwards at the hand
-	//edge (tip y ~ -1.0, visually barely moving despite the 130/90 rotations);
-	//the new plane sweeps the tip across toward the index at the palm's height
-	//(y ~ -1.8). The chain is still too short to reach the palm flesh (model
-	//limitation, not an angle issue). The little finger curls into the palm
-	//with a 60 deg tilt (a plain finger axis would fold it straight down,
-	//beside the ring finger, outside the palm).
-	cVector3f vThumbAxis = cVector3f(0.065f, 0.9970f, bLeft ? 0.0460f : -0.0460f);
-	cVector3f vPinkyAxis = cVector3f(0, -0.8660f, bLeft ? 0.5000f : -0.5000f);
+	//Fold directions re-derived after hardware feedback (21 August 2026,
+	//scripts/verify_fold_directions.py):
+	//- The left rig is a Y-mirror of the right (palmar flesh median at
+	//  -1.95 vs +1.95 relative to each Palm joint), so EVERY fold axis must
+	//  flip its X/Z sign on the left hand or the fingers curl into the back
+	//  of the hand instead of the palm.
+	//- Middle/Ring/Little/Index share one plain +/-Z axis. Their anatomical
+	//  verticals differ by up to 23 deg, but Ring/Middle share a fused mesh
+	//  tube: curling around diverging axes stretches that seam 3.66 units
+	//  (user-reported "double finger"); the shared axis keeps it at 0.71
+	//  and gives exactly zero lateral drift.
+	//- Pinky axis tilted 15 deg out of the shared sagittal plane so its deep
+	//  curl drifts ~1.2 units away from the Ring lane instead of bunching
+	//  against it (user-reported contortion toward the ring finger).
+	cVector3f vFingerAxis = cVector3f(0, 0, -1.0f * (bLeft ? -1.0f : 1.0f));
+	cVector3f vPinkyAxis = cVector3f(0.0f, 0.2588f, -0.9659f * (bLeft ? -1.0f : 1.0f));
+	//- Thumb axis kept for reference; the thumb pose is frozen at zero angles
+	//  above, so no Thumb track is created and this vector stays unused.
+	cVector3f vThumbAxis = cVector3f(0.0f, 0.94f, -0.342f * (bLeft ? -1.0f : 1.0f));
 
-	static const char* ksPoseNames[] = { "HandGrab", "HandTrigger" };
-	static const float* kfPoseAngles[] = { kfGrabAngles, kfTriggerAngles };
+	//One pose animation per finger chain so each finger can be driven and
+	//smoothed independently instead of moving in lockstep with one blend
+	//weight per hand.
+	static const char* ksPoseNames[kFingerTrackNum] = {
+		"HandMiddle","HandRing","HandLittle","HandIndex","HandThumb"
+	};
+	static const int klChainStart[kFingerTrackNum] = { 0,3,6,9,12 };
+	static const float* kpChainAngles[kFingerTrackNum] = {
+		kfGrabAngles,kfGrabAngles,kfGrabAngles,kfTriggerAngles,kfGrabAngles
+	};
 
-	for(int p=0; p<2; ++p)
+	for(int f=0; f<kFingerTrackNum; ++f)
 	{
-		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[p], "") );
+		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[f], "") );
 		pAnim->SetLength(0.001f);
 
-		for(int i=0; i<lHandBoneNum; ++i)
+		for(int j=0; j<3; ++j)
 		{
-			if(kfPoseAngles[p][i] == 0.0f) continue;
+			int i = klChainStart[f] + j;
+			if(kpChainAngles[f][i] == 0.0f) continue;
 
 			cAnimationTrack *pTrack = pAnim->CreateTrack(ksHandBoneNames[i], eAnimTransformFlag_Rotate);
 			pTrack->SetNodeIndex(lBoneIdx[i]);
 
 			cKeyFrame *pFrame = pTrack->CreateKeyFrame(0);
-			cVector3f vAxis = (i >= 12) ? vThumbAxis : (i >= 6 && i < 9) ? vPinkyAxis : vFingerAxis;
-			pFrame->rotation = cQuaternion(cMath::ToRad(kfPoseAngles[p][i]), vAxis);
+			cVector3f vAxis = (i >= 12) ? vThumbAxis
+							: (i >= 6 && i < 9) ? vPinkyAxis : vFingerAxis;
+			pFrame->rotation = cQuaternion(cMath::ToRad(kpChainAngles[f][i]), vAxis);
 
 			Log(" [hand-rig] %s: pose=%s finger=%s boneName=%s boneIndex=%d "
 				"axis=(%.4f,%.4f,%.4f) angle=%.1f appliedRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f)\n",
-				sHand, ksPoseNames[p], ksFingerNames[i], ksHandBoneNames[i], lBoneIdx[i],
-				vAxis.x, vAxis.y, vAxis.z, kfPoseAngles[p][i],
+				sHand, ksPoseNames[f], ksFingerNames[i], ksHandBoneNames[i], lBoneIdx[i],
+				vAxis.x, vAxis.y, vAxis.z, kpChainAngles[f][i],
 				pFrame->rotation.w, pFrame->rotation.v.x, pFrame->rotation.v.y, pFrame->rotation.v.z);
 		}
 
-		mpHandAnimState[p] = mpEntity->AddAnimation(pAnim, ksPoseNames[p], 1.0f);
-		mpHandAnimState[p]->SetActive(true);
-		mpHandAnimState[p]->SetLoop(true);
-		mpHandAnimState[p]->SetPaused(true);
-		mpHandAnimState[p]->SetWeight(0.0f);
+		mpFingerAnimState[f] = mpEntity->AddAnimation(pAnim, ksPoseNames[f], 1.0f);
+		mpFingerAnimState[f]->SetActive(true);
+		mpFingerAnimState[f]->SetLoop(true);
+		mpFingerAnimState[f]->SetPaused(true);
+		mpFingerAnimState[f]->SetWeight(0.0f);
+		mfFingerWeight[f] = 0.0f;
 	}
 
 	mbHandRigSetup = true;
@@ -284,26 +307,95 @@ void iHudModel::SetupHandAnimation()
 
 void iHudModel::DestroyHandAnimation()
 {
-	mpHandAnimState[0] = NULL;
-	mpHandAnimState[1] = NULL;
+	for(int i=0; i<kFingerTrackNum; ++i)
+	{
+		mpFingerAnimState[i] = NULL;
+		mfFingerWeight[i] = 0.0f;
+	}
 	mbHandRigSetup = false;
 }
 
 //-----------------------------------------------------------------------
 
-void iHudModel::UpdateHandAnimation()
+//Remap a raw 0..1 input through the [aLead,aFull] closing window of one
+//finger, with an ease-in-out curve. Staggered windows reproduce the natural
+//closing sequence (pinky/ring lead, middle follows, thumb opposes last)
+//instead of every finger folding in lockstep.
+static float CurlFromWindow(float afValue, float afLead, float afFull)
 {
-	if(mpHandAnimState[0] == NULL) return;
+	float fT = (afFull - afLead) > 0.0001f ? (afValue - afLead) / (afFull - afLead) : afValue;
+	fT = cMath::Clamp(fT, 0.0f, 1.0f);
+	return fT * fT * (3.0f - 2.0f * fT);
+}
+
+//Rescale a raw curl through a soft deadzone: devices report a small
+//constant resting curl (hpl.log showed thumb 0.063, index ~0.10 at rest),
+//which would otherwise leave the hands half-curled while open.
+static float CurlDeadzone(float afValue)
+{
+	const float kfDeadzone = 0.08f;
+	if(afValue <= kfDeadzone) return 0.0f;
+	return (afValue - kfDeadzone) / (1.0f - kfDeadzone);
+}
+
+void iHudModel::UpdateHandAnimation(float afTimeStep)
+{
+	if(mpFingerAnimState[0] == NULL || !mbHandRigSetup) return;
 
 	TrackedController &hand = mlHandIndex == 0 ? mpInit->mpGame->vr_left_hand
 											   : mpInit->mpGame->vr_right_hand;
 	const TrackedController::HandSummary &summary = hand.GetHandSummary();
 
-	float fGrip = summary.valid ? summary.grip : 0.0f;
-	float fTrigger = summary.valid ? summary.trigger : 0.0f;
+	//Per-finger target curl, rig chain order: Middle,Ring,Little,Index,Thumb.
+	float afTarget[kFingerTrackNum] = {0,0,0,0,0};
+	float fGrip = 0.0f;
+	float fTrigger = 0.0f;
+	//Set below from the live grip: many devices without true thumb tracking
+	//report a constant ~0 thumb curl, which would otherwise leave the thumb
+	//frozen while the rest of the hand closes.
+	float fThumbFromGrip = 0.0f;
 
-	mpHandAnimState[0]->SetWeight(fGrip);
-	mpHandAnimState[1]->SetWeight(fTrigger);
+	if(summary.valid)
+	{
+		fGrip = summary.grip;
+		fTrigger = summary.trigger;
+		fThumbFromGrip = CurlFromWindow(fGrip, 0.15f, 0.98f);
+
+		if(summary.skeletal)
+		{
+			//Controllers with skeletal input drive every finger directly from
+			//its measured curl (VR finger order: Thumb,Index,Middle,Ring,Pinky).
+			afTarget[0] = CurlDeadzone(summary.fingerCurl[vr::VRFinger_Middle]);
+			afTarget[1] = CurlDeadzone(summary.fingerCurl[vr::VRFinger_Ring]);
+			afTarget[2] = CurlDeadzone(summary.fingerCurl[vr::VRFinger_Pinky]);
+			afTarget[3] = CurlDeadzone(summary.fingerCurl[vr::VRFinger_Index]);
+			afTarget[4] = cMath::Max(CurlDeadzone(summary.fingerCurl[vr::VRFinger_Thumb]),
+									 fThumbFromGrip);
+		}
+		else
+		{
+			//Legacy devices only report a grip/trigger pair: synthesize the
+			//natural closing sequence from staggered windows. The index stays
+			//tied to the trigger exactly like before.
+			afTarget[0] = CurlFromWindow(fGrip,    0.10f, 0.95f); //Middle
+			afTarget[1] = CurlFromWindow(fGrip,    0.05f, 0.88f); //Ring
+			afTarget[2] = CurlFromWindow(fGrip,    0.00f, 0.80f); //Little
+			afTarget[3] = CurlFromWindow(fTrigger, 0.00f, 0.85f); //Index
+			afTarget[4] = fThumbFromGrip;                         //Thumb
+		}
+	}
+
+	//Exponential smoothing toward the targets (~70 ms time constant): removes
+	//sensor jitter and gives the joints a slight inertia without adding
+	//perceptible lag at VR frame rates.
+	float fDt = afTimeStep < 0.0f ? 0.0f : (afTimeStep > 0.1f ? 0.1f : afTimeStep);
+	float fBlend = 1.0f - expf(-fDt / 0.07f);
+
+	for(int f=0; f<kFingerTrackNum; ++f)
+	{
+		mfFingerWeight[f] += (afTarget[f] - mfFingerWeight[f]) * fBlend;
+		mpFingerAnimState[f]->SetWeight(mfFingerWeight[f]);
+	}
 
 	static float sfLastGrip[2] = { -1.0f, -1.0f };
 	static float sfLastTrigger[2] = { -1.0f, -1.0f };
@@ -319,7 +411,8 @@ void iHudModel::UpdateHandAnimation()
 	//already reflect the new weights.
 	if(bGripChanged || bTriggerChanged)
 	{
-		Log(" [hand-rig] %s: grip=%.3f trigger=%.3f\n", sHand, fGrip, fTrigger);
+		Log(" [hand-rig] %s: grip=%.3f trigger=%.3f skeletal=%d\n", sHand, fGrip, fTrigger,
+			summary.valid && summary.skeletal ? 1 : 0);
 		sbLogPending[mlHandIndex] = true;
 	}
 	else if(sbLogPending[mlHandIndex])
@@ -339,7 +432,8 @@ void iHudModel::UpdateHandAnimation()
 			cVector3f vAxis(0,0,0);
 			if(fSin > 0.0001f) vAxis = qRot.v / fSin;
 
-			float fWeight = (i >= 9 && i < 12) ? fTrigger : fGrip;
+			//Bones are laid out in chains of three, matching the track order.
+			float fWeight = mfFingerWeight[i / 3];
 			Log(" [hand-rig] %s: finger=%s boneName=%s boneIndex=%d weight=%.3f "
 				"engineRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f) engineAngle=%.1f engineAxis=(%.4f,%.4f,%.4f)\n",
 				sHand, ksFingerNames[i], ksHandBoneNames[i], mlBoneIdx[i], fWeight,
@@ -568,7 +662,7 @@ void cPlayerHands::Update(float afTimeStep)
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
 
-    pHudModel->UpdateHandAnimation();
+    pHudModel->UpdateHandAnimation(afTimeStep);
 
 		// Call per-model update for things like throw velocity tracking
 		pHudModel->Update(afTimeStep);

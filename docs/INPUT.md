@@ -295,6 +295,8 @@ SteamVR for the *device* skeletal summary and turns the per-finger curl values
 
 The summary lives on the tracked-hand state beside the pose (validity,
 velocity, and button data), so gameplay code never touches SteamVR directly.
+It also retains the raw per-finger curls (plus a `skeletal` flag) so hand
+rendering can drive every finger individually on devices that measure them.
 
 Start the game and check `hpl.log` for lines like
 `[VR hand +...ms] L grip 0.00 trigger 0.00 (skeleton).`, which are printed for
@@ -312,16 +314,36 @@ summary stays invalid and the hands keep their previous open pose. On the
 legacy polling path the summary is instead derived from the button state:
 grip becomes binary (0/1) while the trigger keeps its analog margin.
 
-The game-side hand animation consumes only these two values. At rig setup
-`PlayerHands.cpp` builds two rotation-only pose tracks per hand (HandGrab and
-HandTrigger, one keyframe per bone with the tuned angles and axes) and each
-frame blends their weights by the grip and trigger values. The hands are
-experimental: the joints, angles, and axes were retuned from bind geometry in
-August 2026 and are intentionally frozen for now. Known limitations: the ring
-and middle fingers share a fused mesh tube, the index has a limited free tube,
-and the thumb chain is too short to reach the palm flesh. The `[hand-rig]` log
-lines report the bone indices, axes, angles, and engine rotations at rig setup
-and after every weight change, which helps diagnose fold problems.
+The game-side hand animation builds one rotation-only pose track per finger
+chain at rig setup (`PlayerHands.cpp`: HandMiddle, HandRing, HandLittle,
+HandIndex, HandThumb, one keyframe per bone with the tuned angles and axes)
+and each frame drives every finger's blend weight independently:
+
+- **Skeletal controllers** (PS VR2 Sense, Index, Touch): each finger follows
+  its own measured curl from the device summary, so individual fingers can
+  move separately.
+- **Legacy devices** (Vive wands, WMR polling fallback): only a grip/trigger
+  pair exists, so the closing sequence is synthesized with staggered windows —
+  pinky starts first, then ring, then middle, and the thumb opposes last;
+  the index stays tied to the trigger. Each window applies an ease-in-out
+  curve so fingers accelerate mid-curl instead of folding linearly.
+
+All weights pass through an exponential smoother (~70 ms time constant) that
+removes sensor jitter and gives the joints slight inertia. The hands remain
+experimental: after hardware feedback on 21 August 2026 the fold directions
+were corrected with `scripts/verify_fold_directions.py` — the left rig is a
+Y-mirror of the right, so every fold axis flips its X/Z sign per hand; the
+four fingers share one plain ±Z axis (curling around diverging anatomical
+axes stretched the fused Ring/Middle mesh tube into a visible double finger),
+and the thumb uses a YZ-tilted per-hand axis that sweeps it toward the index
+zone. The grab wrap reaches 170 deg total per finger. The thumb also always
+follows the grip: many devices report a constant ~0 thumb curl, which would
+otherwise leave it frozen while the rest of the hand closes. Known
+limitations: the ring and middle fingers share a fused mesh tube, the index
+has a limited free tube, and the thumb chain is too short to reach the palm
+flesh. The `[hand-rig]` log lines report the bone indices, axes, angles, and
+engine rotations at rig setup, plus grip/trigger values and per-finger
+weights after every change, which helps diagnose fold problems.
 
 ## HTC Vive compatibility defaults
 

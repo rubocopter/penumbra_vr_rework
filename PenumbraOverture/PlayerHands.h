@@ -117,7 +117,7 @@ public:
     mlHandIndex = handIndex;
   }
 
-  void UpdateHandAnimation();
+  void UpdateHandAnimation(float afTimeStep);
 
 protected:
 	virtual void ResetExtraData()=0;
@@ -145,7 +145,12 @@ protected:
 
   int mlHandIndex;
 
-  cAnimationState *mpHandAnimState[2];
+  //One animation state per finger chain (order matches the bone table:
+  //Middle, Ring, Little, Index, Thumb) so every finger follows its own
+  //curl value with independent timing and smoothing.
+  static const int kFingerTrackNum = 5;
+  cAnimationState *mpFingerAnimState[kFingerTrackNum];
+  float mfFingerWeight[kFingerTrackNum];
   int mlBoneIdx[15];
   bool mbHandRigSetup;
 };
