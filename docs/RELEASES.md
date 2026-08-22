@@ -1,5 +1,46 @@
 # Releases
 
+## v0.1.0-alpha.2 — 22 August 2026
+
+Natural hand animation and aiming polish. The same experimental caveats as
+alpha.1 apply, and PS VR2 Sense remains the only hardware-validated
+controller family.
+
+### New since v0.1.0-alpha.1
+
+- Per-finger hand animation driven by the SteamVR skeletal summary: on PS VR2
+  Sense, Valve Index, and Touch controllers every finger follows its own
+  measured curl, so fingers move independently instead of folding in
+  lockstep with one blend weight per hand.
+- Devices without skeletal input synthesize a natural closing sequence from
+  grip/trigger: pinky and ring start first, middle follows, index stays tied
+  to the trigger.
+- All finger weights pass through an exponential smoother (~70 ms) with a
+  soft deadzone: hands rest fully open and the joints move with slight
+  inertia instead of snapping or jittering.
+- Fold axes corrected per hand. The left rig is a Y-mirror of the right, so
+  un-flipped axes curled the left fingers into the back of the hand instead
+  of toward the palm.
+- One plain ±Z fold axis shared by the four fingers removes the widened
+  double middle finger caused by curling around diverging anatomical axes
+  while Ring/Middle share one fused mesh tube.
+- The pinky folds at exact Middle/Ring parity with its axis tilted 15 deg
+  away from the ring lane, removing the pinky-toward-ring contortion.
+- The thumb is frozen at bind pose by decision: its rig chain is too short to
+  reach anything meaningful and no sweep direction read as visible bending on
+  hardware.
+- The interaction laser of both hands uses the SteamVR aim pose with
+  automatic grip-pose fallback when a driver does not provide `/pose/aim`.
+
+### Known limitations (hands)
+
+- Ring/Middle share one fused tube in the source mesh, so their tips cannot
+  spread independently; the thumb chain is too short to reach the palm flesh,
+  so it stays static during grips.
+- Legacy devices (Vive wands, WMR polling fallback) have no per-finger input:
+  hands follow the synthesized grip sequence only.
+- The full alpha.1 limitations below still apply.
+
 ## v0.1.0-alpha.1 — 20 August 2026
 
 Experimental public alpha. The full game is playable in VR, but this is not a
