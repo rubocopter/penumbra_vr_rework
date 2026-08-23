@@ -88,6 +88,8 @@ private:
 
   bool mbDrawingFader;
 
+  void AnchorMessageToRoom();
+
 	tGameMessageList mlstMessages;
 };
 

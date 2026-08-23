@@ -18,6 +18,10 @@
   SteamVR flagging every action origin inactive in short bursts; the previous
   single-frame fallback swallowed held inputs and left movement dead on
   controllers whose sticks do not assert the legacy touch bit.
+- Game messages re-anchor themselves in room space when another UI surface
+  (inventory, notebook, numerical panel) closes and resets the shared UI
+  state. Previously, closing the inventory during a tutorial message made the
+  remaining text follow the player's head.
 
 ## v0.1.0-alpha.2 — 22 August 2026
 

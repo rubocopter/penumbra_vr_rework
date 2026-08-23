@@ -147,6 +147,7 @@ namespace hpl {
       mVRMenuState = menuState;
       mVRMenuTransform = mat;
     };
+    VR_MenuState GetVRMenuState() const { return mVRMenuState; }
 
 	private:
     VR_MenuState mVRMenuState;

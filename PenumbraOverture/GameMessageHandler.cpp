@@ -153,39 +153,42 @@ void cGameMessageHandler::Add(const tWString& asText)
 
 		pMess->mbActive = true;
 
-    {
-      auto scene = mpInit->mpGame->GetScene();
-
-      cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
-      auto centerPos = pCamera3D->GetPosition();
-
-      // Respect the user's UI distance so examine/message text is readable
-      // instead of glued to the headset.
-      float fDistance = mpInit->mVRSettings.GetUIDistance();
-      cVector3f uiPos = centerPos + pCamera3D->GetViewMatrix().GetRotation().GetForward() * -fDistance;
-
-      auto translateMat = cMath::MatrixTranslate(uiPos);
-      auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
-
-      // Move the UI in front of the player's eyes
-      cMatrixf transMat = cMatrixf::Identity;
-
-      // Translate to center of vision
-      auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
-      transMat = cMath::MatrixMul(centerTranslationMat, transMat);
-
-      // Scale it down
-      transMat = cMath::MatrixMul(scaleMat, transMat);
-
-      // Rotate to face eyes
-      transMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), transMat);
-
-      // Translate in front of eyes
-      transMat = cMath::MatrixMul(translateMat, transMat);
-
-      scene->SetVRMenuState(MenuState_WorldPosition, transMat);
-    }
+    AnchorMessageToRoom();
 	}
+}
+
+void cGameMessageHandler::AnchorMessageToRoom()
+{
+  auto scene = mpInit->mpGame->GetScene();
+
+  cCamera3D* pCamera3D = static_cast<cCamera3D*>(scene->GetCamera());
+  auto centerPos = pCamera3D->GetPosition();
+
+  // Respect the user's UI distance so examine/message text is readable
+  // instead of glued to the headset.
+  float fDistance = mpInit->mVRSettings.GetUIDistance();
+  cVector3f uiPos = centerPos + pCamera3D->GetViewMatrix().GetRotation().GetForward() * -fDistance;
+
+  auto translateMat = cMath::MatrixTranslate(uiPos);
+  auto scaleMat = cMath::MatrixScale(cVector3f(1.0f / 750.0f, -1.0f / 750.0f, 1.0f / 750.0f));
+
+  // Move the UI in front of the player's eyes
+  cMatrixf transMat = cMatrixf::Identity;
+
+  // Translate to center of vision
+  auto centerTranslationMat = cMath::MatrixTranslate(cVector3f(-400.0f, -200.0f, 0.0f));
+  transMat = cMath::MatrixMul(centerTranslationMat, transMat);
+
+  // Scale it down
+  transMat = cMath::MatrixMul(scaleMat, transMat);
+
+  // Rotate to face eyes
+  transMat = cMath::MatrixMul(cMath::MatrixInverse(pCamera3D->GetViewMatrix().GetRotation()), transMat);
+
+  // Translate in front of eyes
+  transMat = cMath::MatrixMul(translateMat, transMat);
+
+  scene->SetVRMenuState(MenuState_WorldPosition, transMat);
 }
 
 //-----------------------------------------------------------------------
@@ -302,6 +305,15 @@ void cGameMessageHandler::Update(float afTimeStep)
 			++it;
 		}
 	}
+
+  // Closing the inventory, notebook, or numerical panel resets the shared UI
+  // surface to facelock. If a message is still showing, re-anchor it in room
+  // space so the remaining text does not follow the player's head.
+  if (mlstMessages.empty() == false &&
+    mpInit->mpGame->GetScene()->GetVRMenuState() == MenuState_Facelock)
+  {
+    AnchorMessageToRoom();
+  }
 }
 
 //-----------------------------------------------------------------------
