@@ -1,6 +1,12 @@
 # Releases
 
-## Unreleased
+## v0.1.0-alpha.3 — 23 August 2026
+
+Controller coverage and input resilience fixes driven by the first external
+Valve Index tester report. The same experimental caveats as earlier alphas
+apply, and PS VR2 Sense remains the only hardware-validated controller family.
+
+### New since v0.1.0-alpha.2
 
 - Controller diagnostics in `hpl.log`: the detected headset driver and both
   controller types are recorded at startup, together with whether each type
@@ -22,6 +28,12 @@
   (inventory, notebook, numerical panel) closes and resets the shared UI
   state. Previously, closing the inventory during a tutorial message made the
   remaining text follow the player's head.
+
+### What to test
+
+Index, Touch, Pico, and WMR owners: check `hpl.log` for the new
+`[VR input]` controller-type lines, confirm thumbstick movement works after
+opening and closing menus, and retest the cases that felt partial before.
 
 ## v0.1.0-alpha.2 — 22 August 2026
 
