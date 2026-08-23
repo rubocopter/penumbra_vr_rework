@@ -13,6 +13,11 @@
   (Pico 4/Ultra and Neo 3 through SteamVR bridges, mirroring the Touch layout)
   and `holographic_controller` (the WMR identifier many SteamVR drivers report,
   sharing the existing WMR scheme).
+- SteamVR Input dropouts are now bridged for 500 ms with the last known input
+  state before falling back to legacy polling. An Index tester session showed
+  SteamVR flagging every action origin inactive in short bursts; the previous
+  single-frame fallback swallowed held inputs and left movement dead on
+  controllers whose sticks do not assert the legacy touch bit.
 
 ## v0.1.0-alpha.2 — 22 August 2026
 

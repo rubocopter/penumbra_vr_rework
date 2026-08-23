@@ -480,7 +480,7 @@ Streaming Assistant.
 On Windows, inspect `Documents/Penumbra Overture/Episode1/hpl.log` after closing the game. It reports one of these paths:
 
 - `SteamVR Input actions are active.` means the action manifest and controller binding are in use.
-- `Falling back to legacy controller polling.` means SteamVR Input could not provide active actions and the historical input path is being used.
+- `Falling back to legacy controller polling.` means SteamVR Input reported every action origin inactive for over half a second (SteamVR occasionally refreshes bindings this way) and the historical input path is being used. Single-frame dropouts are bridged with the last known state instead of dropping input.
 
 At startup (and briefly after, while SteamVR finishes enumerating devices) the log also records the detected hardware profile:
 

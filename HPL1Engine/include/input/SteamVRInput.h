@@ -95,6 +95,7 @@ namespace hpl {
     cVRButtonState ReadDigital(vr::VRActionHandle_t handle) const;
     AnalogState ReadAnalog(vr::VRActionHandle_t handle) const;
     void SuppressDigitalEdges(cVRButtonState& state) const;
+    void SuppressAllEdges(cVRInputState& state) const;
     void ApplyMoveDeadZone(float& x, float& y) const;
     tString FindManifestPath() const;
     // Mirrored action sets (/actions/gameplay_left, /actions/ui_left) carry the
@@ -181,6 +182,7 @@ namespace hpl {
     bool mbProfilesIdentified;
     unsigned long mlNextProfileAttempt;
     unsigned int mlProfileAttempts;
+    unsigned long mlActionsIdleSince;
   };
 }
 

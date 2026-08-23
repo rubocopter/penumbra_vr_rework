@@ -66,7 +66,8 @@ namespace hpl {
       mlLastSkeletonErrorLog(0),
       mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
       mbSkeletonFallbackReported(false),
-      mbProfilesIdentified(false), mlNextProfileAttempt(0), mlProfileAttempts(0) {
+      mbProfilesIdentified(false), mlNextProfileAttempt(0), mlProfileAttempts(0),
+      mlActionsIdleSince(0) {
   }
 
   bool cSteamVRInput::Initialize() {
@@ -297,25 +298,47 @@ namespace hpl {
         nextState.uiDrag.active || nextState.uiBack.active || nextState.uiClose.active;
     }
 
-    if (!anyActionActive) {
-      if (!mbFallbackReported) {
-        Log(" SteamVR Input actions became inactive. Falling back to legacy controller polling.\n");
-        mbFallbackReported = true;
+    if (anyActionActive) {
+      if (!mbUsingActions) {
+        Log(" SteamVR Input actions are active.\n");
       }
-      mbUsingActions = false;
+      mbUsingActions = true;
+      mbFallbackReported = false;
+      mbHasActiveContext = true;
+      mActiveContext = context;
+      mActiveHandedness = mHandedness;
+      mState = nextState;
+      mlActionsIdleSince = 0;
+      return true;
+    }
+
+    // SteamVR intermittently reports every action origin as inactive for a
+    // handful of frames while it refreshes bindings or re-evaluates devices
+    // (observed on PS VR2 and Index). Dropping to legacy polling on the first
+    // idle frame swallowed held inputs and, on controllers whose sticks do not
+    // assert the legacy touch bit, dead-ended movement for whole minutes.
+    // Hold the last good state through a short grace window before falling back.
+    const unsigned long now = GetApplicationTime();
+    if (mlActionsIdleSince == 0) {
+      mlActionsIdleSince = now;
+    }
+
+    if (!mbUsingActions || now - mlActionsIdleSince < 500) {
+      if (mbUsingActions) {
+        mState = previousState;
+        SuppressAllEdges(mState);
+        return true;
+      }
       return false;
     }
 
-    if (!mbUsingActions) {
-      Log(" SteamVR Input actions are active.\n");
+    if (!mbFallbackReported) {
+      Log(" SteamVR Input actions became inactive. Falling back to legacy controller polling.\n");
+      mbFallbackReported = true;
     }
-    mbUsingActions = true;
-    mbFallbackReported = false;
-    mbHasActiveContext = true;
-    mActiveContext = context;
-    mActiveHandedness = mHandedness;
-    mState = nextState;
-    return true;
+    mbUsingActions = false;
+    mlActionsIdleSince = 0;
+    return false;
   }
 
   vr::VRActionHandle_t cSteamVRInput::ActionFor(vr::VRActionHandle_t rightAction,
@@ -735,6 +758,24 @@ bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedControl
   void cSteamVRInput::SuppressDigitalEdges(cVRButtonState& state) const {
     state.justPressed = false;
     state.justReleased = false;
+  }
+
+  void cSteamVRInput::SuppressAllEdges(cVRInputState& state) const {
+    SuppressDigitalEdges(state.sprint);
+    SuppressDigitalEdges(state.interact);
+    SuppressDigitalEdges(state.examine);
+    SuppressDigitalEdges(state.holster);
+    SuppressDigitalEdges(state.inventory);
+    SuppressDigitalEdges(state.notebook);
+    SuppressDigitalEdges(state.quickLight);
+    SuppressDigitalEdges(state.jump);
+    SuppressDigitalEdges(state.crouch);
+    SuppressDigitalEdges(state.pause);
+    SuppressDigitalEdges(state.recenter);
+    SuppressDigitalEdges(state.uiSelect);
+    SuppressDigitalEdges(state.uiDrag);
+    SuppressDigitalEdges(state.uiBack);
+    SuppressDigitalEdges(state.uiClose);
   }
 
   void cSteamVRInput::ApplyMoveDeadZone(float& x, float& y) const {
