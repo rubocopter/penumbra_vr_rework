@@ -1,6 +1,8 @@
 #include "input/TrackedController.h"
 #include "game\Game.h"
 
+#include <math.h>
+
 using namespace hpl;
 using namespace vr;
 
@@ -13,6 +15,7 @@ TrackedController::TrackedController()
     pose_valid_(false), matrix_(cMatrixf::Identity),
     aim_matrix_(cMatrixf::Identity), aim_valid_(false),
     velocity_(0.0f), angular_velocity_(0.0f) {
+  for (int i = 0; i < vr::k_unControllerStateAxisCount; ++i) axis_max_abs_y_[i] = 0.0f;
 }
 
 TrackedController::~TrackedController() {
@@ -95,6 +98,11 @@ void TrackedController::UpdateButtonState() {
 
   button_state_.valid_ = true;
 
+  for (int axis = 0; axis < vr::k_unControllerStateAxisCount; ++axis) {
+    const float absY = fabsf(state.rAxis[axis].y);
+    if (absY > axis_max_abs_y_[axis]) axis_max_abs_y_[axis] = absY;
+  }
+
   // Grip button
   button_state_.gripJustPressed = false;
   button_state_.gripJustReleased = false;
@@ -120,9 +128,33 @@ void TrackedController::UpdateButtonState() {
   // Pad touched
   button_state_.touchContact = (state.ulButtonTouched & (1ULL << ((int)k_EButton_SteamVR_Touchpad))) > 0;
 
-  // Touchpad coordinates
-  button_state_.touchX = state.rAxis[0].x;
-  button_state_.touchY = state.rAxis[0].y;
+  // Stick/trackpad coordinates. Devices place their primary analog stick on
+  // different legacy axis slots (Vive/Knuckles/Touch: axis 0, WMR thumbstick:
+  // axis 1), while trigger-margin axes only ever report x. An axis qualifies
+  // as a stick once it has shown vertical deflection, so trigger values can
+  // never hijack movement.
+  int stickAxis = -1;
+  float stickMagnitude = 0.0f;
+  for (int axis = 0; axis < vr::k_unControllerStateAxisCount; ++axis) {
+    const bool stickCapable = axis == 0 || axis_max_abs_y_[axis] > 0.15f;
+    if (!stickCapable) continue;
+    const float x = state.rAxis[axis].x;
+    const float y = state.rAxis[axis].y;
+    const float magnitude = sqrtf(x * x + y * y);
+    if (magnitude > stickMagnitude) {
+      stickMagnitude = magnitude;
+      stickAxis = axis;
+    }
+  }
+  if (stickAxis < 0) stickAxis = 0;
+
+  button_state_.touchX = state.rAxis[stickAxis].x;
+  button_state_.touchY = state.rAxis[stickAxis].y;
+
+  // Controllers without a physical touch report (Index joystick, WMR pads)
+  // never set the touched bit; count a real deflection as contact so the
+  // legacy movement path stays usable.
+  if (stickMagnitude > 0.15f) button_state_.touchContact = true;
 
   // Trigger button
   button_state_.triggerJustPressed = false;

@@ -110,5 +110,6 @@ struct HandSummary {
     cVector3f velocity_;
     cVector3f angular_velocity_;
     HandSummary hand_summary_;
+    float axis_max_abs_y_[vr::k_unControllerStateAxisCount];
   };
 }

@@ -38,7 +38,7 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs') -Destination $packageR
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\deploy.ps1') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.ps1')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\Install-PenumbraVR.bat') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.bat')
 
-foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat', 'config\English.lang', 'config\Espanol.lang', 'docs\INPUT.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json', 'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json')) {
+foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat', 'config\English.lang', 'config\Espanol.lang', 'docs\INPUT.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json', 'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json', 'vr\bindings\pico4_controller.json', 'vr\bindings\pico_neo3_controller.json', 'vr\bindings\holographic_controller.json')) {
     $packagedPath = Join-Path $packageRoot $requiredPath
     if (-not (Test-Path -LiteralPath $packagedPath)) {
         throw "Required package entry was not created: $packagedPath"

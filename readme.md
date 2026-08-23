@@ -34,8 +34,8 @@ Please test it and report problems through the GitHub issue tracker
 
 PS VR2 (SteamVR on PC) is the primary development platform. The bundled
 bindings for other controllers (HTC Vive, Valve Index, Meta Quest/Oculus
-Touch, Windows Mixed Reality) are included as default profiles but have not
-been hardware-tested by this project.
+Touch, Pico 4/Neo 3, Windows Mixed Reality) are included as default profiles
+but have not been hardware-tested by this project.
 
 Implemented so far:
 

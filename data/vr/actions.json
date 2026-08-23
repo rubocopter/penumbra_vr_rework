@@ -213,8 +213,20 @@
       "binding_url": "bindings/oculus_touch.json"
     },
     {
+      "controller_type": "pico4_controller",
+      "binding_url": "bindings/pico4_controller.json"
+    },
+    {
+      "controller_type": "pico_neo3_controller",
+      "binding_url": "bindings/pico_neo3_controller.json"
+    },
+    {
       "controller_type": "microsoft/motion_controller",
       "binding_url": "bindings/microsoft_motion_controller.json"
+    },
+    {
+      "controller_type": "holographic_controller",
+      "binding_url": "bindings/holographic_controller.json"
     }
   ],
   "localization": [

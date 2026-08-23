@@ -174,7 +174,8 @@ experimental final and should be treated as such until it is reworked.
 | HTC Vive | Compatibility profile retained | Historical layout is represented in SteamVR Input but this rework has not yet been retested on Vive hardware |
 | Valve Index | Bundled default profile, not yet hardware-validated | `knuckles` profile follows the PS VR2 scheme; recenter and pause stay on the left trackpad and left system button in both handedness modes |
 | Meta Quest / Oculus Touch | Bundled default profile, not yet hardware-validated | `oculus_touch` profile follows the PS VR2 scheme; recenter is left unassigned for SteamVR mapping |
-| Windows Mixed Reality | Bundled default profile, not yet hardware-validated | `microsoft/motion_controller` profile keeps the WMR trackpads for pause and recenter |
+| Pico 4 / Neo 3 | Bundled default profile, not yet hardware-validated | `pico4_controller` and `pico_neo3_controller` mirror the Touch layout for SteamVR streaming bridges |
+| Windows Mixed Reality | Bundled default profile, not yet hardware-validated | `microsoft/motion_controller` and `holographic_controller` profiles keep the WMR trackpads for pause and recenter |
 
 Every bundled profile must cover the mandatory actions (move, interact, and UI
 select) or the project validation fails. Custom bindings created in SteamVR
@@ -432,8 +433,11 @@ so the recenter action is left unassigned; it can be mapped through SteamVR.
 
 ## Windows Mixed Reality defaults
 
-The bundled `microsoft/motion_controller` profile uses the WMR joysticks as the
-primary movement inputs and keeps the trackpads for secondary functions. The
+The bundled `microsoft/motion_controller` and `holographic_controller`
+profiles are identical: SteamVR drivers report WMR controllers under either
+identifier depending on version, so both entries resolve to the same control
+scheme. The profiles use the WMR joysticks as the
+primary movement inputs and keep the trackpads for secondary functions. The
 left trackpad click recenters the view and the right trackpad click pauses in
 both handedness modes.
 
@@ -463,12 +467,26 @@ both handedness modes.
 | Right menu | Go back; in inventory, open an item's actions |
 | Right grip or Left menu | Close the current screen |
 
+## Pico defaults
+
+The `pico4_controller` (Pico 4, Pico 4 Ultra) and `pico_neo3_controller`
+(Pico Neo 3) profiles mirror the Touch layout because Pico controllers
+connected to SteamVR expose the same joystick, trigger, and grip controls.
+They are reached through SteamVR streaming bridges such as Pico Connect or
+Streaming Assistant.
+
 ## Runtime diagnostics
 
 On Windows, inspect `Documents/Penumbra Overture/Episode1/hpl.log` after closing the game. It reports one of these paths:
 
 - `SteamVR Input actions are active.` means the action manifest and controller binding are in use.
 - `Falling back to legacy controller polling.` means SteamVR Input could not provide active actions and the historical input path is being used.
+
+At startup (and briefly after, while SteamVR finishes enumerating devices) the log also records the detected hardware profile:
+
+- `[VR input] left hand controller type 'knuckles' matches bundled default profile 'bindings/knuckles.json'.` confirms that the connected controller is covered by one of the shipped default bindings.
+- `WARNING [VR input]: ... has no bundled default profile in actions.json.` means the controller model is unknown to the mod: SteamVR applies its generic binding, unmatched actions drop to legacy polling, and controls may feel partial. If you see this line, please report it along with your `hpl.log` — new default profiles are data-only additions.
+- `[VR input] legacy fallback movement` note: when the fallback path is active, movement reads the strongest qualifying analog axis, so joysticks without touch events (Index, WMR thumbstick on axis 1) also drive movement.
 
 Controller poses use the logical left/right SteamVR pose actions, with the
 existing OpenVR tracked-device role loop retained as a compatibility fallback.

@@ -28,6 +28,9 @@ $requiredPaths = @(
     'data\vr\bindings\knuckles.json',
     'data\vr\bindings\oculus_touch.json',
     'data\vr\bindings\microsoft_motion_controller.json',
+    'data\vr\bindings\pico4_controller.json',
+    'data\vr\bindings\pico_neo3_controller.json',
+    'data\vr\bindings\holographic_controller.json',
     'docs\INPUT_ARCHITECTURE.md',
     'scripts\deploy.ps1'
 )
@@ -501,7 +504,7 @@ foreach ($defaultBinding in $actionManifest.default_bindings) {
         }
     }
 
-    $skeletalControllerTypes = @('playstation_vr2_sense', 'knuckles', 'oculus_touch')
+    $skeletalControllerTypes = @('playstation_vr2_sense', 'knuckles', 'oculus_touch', 'pico4_controller', 'pico_neo3_controller')
     if ($defaultBinding.controller_type -in $skeletalControllerTypes) {
         $skeletonOutputs = @($binding.bindings.PSObject.Properties | ForEach-Object { $_.Value.skeleton } |
             ForEach-Object { if ($null -ne $_) { $_.output } })

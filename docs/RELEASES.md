@@ -1,5 +1,19 @@
 # Releases
 
+## Unreleased
+
+- Controller diagnostics in `hpl.log`: the detected headset driver and both
+  controller types are recorded at startup, together with whether each type
+  matches a bundled default profile. Unmatched types log an explicit warning
+  instead of failing silently.
+- The legacy polling fallback now drives movement from the strongest
+  qualifying analog axis, so joystick-only devices (Valve Index, WMR) keep
+  usable movement when no SteamVR action binding is active.
+- New default binding profiles: `pico4_controller` and `pico_neo3_controller`
+  (Pico 4/Ultra and Neo 3 through SteamVR bridges, mirroring the Touch layout)
+  and `holographic_controller` (the WMR identifier many SteamVR drivers report,
+  sharing the existing WMR scheme).
+
 ## v0.1.0-alpha.2 — 22 August 2026
 
 Natural hand animation and aiming polish. The same experimental caveats as

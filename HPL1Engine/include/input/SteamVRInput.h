@@ -86,6 +86,9 @@ namespace hpl {
 
     bool ResolveActionSet(const char* path, vr::VRActionSetHandle_t& handle);
     bool ResolveAction(const char* path, vr::VRActionHandle_t& handle);
+    void RetryProfileDiagnostics();
+    bool LogControllerProfiles() const;
+    bool ManifestListsBinding(const tString& controllerType, tString& bindingUrl) const;
     bool UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
       const char* handName, bool& stateKnown, bool& wasValid, bool isAim);
     void UpdateSkeletonSummary(vr::VRActionHandle_t action, TrackedController& hand, const char* handName);
@@ -175,6 +178,9 @@ namespace hpl {
     int mlLastSkeletonErrorCode;
     int mlLastSkeletonFallbackCode;
     bool mbSkeletonFallbackReported;
+    bool mbProfilesIdentified;
+    unsigned long mlNextProfileAttempt;
+    unsigned int mlProfileAttempts;
   };
 }
 

@@ -7,6 +7,7 @@
 #endif
 
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 
 namespace hpl {
@@ -64,11 +65,13 @@ namespace hpl {
       mRightSkeletonAction(vr::k_ulInvalidActionHandle),
       mlLastSkeletonErrorLog(0),
       mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
-      mbSkeletonFallbackReported(false) {
+      mbSkeletonFallbackReported(false),
+      mbProfilesIdentified(false), mlNextProfileAttempt(0), mlProfileAttempts(0) {
   }
 
   bool cSteamVRInput::Initialize() {
     msManifestPath = FindManifestPath();
+    RetryProfileDiagnostics();
     if (msManifestPath.empty()) {
       Log(" SteamVR Input disabled: could not resolve vr/actions.json next to the executable.\n");
       return false;
@@ -148,6 +151,10 @@ namespace hpl {
   }
 
   bool cSteamVRInput::Update(eSteamVRInputContext context, TrackedController& leftHand, TrackedController& rightHand) {
+    // Controller roles and their property strings can appear seconds after
+    // VR_Init; keep retrying briefly so the profile log reflects real hardware.
+    RetryProfileDiagnostics();
+
     const cVRInputState previousState = mState;
     mState = cVRInputState();
     if (!mbAvailable) {
@@ -497,6 +504,127 @@ namespace hpl {
       return false;
     }
     return true;
+  }
+
+  void cSteamVRInput::RetryProfileDiagnostics() {
+    if (mbProfilesIdentified || mlProfileAttempts >= 5) {
+      return;
+    }
+
+    const unsigned long now = GetApplicationTime();
+    if (mlProfileAttempts > 0 && now < mlNextProfileAttempt) {
+      return;
+    }
+
+    mlProfileAttempts++;
+    mlNextProfileAttempt = now + 5000;
+    mbProfilesIdentified = LogControllerProfiles();
+  }
+
+  bool cSteamVRInput::LogControllerProfiles() const {
+    vr::IVRSystem* system = vr::VRSystem();
+    if (system == NULL) {
+      return false;
+    }
+
+    bool identified = false;
+    char text[vr::k_unMaxPropertyStringSize];
+    vr::ETrackedPropertyError propertyError = vr::TrackedProp_Success;
+
+    memset(text, 0, sizeof(text));
+    system->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd,
+      vr::Prop_TrackingSystemName_String, text, sizeof(text), &propertyError);
+    if (propertyError == vr::TrackedProp_Success && text[0] != '\0') {
+      Log(" [VR input] headset driver '%s'.\n", text);
+    }
+
+    const vr::TrackedDeviceIndex_t handDevices[2] = {
+      system->GetTrackedDeviceIndexForControllerRole(vr::TrackedControllerRole_LeftHand),
+      system->GetTrackedDeviceIndexForControllerRole(vr::TrackedControllerRole_RightHand)
+    };
+    const char* handNames[2] = { "left", "right" };
+
+    for (int i = 0; i < 2; ++i) {
+      if (handDevices[i] == vr::k_unTrackedDeviceIndexInvalid) {
+        Log(" [VR input] %s hand controller not detected yet.\n", handNames[i]);
+        continue;
+      }
+
+      memset(text, 0, sizeof(text));
+      system->GetStringTrackedDeviceProperty(handDevices[i], vr::Prop_ControllerType_String,
+        text, sizeof(text), &propertyError);
+      if (propertyError != vr::TrackedProp_Success || text[0] == '\0') {
+        Log(" [VR input] %s hand controller type unknown (property error %d).\n",
+          handNames[i], (int)propertyError);
+        continue;
+      }
+
+      identified = true;
+      tString bindingUrl;
+      if (ManifestListsBinding(text, bindingUrl)) {
+        Log(" [VR input] %s hand controller type '%s' matches bundled default profile '%s'.\n",
+          handNames[i], text, bindingUrl.c_str());
+      }
+      else {
+        Log(" WARNING [VR input]: %s hand controller type '%s' has no bundled default profile in actions.json."
+          " SteamVR applies its generic binding, unmatched actions drop to legacy polling and controls may be partial."
+          " See docs/INPUT.md for the supported controller types.\n", handNames[i], text);
+      }
+    }
+
+    return identified;
+  }
+
+  bool cSteamVRInput::ManifestListsBinding(const tString& controllerType, tString& bindingUrl) const {
+    bindingUrl.clear();
+    if (msManifestPath.empty() || controllerType.empty()) {
+      return false;
+    }
+
+    FILE* manifest = fopen(msManifestPath.c_str(), "rb");
+    if (manifest == NULL) {
+      return false;
+    }
+
+    tString text;
+    char buffer[4096];
+    size_t bytesRead = 0;
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), manifest)) > 0) {
+      text.append(buffer, bytesRead);
+    }
+    fclose(manifest);
+
+    tString typeKey = "\"controller_type\": \"" + controllerType + "\"";
+    tString::size_type typeAt = text.find(typeKey);
+    if (typeAt == tString::npos) {
+      typeKey = "\"controller_type\":\"" + controllerType + "\"";
+      typeAt = text.find(typeKey);
+    }
+    if (typeAt == tString::npos) {
+      return false;
+    }
+
+    const tString::size_type nextTypeAt = text.find("\"controller_type\"", typeAt + 1);
+    const char* urlKeys[2] = { "\"binding_url\": \"", "\"binding_url\":\"" };
+    for (int i = 0; i < 2; ++i) {
+      const tString::size_type urlAt = text.find(urlKeys[i], typeAt);
+      if (urlAt == tString::npos) {
+        continue;
+      }
+      if (nextTypeAt != tString::npos && urlAt > nextTypeAt) {
+        return false;
+      }
+
+      const tString::size_type start = urlAt + strlen(urlKeys[i]);
+      const tString::size_type end = text.find('"', start);
+      if (end == tString::npos) {
+        return false;
+      }
+      bindingUrl = text.substr(start, end - start);
+      return true;
+    }
+
+    return false;
   }
 
 bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedController& hand,
