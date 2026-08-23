@@ -412,6 +412,14 @@
     <Entry Name="VRCalibration">CALIBRATION</Entry>
     <Entry Name="VRDisplay">DISPLAY</Entry>
     <Entry Name="VRDetectionDepth">Detection depth:</Entry>
+    <Entry Name="VRRenderScale">Render scale:</Entry>
+    <Entry Name="TipVRRenderScale">Multiplies the SteamVR recommended eye buffer size. Needs an application restart to take effect.</Entry>
+    <Entry Name="VRGraphicsPreset">Graphics preset:</Entry>
+    <Entry Name="TipVRGraphicsPreset">Applies bundles of render scale, shadows, shader quality, and texture quality. Restart to apply the new render scale.</Entry>
+    <Entry Name="VRPresetPerformance">Performance</Entry>
+    <Entry Name="VRPresetBalanced">Balanced</Entry>
+    <Entry Name="VRPresetQuality">Quality</Entry>
+    <Entry Name="VRPresetCustom">Custom</Entry>
     <Entry Name="VRRecenter">Recenter</Entry>
     <Entry Name="TipVRRecenter">Recenter the horizontal view. Same as pressing Create.</Entry>
     <Entry Name="ActionMode Camera Speed:">Action Mode Camera Speed:</Entry>

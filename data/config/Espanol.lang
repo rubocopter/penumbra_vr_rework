@@ -408,6 +408,14 @@
     <Entry Name="VRCalibration">CALIBRACIÓN</Entry>
     <Entry Name="VRDisplay">PANTALLA</Entry>
     <Entry Name="VRDetectionDepth">Profundidad de detección:</Entry>
+    <Entry Name="VRRenderScale">Escala de render:</Entry>
+    <Entry Name="TipVRRenderScale">Multiplica el tamaño de ojo recomendado por SteamVR. Requiere reiniciar la aplicación para aplicarse.</Entry>
+    <Entry Name="VRGraphicsPreset">Preajuste gráfico:</Entry>
+    <Entry Name="TipVRGraphicsPreset">Aplica conjuntos de escala de render, sombras, calidad de shaders y texturas. Reinicia para aplicar la nueva escala.</Entry>
+    <Entry Name="VRPresetPerformance">Rendimiento</Entry>
+    <Entry Name="VRPresetBalanced">Equilibrado</Entry>
+    <Entry Name="VRPresetQuality">Calidad</Entry>
+    <Entry Name="VRPresetCustom">Personalizado</Entry>
     <Entry Name="VRRecenter">Re-centrar</Entry>
     <Entry Name="TipVRRecenter">Recentra la vista horizontal. Igual que pulsar Create.</Entry>
     <Entry Name="ActionMode Camera Speed:">Velocidad de cámara en modo acción:</Entry>

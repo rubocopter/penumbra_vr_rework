@@ -242,6 +242,7 @@ mpGameSetup = apGameSetup;
     }
 
     vr_input.Initialize();
+    mpGraphics->GetRenderer3D()->SetVRRenderScale(aVars.GetFloat("VRRenderScale", 1.0f));
     mpGraphics->GetRenderer3D()->CreateVREyeTextures(vr_hmd);
 
 		//Init Sound

@@ -1021,6 +1021,7 @@ enum eVRMenuSetting
 	eVRMenuSetting_HeightOffset,
 	eVRMenuSetting_UIDistance,
 	eVRMenuSetting_UIScale,
+	eVRMenuSetting_RenderScale,
 	eVRMenuSetting_SubtitleScale,
 	eVRMenuSetting_LastEnum
 };
@@ -1050,6 +1051,7 @@ static const char *VRSettingsTextName(eVRMenuSetting aSetting)
 	case eVRMenuSetting_HeightOffset: return "VRHeightOffset";
 	case eVRMenuSetting_UIDistance: return "VRUIDistance";
 	case eVRMenuSetting_UIScale: return "VRUIScale";
+	case eVRMenuSetting_RenderScale: return "VRRenderScale";
 	case eVRMenuSetting_SubtitleScale: return "VRSubtitleScale";
 	default: return "";
 	}
@@ -1117,6 +1119,9 @@ switch(aSetting)
 		break;
 	case eVRMenuSetting_UIScale:
 		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetUIScale() * 100.0f);
+		break;
+	case eVRMenuSetting_RenderScale:
+		sprintf_s(sValue, sizeof(sValue), "%.2fx", settings.GetRenderScale());
 		break;
 	case eVRMenuSetting_SubtitleScale:
 		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetSubtitleScale() * 100.0f);
@@ -1214,6 +1219,9 @@ cVRSettings& settings = mpInit->mVRSettings;
 			break;
 		case eVRMenuSetting_UIScale:
 			settings.SetUIScale(settings.GetUIScale() + 0.10f * direction);
+			break;
+		case eVRMenuSetting_RenderScale:
+			settings.SetRenderScale(settings.GetRenderScale() + 0.05f * direction);
 			break;
 		case eVRMenuSetting_SubtitleScale:
 			settings.SetSubtitleScale(settings.GetSubtitleScale() + 0.10f * direction);
@@ -2217,6 +2225,125 @@ public:
 
 		if(mpInit->mpMapHandler->GetCurrentMapName() != "") gbMustRestart = true;
 	}
+};
+
+//------------------------------------------------------------
+
+enum eVRGraphicsPreset
+{
+	eVRGraphicsPreset_Performance=0,
+	eVRGraphicsPreset_Balanced=1,
+	eVRGraphicsPreset_Quality=2,
+	eVRGraphicsPreset_Custom=3
+};
+
+static void ApplyVRGraphicsPreset(cInit *apInit, int alPreset)
+{
+	cVRSettings& settings = apInit->mVRSettings;
+	int lShadows = eRendererShowShadows_Static;
+	int lShader = eMaterialQuality_High;
+	int lTextureLevel = 0;
+	int lAnisotropy = 8;
+
+	switch(alPreset)
+	{
+	case eVRGraphicsPreset_Performance:
+		settings.SetRenderScale(0.75f);
+		lShadows = eRendererShowShadows_None;
+		lShader = eMaterialQuality_Medium;
+		lTextureLevel = 1;
+		lAnisotropy = 4;
+		break;
+	case eVRGraphicsPreset_Balanced:
+		settings.SetRenderScale(1.0f);
+		break;
+	default:
+		settings.SetRenderScale(1.25f);
+		lShadows = eRendererShowShadows_All;
+		lAnisotropy = 16;
+		break;
+	}
+
+	apInit->mpGame->GetGraphics()->GetRenderer3D()->SetShowShadows((eRendererShowShadows)lShadows);
+	iMaterial::SetQuality((eMaterialQuality)lShader);
+	apInit->mpGame->GetResources()->GetMaterialManager()->SetTextureSizeLevel(lTextureLevel);
+	apInit->mpGame->GetResources()->GetMaterialManager()->SetTextureAnisotropy((float)lAnisotropy);
+
+	if(gpShadowsText) gpShadowsText->msText = apInit->mpGame->GetResources()->Translate("MainMenu",gvShadowTypes[lShadows]);
+	if(gpShaderQualityText) gpShaderQualityText->msText = apInit->mpGame->GetResources()->Translate("MainMenu",gvShaderQuality[lShader]);
+	if(gpTextureQualityText) gpTextureQualityText->msText = apInit->mpGame->GetResources()->Translate("MainMenu",gvTextureQuality[lTextureLevel]);
+	if(gpTextureAnisotropyText)
+	{
+		if(lAnisotropy > 1) gpTextureAnisotropyText->msText = cString::To16Char(cString::ToString(lAnisotropy)+"x");
+		else gpTextureAnisotropyText->msText = apInit->mpGame->GetResources()->Translate("MainMenu","Off");
+	}
+
+	// The render scale only takes effect once the eye buffers are rebuilt.
+	gbMustRestart = true;
+	apInit->ApplyVRSettings(true);
+
+	const char* asKeys[] = {"VRPresetPerformance","VRPresetBalanced","VRPresetQuality"};
+	Log(" [VR settings +%lu ms] graphics preset '%s' applied.\n",
+		GetApplicationTime(), (alPreset >= 0 && alPreset < 3) ? asKeys[alPreset] : "?");
+}
+
+static int ClassifyVRGraphicsPreset(cInit *apInit)
+{
+	const float fScale = apInit->mVRSettings.GetRenderScale();
+	const int lShadows = apInit->mpGame->GetGraphics()->GetRenderer3D()->GetShowShadows();
+	const int lShader = iMaterial::GetQuality();
+	const int lTextureLevel = apInit->mpGame->GetResources()->GetMaterialManager()->GetTextureSizeLevel();
+	const int lAnisotropy = (int)apInit->mpGame->GetResources()->GetMaterialManager()->GetTextureAnisotropy();
+
+	if(fScale < 0.80f && lShadows == eRendererShowShadows_None &&
+		lShader == eMaterialQuality_Medium && lTextureLevel == 1 && lAnisotropy == 4)
+		return eVRGraphicsPreset_Performance;
+	if(fScale > 1.20f && lShadows == eRendererShowShadows_All &&
+		lShader == eMaterialQuality_High && lTextureLevel == 0 && lAnisotropy == 16)
+		return eVRGraphicsPreset_Quality;
+	if(fScale >= 0.95f && fScale <= 1.05f && lShadows == eRendererShowShadows_Static &&
+		lShader == eMaterialQuality_High && lTextureLevel == 0 && lAnisotropy == 8)
+		return eVRGraphicsPreset_Balanced;
+	return eVRGraphicsPreset_Custom;
+}
+
+cMainMenuWidget_Text *gpVRGraphicsPresetText=NULL;
+
+class cMainMenuWidget_GraphicsPreset : public cMainMenuWidget_Button
+{
+public:
+	cMainMenuWidget_GraphicsPreset(cInit *apInit, const cVector3f &avPos, const tWString& asText,
+		cVector2f avFontSize, eFontAlign aAlignment)
+		: cMainMenuWidget_Button(apInit,avPos,asText,eMainMenuState_LastEnum,avFontSize,aAlignment),
+		  mlPreset(ClassifyVRGraphicsPreset(apInit))
+	{
+		msTip = kTranslate("MainMenu", "TipVRGraphicsPreset");
+	}
+
+	int GetPreset() const { return mlPreset; }
+
+	void OnMouseDown(eMButton aButton)
+	{
+		const int direction = aButton == eMButton_Left ? 1 : (aButton == eMButton_Right ? -1 : 0);
+		if(direction == 0) return;
+
+		mlPreset += direction;
+		if(mlPreset > eVRGraphicsPreset_Quality) mlPreset = eVRGraphicsPreset_Performance;
+		if(mlPreset < eVRGraphicsPreset_Performance) mlPreset = eVRGraphicsPreset_Quality;
+
+		ApplyVRGraphicsPreset(mpInit, mlPreset);
+		UpdateText();
+	}
+
+	void UpdateText()
+	{
+		if(gpVRGraphicsPresetText == NULL) return;
+		const char* asKeys[] = {"VRPresetPerformance","VRPresetBalanced","VRPresetQuality","VRPresetCustom"};
+		gpVRGraphicsPresetText->msText = kTranslate("MainMenu", asKeys[mlPreset]);
+	}
+
+private:
+	int mlPreset;
 };
 
 //------------------------------------------------------------
@@ -3561,13 +3688,14 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
   static const eVRMenuSetting vVRDisplaySettings[] = {
     eVRMenuSetting_UIDistance,
     eVRMenuSetting_UIScale,
+    eVRMenuSetting_RenderScale,
     eVRMenuSetting_SubtitleScale
   };
   static const sVRSettingSection vVRSections[] = {
     { "VRControls", vVRControlsSettings, 1 },
     { "VRMovement", vVRMovementSettings, 8 },
     { "VRCalibration", vVRCalibrationSettings, 3 },
-    { "VRDisplay", vVRDisplaySettings, 3 }
+    { "VRDisplay", vVRDisplaySettings, 4 }
   };
 
   for(int section = 0; section < 4; ++section)
@@ -3615,6 +3743,17 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
   }
 
   RefreshVRSettingAvailability(mpInit);
+
+  vPos.y += 4;
+  cMainMenuWidget_GraphicsPreset *pVRGraphicsPreset = hplNew(cMainMenuWidget_GraphicsPreset,
+    (mpInit, vPos, kTranslate("MainMenu", "VRGraphicsPreset"), 14, eFontAlign_Right));
+  AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRGraphicsPreset);
+  const char* asPresetKeys[] = {"VRPresetPerformance","VRPresetBalanced","VRPresetQuality","VRPresetCustom"};
+  gpVRGraphicsPresetText = hplNew(cMainMenuWidget_Text,
+    (mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z),
+      kTranslate("MainMenu", asPresetKeys[pVRGraphicsPreset->GetPreset()]), 14, eFontAlign_Left));
+  AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRGraphicsPresetText);
+  vPos.y += 14;
 
   vPos.y += 4;
   cMainMenuWidget *pVRRenderToMonitor = hplNew(cMainMenuWidget_RenderToMonitor,

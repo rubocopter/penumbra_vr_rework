@@ -1,5 +1,22 @@
 # Releases
 
+## Unreleased
+
+- New `[VR] RenderScale` setting (0.5–2.0, default 1.0) that multiplies the
+  SteamVR recommended eye buffer size at startup. This is the main performance
+  lever on modern high-resolution headsets; changing it needs an application
+  restart.
+- One-click graphics presets in Options → VR Settings: Performance (0.75x,
+  shadows off, medium shaders, 4x anisotropy), Balanced (1.0x, static shadows,
+  8x anisotropy), and Quality (1.25x, full shadows, 16x anisotropy). Each also
+  updates the classic graphics page values, and the row shows Custom when the
+  current mix matches no preset.
+- Texture anisotropic filtering now defaults to 16x instead of Off; sharpens
+  floors and walls viewed at angles at negligible cost on modern GPUs.
+- Fixed `[Screen] Vsync` never being loaded from the settings file.
+- Fixed the `[Graphics] Refractions` value never being written back to the
+  settings file.
+
 ## v0.1.0-alpha.3 — 23 August 2026
 
 Controller coverage and input resilience fixes driven by the first external

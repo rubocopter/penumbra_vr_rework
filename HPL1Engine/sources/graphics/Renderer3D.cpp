@@ -116,6 +116,8 @@ namespace hpl {
 
 		mbLog = false;
 
+		mfVRRenderScale = 1.0f;
+
 		mfRenderTime =0;
 
 		mbRefractionUsed = true;
@@ -299,6 +301,18 @@ namespace hpl {
     Log("   init vr eye textures");
 
     vr_hmd->GetRecommendedRenderTargetSize(&m_nVRRenderWidth, &m_nVRRenderHeight);
+
+    // Supersampling/subsampling factor over the SteamVR recommended size.
+    float fScale = mfVRRenderScale;
+    if(fScale < 0.5f) fScale = 0.5f;
+    if(fScale > 2.0f) fScale = 2.0f;
+    if(fScale != 1.0f) {
+      m_nVRRenderWidth = (GLuint)((float)m_nVRRenderWidth * fScale + 0.5f);
+      m_nVRRenderHeight = (GLuint)((float)m_nVRRenderHeight * fScale + 0.5f);
+    }
+
+    Log("   vr eye buffer %ux%u (recommended size x %.2f)\n",
+      m_nVRRenderWidth, m_nVRRenderHeight, fScale);
 
     CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, leftEyeDesc);
     CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, rightEyeDesc);

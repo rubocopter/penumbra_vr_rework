@@ -330,7 +330,7 @@ bool cInit::Init(tString asCommandLine)
 	mvScreenSize.x = mpConfig->GetInt("Screen","Width",800);
 	mvScreenSize.y = mpConfig->GetInt("Screen","Height",600);
 	mbFullScreen = mpConfig->GetBool("Screen", "FullScreen", true);
-	mbVsync = false;
+	mbVsync = mpConfig->GetBool("Screen", "Vsync", false);
 	mbLogResources = mpConfig->GetBool("Debug", "LogResources", false);
 	mbDebugInteraction = mpConfig->GetBool("Debug", "DebugInteraction", false);
 
@@ -400,6 +400,7 @@ bool cInit::Init(tString asCommandLine)
 	Vars.AddInt("ScreenBpp",32);
 	Vars.AddBool("Fullscreen",mbFullScreen);
 	Vars.AddInt("Multisampling",mlFSAA);
+	Vars.AddFloat("VRRenderScale", mVRSettings.GetRenderScale());
 	Vars.AddInt("LogicUpdateRate",60);
 	Vars.AddBool("UseSoundHardware",mbUseSoundHardware);
 	Vars.AddBool("ForceGeneric", mpConfig->GetBool("Sound", "ForceGeneric", false));
@@ -513,7 +514,7 @@ bool cInit::Init(tString asCommandLine)
 
 	mpGame->GetResources()->GetMaterialManager()->SetTextureSizeLevel(mpConfig->GetInt("Graphics","TextureSizeLevel",0));
 	mpGame->GetResources()->GetMaterialManager()->SetTextureFilter((eTextureFilter)mpConfig->GetInt("Graphics","TextureFilter",0));
-	mpGame->GetResources()->GetMaterialManager()->SetTextureAnisotropy(mpConfig->GetFloat("Graphics","TextureAnisotropy",1.0f));
+	mpGame->GetResources()->GetMaterialManager()->SetTextureAnisotropy(mpConfig->GetFloat("Graphics","TextureAnisotropy",16.0f));
 
 	mpGame->GetGraphics()->GetLowLevel()->SetGammaCorrection(mpConfig->GetFloat("Graphics","Gamma",1.0f));
 
@@ -841,7 +842,7 @@ void cInit::Exit()
 	mpConfig->SetBool("Graphics", "MotionBlur",mpGame->GetGraphics()->GetRendererPostEffects()->GetMotionBlurActive());
 	mpConfig->SetFloat("Graphics", "MotionBlurAmount",mpGame->GetGraphics()->GetRendererPostEffects()->GetMotionBlurAmount());
 	mpConfig->SetBool("Graphics", "DepthOfField",!mpEffectHandler->GetDepthOfField()->IsDisabled());
-	mpConfig->GetBool("Graphics", "Refractions", mpGame->GetGraphics()->GetRenderer3D()->GetRefractionUsed());
+	mpConfig->SetBool("Graphics", "Refractions", mpGame->GetGraphics()->GetRenderer3D()->GetRefractionUsed());
 	
 	mpConfig->SetFloat("Sound","Volume",mpGame->GetSound()->GetLowLevel()->GetVolume());
 	mpConfig->SetBool("Sound","UseSoundHardware", mbUseSoundHardware);

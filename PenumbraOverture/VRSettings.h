@@ -58,6 +58,7 @@ public:
 	float GetTurnDeadZone() const { return mfTurnDeadZone; }
 	float GetUIDistance() const { return mfUIDistance; }
 	float GetUIScale() const { return mfUIScale; }
+	float GetRenderScale() const { return mfRenderScale; }
 	eVRCrouchMode GetCrouchMode() const { return mCrouchMode; }
 	float GetPhysicalCrouchDepth() const { return mfPhysicalCrouchDepth; }
 	float GetSubtitleScale() const { return mfSubtitleScale; }
@@ -74,6 +75,7 @@ public:
 	void SetTurnDeadZone(float afValue) { mfTurnDeadZone = Clamp(afValue, 0.0f, 0.9f); }
 	void SetUIDistance(float afValue) { mfUIDistance = Clamp(afValue, 0.75f, 3.0f); }
 	void SetUIScale(float afValue) { mfUIScale = Clamp(afValue, 0.5f, 2.0f); }
+	void SetRenderScale(float afValue) { mfRenderScale = Clamp(afValue, 0.5f, 2.0f); }
 	void SetCrouchMode(eVRCrouchMode aMode) { mCrouchMode = aMode; }
 	void SetPhysicalCrouchDepth(float afValue) { mfPhysicalCrouchDepth = Clamp(afValue, 0.10f, 0.60f); }
 	void SetSubtitleScale(float afValue) { mfSubtitleScale = Clamp(afValue, 0.75f, 2.0f); }
@@ -93,6 +95,7 @@ private:
 	float mfTurnDeadZone;
 	float mfUIDistance;
 	float mfUIScale;
+	float mfRenderScale;
 	eVRCrouchMode mCrouchMode;
 	float mfPhysicalCrouchDepth;
 	float mfSubtitleScale;

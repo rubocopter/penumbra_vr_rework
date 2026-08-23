@@ -25,6 +25,7 @@ namespace
 	const float kDefaultTurnDeadZone = 0.20f;
 	const float kDefaultUIDistance = 1.75f;
 	const float kDefaultUIScale = 1.0f;
+	const float kDefaultRenderScale = 1.0f;
 	const float kDefaultPhysicalCrouchDepth = 0.25f;
 	const float kDefaultSubtitleScale = 1.35f;
 	const float kDefaultPlayerHeight = 1.70f;
@@ -78,6 +79,7 @@ cVRSettings::cVRSettings()
 	  mfTurnDeadZone(kDefaultTurnDeadZone),
 	  mfUIDistance(kDefaultUIDistance),
 	  mfUIScale(kDefaultUIScale),
+	  mfRenderScale(kDefaultRenderScale),
 	  mCrouchMode(eVRCrouchMode_Hybrid),
 	  mfPhysicalCrouchDepth(kDefaultPhysicalCrouchDepth),
 	  mfSubtitleScale(kDefaultSubtitleScale),
@@ -111,6 +113,9 @@ void cVRSettings::Load(cConfigFile *apConfig)
 	mfTurnDeadZone = Clamp(apConfig->GetFloat("VR", "TurnDeadZone", kDefaultTurnDeadZone), 0.0f, 0.9f);
 	mfUIDistance = Clamp(apConfig->GetFloat("VR", "UIDistance", kDefaultUIDistance), 0.75f, 3.0f);
 	mfUIScale = Clamp(apConfig->GetFloat("VR", "UIScale", kDefaultUIScale), 0.5f, 2.0f);
+	// Applied when the VR eye buffers are created, so a new value needs an
+	// application restart to take effect.
+	mfRenderScale = Clamp(apConfig->GetFloat("VR", "RenderScale", kDefaultRenderScale), 0.5f, 2.0f);
 
 	const tString sCrouchMode = cString::ToLowerCase(apConfig->GetString("VR", "CrouchMode", "Hybrid"));
 	if(sCrouchMode == "physical") mCrouchMode = eVRCrouchMode_Physical;
@@ -131,11 +136,11 @@ void cVRSettings::Load(cConfigFile *apConfig)
 
 	Log(" VR settings: move speed %.2f, dead zone %.2f, height offset %.2f m; "
 		"turn %s, snap %.0f deg, smooth %.0f deg/s, turn dead zone %.2f; "
-		"UI distance %.2f m, scale %.2f; crouch %s, depth %.2f m; subtitle scale %.2f; "
+		"UI distance %.2f m, scale %.2f; render scale %.2f; crouch %s, depth %.2f m; subtitle scale %.2f; "
 		"handedness %s, play mode %s, player height %.2f m.\n",
 		mfMoveSpeed, mfMoveDeadZone, mfHeightOffset, TurnModeName(mTurnMode),
 		mfSnapTurnAngle, mfSmoothTurnSpeed, mfTurnDeadZone, mfUIDistance, mfUIScale,
-		CrouchModeName(mCrouchMode), mfPhysicalCrouchDepth, mfSubtitleScale,
+		mfRenderScale, CrouchModeName(mCrouchMode), mfPhysicalCrouchDepth, mfSubtitleScale,
 		HandednessName(mHandedness), PlayModeName(mPlayMode), mfPlayerHeight);
 }
 
@@ -152,6 +157,7 @@ void cVRSettings::Save(cConfigFile *apConfig) const
 	apConfig->SetFloat("VR", "TurnDeadZone", mfTurnDeadZone);
 	apConfig->SetFloat("VR", "UIDistance", mfUIDistance);
 	apConfig->SetFloat("VR", "UIScale", mfUIScale);
+	apConfig->SetFloat("VR", "RenderScale", mfRenderScale);
 	apConfig->SetString("VR", "CrouchMode", CrouchModeName(mCrouchMode));
 	apConfig->SetFloat("VR", "PhysicalCrouchDepth", mfPhysicalCrouchDepth);
 	apConfig->SetFloat("VR", "SubtitleScale", mfSubtitleScale);

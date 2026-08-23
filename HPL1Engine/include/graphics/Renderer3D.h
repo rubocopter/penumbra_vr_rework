@@ -201,11 +201,15 @@ namespace hpl {
 
     void CreateVREyeTextures(vr::IVRSystem* vr_hmd);
 
+    void SetVRRenderScale(float afScale) { mfVRRenderScale = afScale; }
+    float GetVRRenderScale() const { return mfVRRenderScale; }
+
     FramebufferDesc leftEyeDesc;
     FramebufferDesc rightEyeDesc;
 
     GLuint m_nVRRenderWidth;
     GLuint m_nVRRenderHeight;
+    float mfVRRenderScale;
 	
 	private:
 		inline void BeginRendering(cCamera3D* apCamera);
