@@ -1464,7 +1464,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 										cVector3f(0,-1,0));
 			}
 			
-			if(pHudModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
+			if(mpInit->mpPlayerHands->FindHandModel(offSlot,"Flashlight") == pHudModel)
 			{
 				tGameEnemyIterator it = mpInit->mpMapHandler->GetGameEnemyIterator();
 				while(it.HasNext())
@@ -1512,7 +1512,7 @@ void cPlayerFlashLight::Update(float afTimeStep)
 	}
 	
 	
-	iHudModel *pHudModel = mpInit->mpPlayerHands->GetCurrentModel(offSlot);
+	iHudModel *pHudModel = mpInit->mpPlayerHands->FindHandModel(offSlot,"Flashlight");
 	
 	//////////////////////////
 	//Player power
@@ -1584,18 +1584,13 @@ void cPlayerFlashLight::SetActive(bool abX)
 	//Active
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flashlight");
-    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
-		
-		//pSoundHanlder->PlayGui("item_flashlight_on",false,1);
+		mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"Flashlight");
 	}
 	/////////////////////////////
 	//Not active
-	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flashlight" &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->FindHandModel(offSlot,"Flashlight"))
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
+		mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"");
 		
 		if(mpInit->mpPlayer->GetPower()==0)
 			pSoundHanlder->PlayGui("item_flashlight_nopower",false,1);
@@ -1692,16 +1687,13 @@ void cPlayerGlowStick::SetActive(bool abX)
 	if(mbActive)
 	{
 		//Log("Setting the glowstick to TRUE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Glowstick");
-    mpInit->mpPlayerHands->GetCurrentModel(offSlot)->SetHandIndex(offSlot);
+		mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"Glowstick");
 		//pSoundHanlder->PlayGui("item_glowstick_on",false,1);
 	}
-	else if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Glowstick" &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
+	else if(mpInit->mpPlayerHands->FindHandModel(offSlot,"Glowstick"))
 	{
 		//Log("Setting the glowstick to FALSE\n");
-		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
+		mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"");
 		//pSoundHanlder->PlayGui("item_glowstick_off",false,1);
 	}
 }
@@ -1809,6 +1801,10 @@ void cPlayerVRHand::SetVisible(bool visible)
   if (mpInit->mpPlayerHands->GetCurrentModel(mHandIndex))
   {
     mpInit->mpPlayerHands->GetCurrentModel(mHandIndex)->SetVisible(visible);
+  }
+  if (mpInit->mpPlayerHands->GetAttachmentModel(mHandIndex))
+  {
+    mpInit->mpPlayerHands->GetAttachmentModel(mHandIndex)->SetVisible(visible);
   }
 }
 
@@ -2108,7 +2104,7 @@ void cPlayerFlare::Update(float afTimeStep)
 		// Model entities not loaded yet
 		else
 		{
-			if(mpModel == mpInit->mpPlayerHands->GetCurrentModel(offSlot))
+			if(mpModel && mpInit->mpPlayerHands->FindHandModel(offSlot,"Flare") == mpModel)
 			{
 				if(mpModel->mvLights.empty()==false)
 				{
@@ -2139,7 +2135,7 @@ void cPlayerFlare::SetActive(bool abX)
 
 	if(mbActive)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(offSlot,"Flare");
+		mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"Flare");
 
 		if(mpInit->mpPlayer->GetFlashLight()->IsActive())
 			mpInit->mpPlayer->GetFlashLight()->SetActive(false);
@@ -2155,11 +2151,9 @@ void cPlayerFlare::SetActive(bool abX)
 	{
 		///////////////////////////////
 		//Check if hud model should be put down.
-		if(mpInit->mpPlayerHands->GetCurrentModel(offSlot) &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->msName == "Flare" &&
-			mpInit->mpPlayerHands->GetCurrentModel(offSlot)->GetState() != eHudModelState_Unequip)
+		if(mpInit->mpPlayerHands->FindHandModel(offSlot,"Flare"))
 		{
-			mpInit->mpPlayerHands->SetCurrentModel(offSlot,"");
+			mpInit->mpPlayerHands->SetAttachmentModel(offSlot,"");
 		}
 
 		///////////////////////////////

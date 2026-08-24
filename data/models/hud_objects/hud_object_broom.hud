@@ -12,7 +12,7 @@
 		UnequipPose_Pos = "0.073 -0.120 0.057"
 		UnequipPose_Rot = "134.1 -5.4 29.6"
 		 
-		VrTransOffset = "0.0 0.0 -0.35"
+		VrTransOffset = "0.0 0.0 0.0"
 		VrRotOffset = "1.57 0.0 0.0"
 		VrScale = 12.5f
 

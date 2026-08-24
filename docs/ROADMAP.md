@@ -182,6 +182,18 @@ dynamics) is the accepted stopping point after multiple hardware passes; the
 known mesh limits (fused Ring/Middle tube, short thumb chain) are model
 constraints, not tuning issues.
 
+### Equipped objects in hand (experimental, 23 August 2026)
+
+First pass of held-object rendering landed: tools, lights, melee weapons, and
+thrown items render as attachments on top of the visible hand rig (a palm
+socket in the controller frame) instead of replacing it. Melee damage sweeps,
+throw charging, and release keep working through the attachment pose.
+
+State: **very green**. The forced grip does not fully close the fist yet and
+per-item placement is approximate; both will keep changing. The notebook
+geometry lesson (anchor to the visible object, mind the per-hand mirroring)
+remains the reference for refining placements.
+
 Hand rig tooling (in `scripts/`):
 
 - `verify_bind_fix.py` — engine-exact simulation of the HPL1 skin (IBM layout,

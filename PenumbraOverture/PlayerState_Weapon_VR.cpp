@@ -169,7 +169,7 @@ void cPlayerState_Throw_VR::OnStartExamine()
 
 void cPlayerState_Throw_VR::OnStartHolster()
 {
-	mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
+	mpInit->mpPlayerHands->SetAttachmentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 }
 
@@ -215,9 +215,9 @@ void cPlayerState_Throw_VR::LeaveState(iPlayerState* apNextState)
 {
 	if(	apNextState->mType != ePlayerState_Message &&
 		apNextState->mType != ePlayerState_WeaponMelee &&
-		mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)) == mpHudObject)
+		mpInit->mpPlayerHands->FindHandModel(VRHelper::DominantHandSlot(mpInit->mpGame), mpHudObject ? mpHudObject->msName : "") == mpHudObject)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
+		mpInit->mpPlayerHands->SetAttachmentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	}
 }
 
@@ -477,9 +477,9 @@ void cPlayerState_WeaponMelee_VR::LeaveState(iPlayerState* apNextState)
 {
 	if(	apNextState->mType != ePlayerState_Message &&
 		apNextState->mType != ePlayerState_Throw &&
-		mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)) == mpHudWeapon)
+		mpInit->mpPlayerHands->FindHandModel(VRHelper::DominantHandSlot(mpInit->mpGame), mpHudWeapon ? mpHudWeapon->msName : "") == mpHudWeapon)
 	{
-		mpInit->mpPlayerHands->SetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
+		mpInit->mpPlayerHands->SetAttachmentModel(VRHelper::DominantHandSlot(mpInit->mpGame),"");
 	}
 }
 

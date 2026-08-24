@@ -762,7 +762,6 @@ if(actionInputActive && vrUIContext && vrInput.uiSelect.justPressed)
           }
 
 if (vrInput.jump.justPressed) {
-            Log(" [VR input +%lu ms] jump pressed.\n", GetApplicationTime());
             mpPlayer->Jump();
           }
 
@@ -884,7 +883,6 @@ if (vrInput.jump.justPressed) {
 				}
 if(mpInput->BecameTriggerd("Holster") || vrInput.holster.justPressed)
 				{
-					Log(" [VR input +%lu ms] holster pressed.\n", GetApplicationTime());
 					mpPlayer->StartHolster();
 				}
 
@@ -941,9 +939,6 @@ void cButtonHandler::UpdateVRTurn(const cVRInputState& aInputState, float afTime
 		const float fYawDelta = cMath::ToRad(mpInit->mVRSettings.GetSnapTurnAngle()) * fDirection;
 		mpInit->mpGame->vr_tracking.AddWorldYaw(fYawDelta);
 		mbSnapTurnReady = false;
-		Log(" [VR comfort +%lu ms] snap turn %.0f deg; world yaw %.1f deg.\n",
-			GetApplicationTime(), cMath::ToDeg(fYawDelta),
-			cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
 	}
 	else
 	{

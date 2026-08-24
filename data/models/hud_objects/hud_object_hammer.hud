@@ -15,7 +15,7 @@
 		EquipSound = ""
 		UnequipSound = ""
 		 
-		VrTransOffset = "0.0 0.0 0.2"
+		VrTransOffset = "0.0 0.0 0.0"
 		VrRotOffset = "-1.57 0.0 0.0"
 		VrScale = 2.85f
 	 />

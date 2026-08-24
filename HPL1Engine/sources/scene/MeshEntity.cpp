@@ -456,6 +456,16 @@ namespace hpl {
 	//-----------------------------------------------------------------------
 	
 	//int glDebugTabs=0;
+	void cMeshEntity::RefreshBoneWorldMatrices()
+	{
+		cNodeIterator NodeIt = mpRootNode->GetChildIterator();
+		while(NodeIt.HasNext())
+		{
+			cNode3D *pBoneState = static_cast<cNode3D*>(NodeIt.Next());
+			UpdateNodeMatrixRec(mpRootNode->GetWorldMatrix(), pBoneState);
+		}
+	}
+
 	void cMeshEntity::UpdateNodeMatrixRec(const cMatrixf& a_mtxParentWorld,cNode3D *apNode)
 	{
 		if(apNode->IsActive()){

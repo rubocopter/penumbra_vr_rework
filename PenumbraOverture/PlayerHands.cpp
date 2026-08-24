@@ -27,13 +27,6 @@
 
 #include "VRHelper.hpp"
 
-static const char* ksFingerNames[] = {
-	"Middle","Middle","Middle",
-	"Ring","Ring","Ring",
-	"Little","Little","Little",
-	"Index","Index","Index",
-	"Thumb","Thumb","Thumb"
-};
 static const char* ksHandBoneNames[] = {
 	"Middle1","Middle2","Middle3",
 	"Ring1","Ring2","Ring3",
@@ -71,17 +64,28 @@ cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem)
 
 //-----------------------------------------------------------------------
 
-iHudModel::iHudModel(ePlayerHandType aType)
+	iHudModel::iHudModel(ePlayerHandType aType)
 {
 	mType = aType;
 	mState = eHudModelState_Idle;
 	for(int i=0; i<kFingerTrackNum; ++i)
 	{
-		mpFingerAnimState[i] = NULL;
 		mfFingerWeight[i] = 0.0f;
 	}
 	mbHandRigSetup = false;
 	mlHandIndex = 0;
+	mbForceGrabPose = false;
+	mbForceGrabLogged = false;
+	mfIndexHoldWeight = 0.0f;
+	mpPoseCallback = NULL;
+	mmtxLastPose = cMatrixf::Identity;
+	mbLastPoseValid = false;
+	for(int i=0; i<15; ++i)
+	{
+		mvGrabRot[i] = cQuaternion::Identity;
+		mvTriggerRot[i] = cQuaternion::Identity;
+		mvHoldRot[i] = cQuaternion::Identity;
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -171,6 +175,13 @@ void iHudModel::LoadEntities()
 	}
 
 	SetupHandAnimation();
+
+	//Direct finger posing: the callback writes the smoothed rotations onto
+	//the bones after the engine animation update and refreshes the world
+	//matrices, so the pose never depends on animation-state application.
+	if(mpEntity && mpPoseCallback == NULL)
+		mpPoseCallback = hplNew( cHandRigPoseCallback, (this) );
+	mpEntity->SetCallback(mpPoseCallback);
 }
 
 //-----------------------------------------------------------------------
@@ -180,13 +191,6 @@ void iHudModel::SetupHandAnimation()
 	if(mpEntity == NULL || mbHandRigSetup) return;
 
 	const char* sHand = mlHandIndex == 0 ? "left" : "right";
-
-	Log(" [hand-rig] %s: entity has %d bone states\n", sHand, mpEntity->GetBoneStateNum());
-	for(int i=0; i< mpEntity->GetBoneStateNum(); ++i)
-	{
-		cBoneState *pBone = mpEntity->GetBoneState(i);
-		Log(" [hand-rig] %s: boneState[%d]='%s'\n", sHand, i, pBone->GetName());
-	}
 
 	//Own rotation per joint in degrees (per-joint deltas; they accumulate
 	//down each chain). Grab: middle/ring/little/thumb. Trigger: index.
@@ -217,8 +221,19 @@ void iHudModel::SetupHandAnimation()
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
-		45,55,32,	//Index
+		50,60,36,	//Index: slightly deeper than the old 45/55/32 so a held
+					//item (forced grab drives this chain to full weight)
+					//reads as wrapped instead of resting on top.
 		0,0,0		//Thumb
+	};
+	//Deep hold pose driven only while an item is attached: every finger
+	//wraps like a tight fist around the held object.
+	static const float kfHoldAngles[lHandBoneNum] = {
+		75,85,50,	//Middle
+		75,85,50,	//Ring
+		75,85,50,	//Little
+		60,70,40,	//Index
+		0,0,0		//Thumb frozen (model limitation, documented above)
 	};
 
 	int lBoneIdx[lHandBoneNum];
@@ -253,15 +268,13 @@ void iHudModel::SetupHandAnimation()
 	cVector3f vFingerAxis = cVector3f(0, 0, -1.0f * (bLeft ? -1.0f : 1.0f));
 	cVector3f vPinkyAxis = cVector3f(0.0f, 0.2588f, -0.9659f * (bLeft ? -1.0f : 1.0f));
 	//- Thumb axis kept for reference; the thumb pose is frozen at zero angles
-	//  above, so no Thumb track is created and this vector stays unused.
+	//  above, so the thumb quaternions stay identity and the bone never moves.
 	cVector3f vThumbAxis = cVector3f(0.0f, 0.94f, -0.342f * (bLeft ? -1.0f : 1.0f));
 
-	//One pose animation per finger chain so each finger can be driven and
-	//smoothed independently instead of moving in lockstep with one blend
-	//weight per hand.
-	static const char* ksPoseNames[kFingerTrackNum] = {
-		"HandMiddle","HandRing","HandLittle","HandIndex","HandThumb"
-	};
+	//Precompute the per-bone bind-relative rotations for the three poses
+	//(relaxed grab, trigger, deep hold). ApplyFingerPose writes these
+	//straight onto the bones from the entity callback, bypassing the
+	//animation-state path.
 	static const int klChainStart[kFingerTrackNum] = { 0,3,6,9,12 };
 	static const float* kpChainAngles[kFingerTrackNum] = {
 		kfGrabAngles,kfGrabAngles,kfGrabAngles,kfTriggerAngles,kfGrabAngles
@@ -269,35 +282,29 @@ void iHudModel::SetupHandAnimation()
 
 	for(int f=0; f<kFingerTrackNum; ++f)
 	{
-		cAnimation *pAnim = hplNew( cAnimation, (ksPoseNames[f], "") );
-		pAnim->SetLength(0.001f);
-
 		for(int j=0; j<3; ++j)
 		{
 			int i = klChainStart[f] + j;
-			if(kpChainAngles[f][i] == 0.0f) continue;
-
-			cAnimationTrack *pTrack = pAnim->CreateTrack(ksHandBoneNames[i], eAnimTransformFlag_Rotate);
-			pTrack->SetNodeIndex(lBoneIdx[i]);
-
-			cKeyFrame *pFrame = pTrack->CreateKeyFrame(0);
 			cVector3f vAxis = (i >= 12) ? vThumbAxis
 							: (i >= 6 && i < 9) ? vPinkyAxis : vFingerAxis;
-			pFrame->rotation = cQuaternion(cMath::ToRad(kpChainAngles[f][i]), vAxis);
-
-			Log(" [hand-rig] %s: pose=%s finger=%s boneName=%s boneIndex=%d "
-				"axis=(%.4f,%.4f,%.4f) angle=%.1f appliedRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f)\n",
-				sHand, ksPoseNames[f], ksFingerNames[i], ksHandBoneNames[i], lBoneIdx[i],
-				vAxis.x, vAxis.y, vAxis.z, kpChainAngles[f][i],
-				pFrame->rotation.w, pFrame->rotation.v.x, pFrame->rotation.v.y, pFrame->rotation.v.z);
+			mvGrabRot[i] = cQuaternion(cMath::ToRad(kfGrabAngles[i]), vAxis);
+			mvTriggerRot[i] = cQuaternion(cMath::ToRad(kfTriggerAngles[i]), vAxis);
+			mvHoldRot[i] = cQuaternion(cMath::ToRad(kfHoldAngles[i]), vAxis);
 		}
+	}
 
-		mpFingerAnimState[f] = mpEntity->AddAnimation(pAnim, ksPoseNames[f], 1.0f);
-		mpFingerAnimState[f]->SetActive(true);
-		mpFingerAnimState[f]->SetLoop(true);
-		mpFingerAnimState[f]->SetPaused(true);
-		mpFingerAnimState[f]->SetWeight(0.0f);
-		mfFingerWeight[f] = 0.0f;
+	//Bind-pose locals for the per-frame reset in ApplyFingerPose: the
+	//engine only resets bones when an animation state is active, and the
+	//callback path no longer uses any, so without this the applied
+	//rotations would accumulate every frame.
+	if(mpMesh->GetSkeleton())
+	{
+		for(int i=0; i<15; ++i)
+		{
+			if(mlBoneIdx[i] < 0) continue;
+			cBone *pBone = mpMesh->GetSkeleton()->GetBoneByIndex(mlBoneIdx[i]);
+			if(pBone) mvBindLocal[i] = pBone->GetLocalTransform();
+		}
 	}
 
 	mbHandRigSetup = true;
@@ -307,9 +314,9 @@ void iHudModel::SetupHandAnimation()
 
 void iHudModel::DestroyHandAnimation()
 {
+	mfIndexHoldWeight = 0.0f;
 	for(int i=0; i<kFingerTrackNum; ++i)
 	{
-		mpFingerAnimState[i] = NULL;
 		mfFingerWeight[i] = 0.0f;
 	}
 	mbHandRigSetup = false;
@@ -340,7 +347,10 @@ static float CurlDeadzone(float afValue)
 
 void iHudModel::UpdateHandAnimation(float afTimeStep)
 {
-	if(mpFingerAnimState[0] == NULL || !mbHandRigSetup) return;
+	if(!mbHandRigSetup)
+	{
+		return;
+	}
 
 	TrackedController &hand = mlHandIndex == 0 ? mpInit->mpGame->vr_left_hand
 											   : mpInit->mpGame->vr_right_hand;
@@ -388,78 +398,101 @@ void iHudModel::UpdateHandAnimation(float afTimeStep)
 	//Exponential smoothing toward the targets (~70 ms time constant): removes
 	//sensor jitter and gives the joints a slight inertia without adding
 	//perceptible lag at VR frame rates.
+	if(mbForceGrabPose)
+	{
+		//An item is attached to this slot: wrap every finger around it with
+		//the full grab pose instead of following the live grip input. The
+		//index chain retracts so only the dedicated hold pose drives it.
+		for(int f=0; f<kFingerTrackNum; ++f) afTarget[f] = 1.0f;
+		afTarget[3] = 0.0f;
+	}
+
 	float fDt = afTimeStep < 0.0f ? 0.0f : (afTimeStep > 0.1f ? 0.1f : afTimeStep);
 	float fBlend = 1.0f - expf(-fDt / 0.07f);
 
 	for(int f=0; f<kFingerTrackNum; ++f)
 	{
 		mfFingerWeight[f] += (afTarget[f] - mfFingerWeight[f]) * fBlend;
-		mpFingerAnimState[f]->SetWeight(mfFingerWeight[f]);
 	}
 
-	static float sfLastGrip[2] = { -1.0f, -1.0f };
-	static float sfLastTrigger[2] = { -1.0f, -1.0f };
-	static bool sbLogPending[2] = { false, false };
+	float fHoldTarget = mbForceGrabPose ? 1.0f : 0.0f;
+	mfIndexHoldWeight += (fHoldTarget - mfIndexHoldWeight) * fBlend;
+}
 
-	const char* sHand = mlHandIndex == 0 ? "left" : "right";
-	bool bGripChanged = cMath::Abs(fGrip - sfLastGrip[mlHandIndex]) > 0.02f;
-	bool bTriggerChanged = cMath::Abs(fTrigger - sfLastTrigger[mlHandIndex]) > 0.02f;
-	sfLastGrip[mlHandIndex] = fGrip;
-	sfLastTrigger[mlHandIndex] = fTrigger;
+//Called from the entity callback right after the engine's own animation
+//update: writes the smoothed finger rotations directly onto the bones and
+//refreshes the world matrices, so the pose is deterministic and never
+//depends on the animation-state application order.
+void iHudModel::ApplyFingerPose()
+{
+	if(!mbHandRigSetup || mpEntity == NULL) return;
 
-	//Log one frame after a weight change so the engine bone states
-	//already reflect the new weights.
-	if(bGripChanged || bTriggerChanged)
+	static int slCallCounter = 0;
+	++slCallCounter;
+	if(mbForceGrabPose && slCallCounter % 200 == 0)
 	{
-		Log(" [hand-rig] %s: grip=%.3f trigger=%.3f skeletal=%d\n", sHand, fGrip, fTrigger,
-			summary.valid && summary.skeletal ? 1 : 0);
-		sbLogPending[mlHandIndex] = true;
+		Log(" [hand-rig] '%s': pose tick #%d force=1 weights %.2f/%.2f/%.2f/%.2f/%.2f hold=%.2f\n",
+			msName.c_str(), slCallCounter, mfFingerWeight[0], mfFingerWeight[1],
+			mfFingerWeight[2], mfFingerWeight[3], mfFingerWeight[4], mfIndexHoldWeight);
 	}
-	else if(sbLogPending[mlHandIndex])
+
+	if(mbForceGrabPose && !mbForceGrabLogged)
 	{
-		sbLogPending[mlHandIndex] = false;
-		for(int i=0; i<lHandBoneNum; ++i)
+		Log(" [hand-rig] '%s': force=1 weights %.2f/%.2f/%.2f/%.2f/%.2f hold=%.2f\n",
+			msName.c_str(), mfFingerWeight[0], mfFingerWeight[1], mfFingerWeight[2],
+			mfFingerWeight[3], mfFingerWeight[4], mfIndexHoldWeight);
+		mbForceGrabLogged = true;
+	}
+	else if(!mbForceGrabPose)
+	{
+		mbForceGrabLogged = false;
+	}
+
+	for(int i=0; i<15; ++i)
+	{
+		if(mlBoneIdx[i] < 0) continue;
+		cBoneState *pBone = mpEntity->GetBoneState(mlBoneIdx[i]);
+		if(pBone == NULL) continue;
+
+		//Reset to bind first: without this the rotations accumulate every
+		//frame because the engine only resets bones when an animation state
+		//is active, and this path no longer uses any.
+		pBone->SetMatrix(mvBindLocal[i], false);
+
+		int f = i / 3;
+		float w;
+		const cQuaternion *pq;
+		if(mbForceGrabPose)
 		{
-			if(mlBoneIdx[i] < 0) continue;
-			cBoneState *pState = mpEntity->GetBoneState(mlBoneIdx[i]);
-			if(pState == NULL) continue;
-
-			cQuaternion qRot;
-			qRot.FromRotationMatrix(pState->GetLocalMatrix().GetRotation());
-
-			float fAngle = cMath::ToDeg(2.0f * acos(cMath::Clamp(qRot.w, -1.0f, 1.0f)));
-			float fSin = sqrtf(1.0f - qRot.w * qRot.w);
-			cVector3f vAxis(0,0,0);
-			if(fSin > 0.0001f) vAxis = qRot.v / fSin;
-
-			//Bones are laid out in chains of three, matching the track order.
-			float fWeight = mfFingerWeight[i / 3];
-			Log(" [hand-rig] %s: finger=%s boneName=%s boneIndex=%d weight=%.3f "
-				"engineRotation=(w=%.4f,x=%.4f,y=%.4f,z=%.4f) engineAngle=%.1f engineAxis=(%.4f,%.4f,%.4f)\n",
-				sHand, ksFingerNames[i], ksHandBoneNames[i], mlBoneIdx[i], fWeight,
-				qRot.w, qRot.v.x, qRot.v.y, qRot.v.z, fAngle, vAxis.x, vAxis.y, vAxis.z);
+			w = (f == 3) ? mfIndexHoldWeight : mfFingerWeight[f];
+			pq = (f == 3) ? &mvHoldRot[i] : &mvGrabRot[i];
+		}
+		else
+		{
+			w = mfFingerWeight[f];
+			pq = (f == 3) ? &mvTriggerRot[i] : &mvGrabRot[i];
 		}
 
-		//Thumb probe: where the thumb tip ends up relative to the hand origin.
-		if(mlBoneIdx[14] >= 0)
-		{
-			cBoneState *pThumb = mpEntity->GetBoneState(mlBoneIdx[14]);
-			if(pThumb)
-			{
-				cVector3f vTip = pThumb->GetWorldMatrix().GetTranslation();
-				cVector3f vHand = mpEntity->GetWorldMatrix().GetTranslation();
-				Log(" [hand-rig] %s: thumbTip world=(%.3f,%.3f,%.3f) relHand=(%.3f,%.3f,%.3f) grip=%.3f\n",
-					sHand, vTip.x, vTip.y, vTip.z,
-					(vTip - vHand).x, (vTip - vHand).y, (vTip - vHand).z, fGrip);
-			}
-		}
+		if(w <= 0.001f) continue;
+
+		cQuaternion qRot = cMath::QuaternionSlerp(w, cQuaternion::Identity, *pq, true);
+		pBone->AddRotation(qRot);
 	}
 }
 
 	//-----------------------------------------------------------------------
 
+void cHandRigPoseCallback::AfterAnimationUpdate(cMeshEntity* apMeshEntity, float afTimeStep)
+{
+	if(mpModel == NULL) return;
+	mpModel->ApplyFingerPose();
+	apMeshEntity->RefreshBoneWorldMatrices();
+}
+
+	//-----------------------------------------------------------------------
+
 void iHudModel::SetVisible(bool visible) {
-  mpEntity->SetVisible(visible);
+  if(mpEntity) mpEntity->SetVisible(visible);
 }
 
 //-----------------------------------------------------------------------
@@ -467,8 +500,9 @@ void iHudModel::SetVisible(bool visible) {
 void iHudModel::DestroyEntities()
 {
 	cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
-	
+
 	//Mesh entity
+	if(mpEntity) mpEntity->SetCallback(NULL);
 	pWorld->DestroyMeshEntity(mpEntity);
 	mpEntity = NULL;
 	
@@ -564,6 +598,7 @@ cPlayerHands::cPlayerHands(cInit *apInit)  : iUpdateable("FadeHandler")
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
 		mvCurrentHudModels[i] = NULL;
+		mvAttachmentHudModels[i] = NULL;
 	}
 }
 
@@ -662,9 +697,62 @@ void cPlayerHands::Update(float afTimeStep)
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
 
+    pHudModel->mbForceGrabPose = mvAttachmentHudModels[i] != NULL;
+
     pHudModel->UpdateHandAnimation(afTimeStep);
 
 		// Call per-model update for things like throw velocity tracking
+		pHudModel->Update(afTimeStep);
+	}
+
+	/////////////////////////////////////
+	// Attachment models share the slot's controller pose but never replace
+	// the hand rig, so the item is seen held by a visible hand. They skip
+	// the finger animation and the equip/unequip swap chain.
+	for(int i=0; i< mlCurrentModelNum; ++i)
+	{
+		iHudModel *pHudModel = mvAttachmentHudModels[i];
+		if(pHudModel == NULL) continue;
+
+    const bool poseValid = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
+      mpInit->mpGame->vr_right_hand.IsPoseValid();
+    if (!poseValid) {
+      if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(false);
+      continue;
+    }
+    if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(true);
+
+    TrackedController& hand = i == 0 ? mpInit->mpGame->vr_left_hand :
+      mpInit->mpGame->vr_right_hand;
+    cMatrixf mtxRaw = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
+
+    //Virtual per-model pose logic (the melee attack sweep, throw charging)
+    //must keep running even though the final rendered matrix below comes
+    //from the palm anchor.
+    cMatrixf mtxLogicPose = cMatrixf::Identity;
+    pHudModel->UpdatePoseMatrix(mtxLogicPose, afTimeStep);
+
+    //Fixed palm socket expressed in the CONTROLLER frame (multiplied right
+    //after the raw pose, before any world-space operation): slightly above
+    //the grip origin and forward, at the line between the palm and the
+    //finger knuckles, shifted toward the thumb side. Composing it inside
+    //the controller frame keeps the item rigid relative to the hand no
+    //matter how the hand or the body move.
+    cVector3f vSocket(
+      ((i == 0) ? 0.05f : -0.05f) + pHudModel->mvVrTransOffset.x,
+      0.015f + pHudModel->mvVrTransOffset.y,
+      0.08f + pHudModel->mvVrTransOffset.z);
+    cMatrixf mtxLocal = cMath::MatrixMul(
+      cMath::MatrixTranslate(vSocket),
+      cMath::MatrixMul(
+        cMath::MatrixRotate(pHudModel->mvVrRotOffset, eEulerRotationOrder_XYZ),
+        cMath::MatrixScale(cVector3f(pHudModel->mfVrScale))));
+    cMatrixf mtxPose = cMath::MatrixMul(mtxRaw, mtxLocal);
+
+    if (pHudModel->mpEntity != nullptr)
+      pHudModel->mpEntity->SetMatrix(mtxPose);
+    pHudModel->SetLastPose(mtxPose);
+
 		pHudModel->Update(afTimeStep);
 	}
 }
@@ -682,6 +770,12 @@ void cPlayerHands::Reset()
 		}
 		
 		mvCurrentHudModels[i] = NULL;
+
+		if(mvAttachmentHudModels[i])
+		{
+			mvAttachmentHudModels[i]->DestroyEntities();
+			mvAttachmentHudModels[i] = NULL;
+		}
 	}
 	
 	tHudModelMapIt it = m_mapHudModels.begin();
@@ -803,6 +897,8 @@ bool cPlayerHands::AddModelFromFile(const tString &asFile)
 
 void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 {
+	Log(" [hand-rig] SetCurrentModel slot %d -> '%s'\n", alNum, asName.c_str());
+
 	//////////////////////////////////////////////
 	//Check so that it is not already equipped
 	if(mvCurrentHudModels[alNum] &&
@@ -884,6 +980,81 @@ void cPlayerHands::SetCurrentModel(int alNum,const tString& asName)
 
 //-----------------------------------------------------------------------
 
+void cPlayerHands::SetAttachmentModel(int alNum,const tString& asName)
+{
+	iHudModel *&pSlot = mvAttachmentHudModels[alNum];
+
+	if(pSlot && asName != "" &&
+		cString::ToLowerCase(asName) == cString::ToLowerCase(pSlot->msName))
+	{
+		return;
+	}
+
+	if(pSlot)
+	{
+		Log(" [hand-rig] detach '%s' from %s hand.\n", pSlot->msName.c_str(),
+			alNum == 0 ? "left" : "right");
+		pSlot->UnequipEffect();
+		pSlot->DestroyEntities();
+		pSlot->Reset();
+		pSlot = NULL;
+	}
+
+	if(asName == "") return;
+
+	tHudModelMapIt it = m_mapHudModels.find(cString::ToLowerCase(asName));
+	if(it == m_mapHudModels.end())
+	{
+		Log(" Couldn't find hud model '%s'!\n",asName.c_str());
+		return;
+	}
+
+	iHudModel *pAttachModel = it->second;
+
+	Log(" [hand-rig] attach '%s' to %s hand.\n", pAttachModel->msName.c_str(),
+		alNum == 0 ? "left" : "right");
+
+	pAttachModel->SetHandIndex(alNum);
+	pAttachModel->LoadEntities();
+	pAttachModel->EquipEffect(true);
+	pAttachModel->mfTime = 0;
+	pAttachModel->mState = eHudModelState_Idle;
+
+	pSlot = pAttachModel;
+}
+
+//-----------------------------------------------------------------------
+
+iHudModel* cPlayerHands::FindHandModel(int alNum,const tString& asName)
+{
+	const tString sLower = cString::ToLowerCase(asName);
+
+	iHudModel* apCandidates[2] = { mvCurrentHudModels[alNum], mvAttachmentHudModels[alNum] };
+	for(int i=0; i<2; ++i)
+	{
+		if(apCandidates[i] &&
+			cString::ToLowerCase(apCandidates[i]->msName) == sLower &&
+			apCandidates[i]->GetState() != eHudModelState_Unequip)
+		{
+			return apCandidates[i];
+		}
+	}
+
+	return NULL;
+}
+
+//-----------------------------------------------------------------------
+
+void cPlayerHands::SetSlotVisible(int alNum, bool abX)
+{
+	if(mvCurrentHudModels[alNum])
+		mvCurrentHudModels[alNum]->SetVisible(abX);
+	if(mvAttachmentHudModels[alNum])
+		mvAttachmentHudModels[alNum]->SetVisible(abX);
+}
+
+//-----------------------------------------------------------------------
+
 iHudModel* cPlayerHands::GetModel(const tString& asName)
 {
 	tHudModelMapIt it = m_mapHudModels.find(cString::ToLowerCase(asName));
@@ -906,6 +1077,11 @@ void cPlayerHands::OnWorldExit()
 		{
 			pHudModel->DestroyEntities();
 		}
+
+		if(mvAttachmentHudModels[i])
+		{
+			mvAttachmentHudModels[i]->DestroyEntities();
+		}
 	}
 }
 
@@ -920,6 +1096,12 @@ void cPlayerHands::OnWorldLoad()
 		{
 			pHudModel->SetHandIndex(i);
 			pHudModel->LoadEntities();
+		}
+
+		if(mvAttachmentHudModels[i])
+		{
+			mvAttachmentHudModels[i]->SetHandIndex(i);
+			mvAttachmentHudModels[i]->LoadEntities();
 		}
 	}
 }

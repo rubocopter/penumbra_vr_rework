@@ -1016,7 +1016,9 @@ void cNotebook::Update(float afTimeStep)
     // Translate in front of eyes
     transMat = cMath::MatrixMul(translateMat, transMat);
 
-    scene->SetVRMenuState(MenuState_WorldPositionDepthTest, transMat);
+    // Draw without a depth test: the notebook is a reading surface held in
+    // one hand, so world geometry must never clip it or hide its text.
+    scene->SetVRMenuState(MenuState_WorldPosition, transMat);
   }
 
 	////////////////////////////////
@@ -1270,9 +1272,13 @@ void cNotebook::SetActive(bool abX)
         mpInit->mpPlayer->GetFlashLight()->SetActive(false);
       if(mpInit->mpPlayer->GetGlowStick()->IsActive())
         mpInit->mpPlayer->GetGlowStick()->SetActive(false);
+      if(mpInit->mpPlayer->GetFlare()->IsActive())
+        mpInit->mpPlayer->GetFlare()->SetActive(false);
       mpInit->mpPlayer->StartHolster();
       mpInit->mpPlayerHands->SetCurrentModel(0, "");
       mpInit->mpPlayerHands->SetCurrentModel(1, "");
+      mpInit->mpPlayerHands->SetAttachmentModel(0, "");
+      mpInit->mpPlayerHands->SetAttachmentModel(1, "");
     }
 
     // Hide hands

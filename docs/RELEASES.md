@@ -1,21 +1,64 @@
 # Releases
 
-## Unreleased
+## v0.1.0-alpha.4 — 23 August 2026
+
+Graphics presets and the first pass of **equipped objects visible in the
+hands**.
+
+> **The held-object system is experimental and in a very green state.** Items
+> render attached to the visible hand rigs and melee combat works, but grip
+> poses, finger wrap, and per-item placement are approximate and will keep
+> changing. Expect visible imperfections.
+
+### New since v0.1.0-alpha.3
+
+Graphics:
 
 - New `[VR] RenderScale` setting (0.5–2.0, default 1.0) that multiplies the
-  SteamVR recommended eye buffer size at startup. This is the main performance
-  lever on modern high-resolution headsets; changing it needs an application
-  restart.
+  SteamVR recommended eye buffer size at startup; the main performance lever
+  on modern headsets (restart required after changing it).
 - One-click graphics presets in Options → VR Settings: Performance (0.75x,
-  shadows off, medium shaders, 4x anisotropy), Balanced (1.0x, static shadows,
-  8x anisotropy), and Quality (1.25x, full shadows, 16x anisotropy). Each also
-  updates the classic graphics page values, and the row shows Custom when the
-  current mix matches no preset.
-- Texture anisotropic filtering now defaults to 16x instead of Off; sharpens
-  floors and walls viewed at angles at negligible cost on modern GPUs.
-- Fixed `[Screen] Vsync` never being loaded from the settings file.
-- Fixed the `[Graphics] Refractions` value never being written back to the
-  settings file.
+  shadows off, medium shaders, 4x anisotropy), Balanced (1.0x, static
+  shadows, 8x anisotropy), and Quality (1.25x, full shadows, 16x
+  anisotropy). The row shows Custom when the current mix matches no preset.
+- Texture anisotropic filtering now defaults to 16x instead of Off.
+- Fixed `[Screen] Vsync` never being loaded and `[Graphics] Refractions`
+  never being saved.
+
+Hands and equipped objects (experimental):
+
+- The flashlight, glowstick, flare, melee weapons (hammer, pickaxe, broom),
+  and thrown items render as attachments on top of the visible hand rig
+  instead of replacing it, so the hand is seen holding the object.
+- Items anchor to a palm socket in the controller frame (between palm and
+  finger knuckles, shifted toward the thumb) with per-item rotation and
+  scale; the placement is rigid relative to the hand while moving.
+- Melee weapons and thrown items keep their full gameplay logic: damage
+  sweeps, charging, and throw release from the rendered item pose.
+- Fixed a crash when opening the notebook while a flare was equipped: the
+  flare helper kept a pointer to its destroyed light (use-after-free). The
+  notebook and the handedness change now deactivate the flare properly.
+- The notebook draws without a depth test, so world geometry can no longer
+  clip it or hide its text.
+- The thrown item honours the `VrScale` of its hud file again (the loader
+  overrode it with a hardcoded 3.0, rendering the held dynamite tiny);
+  ships a held-dynamite override at 6.0.
+
+### Known limitations (held objects)
+
+- The forced grip does not close the fist completely yet; the finger wrap is
+  still shallow and the thumb stays static (known model limitation).
+- Per-item placement is a first pass: some items still intersect the hand or
+  sit slightly off the palm line.
+- The system may change without notice between builds.
+
+### What to test
+
+- Graphics presets and the render scale lever (compare frame timing at 0.75,
+  1.0, and 1.25).
+- Equipped items: flashlight, glowstick, flare, hammer, pickaxe, dynamite —
+  visibility, placement, and melee damage.
+- The notebook with items equipped (earlier builds crashed here).
 
 ## v0.1.0-alpha.3 — 23 August 2026
 

@@ -1586,22 +1586,6 @@ void cPlayer::Update(float afTimeStep)
 vr_headPos.y = mpCharBody->GetFeetPosition().y;
     mpInit->mpGame->vr_tracking.SetPlayerWorldPose(cMath::MatrixTranslate(vr_headPos));
   }
-
-  static unsigned long lastVRPosLog = 0;
-  const unsigned long now = GetApplicationTime();
-  if(now - lastVRPosLog > 2000)
-  {
-    lastVRPosLog = now;
-    cVector3f vFeet = mpCharBody->GetFeetPosition();
-    cVector3f vHmd = mpInit->mpGame->vr_tracking.GetHeadTrackingPose().GetTranslation();
-    cVector3f vHead = mpInit->mpGame->vr_tracking.GetHeadWorldPose().GetTranslation();
-    Log(" [VR pos +%lu ms] feet=(%.2f,%.2f,%.2f) hmdHeight=%.2f calibration=%.2f posture=%.2f headWorld=(%.2f,%.2f,%.2f) yaw=%.1f\n",
-      now, vFeet.x, vFeet.y, vFeet.z, vHmd.y,
-      mpInit->mpGame->vr_tracking.GetHeightCalibration(),
-      mpInit->mpGame->vr_tracking.GetPostureOffset(),
-      vHead.x, vHead.y, vHead.z,
-      cMath::ToDeg(mpInit->mpGame->vr_tracking.GetWorldYaw()));
-  }
 }
 
 //-----------------------------------------------------------------------

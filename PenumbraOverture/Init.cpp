@@ -687,9 +687,13 @@ void cInit::ApplyVRSettings(bool abSave)
 				mpPlayer->GetFlashLight()->SetActive(false);
 			if(mpPlayer->GetGlowStick()->IsActive())
 				mpPlayer->GetGlowStick()->SetActive(false);
+			if(mpPlayer->GetFlare()->IsActive())
+				mpPlayer->GetFlare()->SetActive(false);
 			mpPlayer->StartHolster();
 			mpPlayerHands->SetCurrentModel(0, "");
 			mpPlayerHands->SetCurrentModel(1, "");
+			mpPlayerHands->SetAttachmentModel(0, "");
+			mpPlayerHands->SetAttachmentModel(1, "");
 		}
 
 		mpGame->vr_dominant_hand = newDominant;

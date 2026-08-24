@@ -112,6 +112,11 @@ namespace hpl {
 
 		void SetCallback(cMeshEntityCallback *apCallback){mpCallback = apCallback;}
 
+		//Recompute the bone/node world matrices from their local transforms.
+		//Public so external pose drivers (e.g. the VR hand rig callback) can
+		//refresh the hierarchy after writing local bone rotations.
+		void RefreshBoneWorldMatrices();
+
 		//Sub mesh entities
 		cSubMeshEntity* GetSubMeshEntity(unsigned int alIdx);
 		cSubMeshEntity* GetSubMeshEntityName(const tString &asName);
@@ -240,7 +245,7 @@ namespace hpl {
 		tNodeStateIndexMap m_mapBoneStateIndices;
 		tNodeStateVec mvTempBoneStates;
 
-		std::vector<cMatrixf> mvBoneMatrices;
+		std::vector<cMatrixf>  mvBoneMatrices;
 
 		bool mbSkeletonPhysics;
 		bool mbSkeletonPhysicsFading;

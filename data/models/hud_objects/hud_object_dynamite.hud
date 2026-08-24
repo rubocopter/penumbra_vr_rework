@@ -1,0 +1,43 @@
+<HUD_MODEL>
+	<MAIN
+		Name = "Dynamite"
+		Type = "Throw"
+		
+		ModelFile = "hud_object_dynamite.dae"
+		EquipTime = 0.43f
+		UnequipTime = 0.31f
+		
+		EquipPose_Pos = "0.097 -0.087 0.120"
+		EquipPose_Rot =	"-22.4 19.6 0.0"
+		
+		UnequipPose_Pos = "0.097 -0.120 0.120"
+		UnequipPose_Rot = "-64.4 19.6 0.0"
+
+		EquipSound = ""
+		UnequipSound = ""
+		
+		VrTransOffset = "0.0 0.0 0.0"
+		VrRotOffset = "4.71 0.0 0.0"
+		VrScale = 6.0f
+	 />
+	 
+	 <THROW
+	 	ChargePose_Pos = "0.120 -0.003 0.120"
+	 	ChargePose_Rot = "28.0 19.6 0.0"
+
+		ChargeTime = "2"
+		MinImpulse = "2"
+		MaxImpulse = "15"
+
+		ReloadTime = "1.4"
+
+		Torque = "1 0 0"
+
+		ThrowEntity = "item_dynamite_thrown"
+
+		ChargeSound = ""
+		ThrowSound = ""
+	 />
+	 
+</HUD_MODEL>
+

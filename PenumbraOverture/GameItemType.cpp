@@ -366,11 +366,10 @@ bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum
 		if(mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName())==NULL)
 			mpInit->mpPlayerHands->AddModelFromFile(apItem->GetHudModelFile());
 
-		if(mpInit->mpPlayerHands->GetCurrentModel(weaponSlot) &&
-			mpInit->mpPlayerHands->GetCurrentModel(weaponSlot)->msName == apItem->GetHudModelName())
+		if(mpInit->mpPlayerHands->FindHandModel(weaponSlot, apItem->GetHudModelName()))
 		{
-			//mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, "");
-			
+			//mpInit->mpPlayerHands->SetAttachmentModel(weaponSlot, "");
+
 			mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 		}
 		else
@@ -381,7 +380,7 @@ bool cGameItemType_WeaponMelee::OnAction(cInventoryItem *apItem, int alActionNum
 				return true;
 			}
 			
-            if(mpInit->mbHasHaptics==false) mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, apItem->GetHudModelName());
+            if(mpInit->mbHasHaptics==false) mpInit->mpPlayerHands->SetAttachmentModel(weaponSlot, apItem->GetHudModelName());
 
 			//////////////////////////
 			//Set up the melee state
@@ -433,10 +432,9 @@ bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 		if(mpInit->mpPlayerHands->GetModel(apItem->GetHudModelName())==NULL)
 			mpInit->mpPlayerHands->AddModelFromFile(apItem->GetHudModelFile());
 
-		if(mpInit->mpPlayerHands->GetCurrentModel(weaponSlot) &&
-			mpInit->mpPlayerHands->GetCurrentModel(weaponSlot)->msName == apItem->GetHudModelName())
+		if(mpInit->mpPlayerHands->FindHandModel(weaponSlot, apItem->GetHudModelName()))
 		{
-			//mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, "");
+			//mpInit->mpPlayerHands->SetAttachmentModel(weaponSlot, "");
 
 			mpInit->mpPlayer->ChangeState(ePlayerState_Normal);
 		}
@@ -448,7 +446,7 @@ bool cGameItemType_Throw::OnAction(cInventoryItem *apItem, int alActionNum)
 				return true;
 			}
 
-			mpInit->mpPlayerHands->SetCurrentModel(weaponSlot, apItem->GetHudModelName());
+			mpInit->mpPlayerHands->SetAttachmentModel(weaponSlot, apItem->GetHudModelName());
 
 			//////////////////////////
 			//Set up the throw state

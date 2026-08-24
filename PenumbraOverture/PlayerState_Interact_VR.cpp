@@ -253,8 +253,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
 	
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -338,8 +337,7 @@ void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 {
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 	mpPushBody->SetGravity(mbHasGravity);
@@ -645,8 +643,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -742,8 +739,7 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	mpPushBody->RemoveBodyCallback(mpCallback);
 	}*/
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
 
 	////////////////////////////
 	//Pause controllers
@@ -995,8 +991,7 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(false);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -1071,8 +1066,7 @@ void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 {
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
 
-  if (mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame)))
-    mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame))->SetVisible(true);
+  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 

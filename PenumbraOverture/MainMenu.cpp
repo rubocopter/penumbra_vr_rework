@@ -1233,7 +1233,6 @@ cVRSettings& settings = mpInit->mVRSettings;
 gpVRSettingTexts[mSetting]->msText = GetVRSettingText(mpInit, mSetting);
 		mpInit->ApplyVRSettings(true);
 		RefreshVRSettingAvailability(mpInit);
-		Log(" [VR settings +%lu ms] menu setting %d changed.\n", GetApplicationTime(), (int)mSetting);
 	}
 
 	void OnMouseOver(bool abOver)

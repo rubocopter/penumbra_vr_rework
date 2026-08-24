@@ -71,7 +71,9 @@ void cHudModel_Throw::LoadData(TiXmlElement *apRootElem)
 	msChargeSound = cString::ToString(pMeleeElem->Attribute("ChargeSound"),"");
 	msThrowSound = cString::ToString(pMeleeElem->Attribute("ThrowSound"),"");
 
-  mfVrScale = 3.0f;
+	// The generic MAIN parse above already read VrScale; honour the file value
+	// (3.0 kept as default for legacy item hud files without Vr keys).
+	mfVrScale = cString::ToFloat(apRootElem->FirstChildElement("MAIN")->Attribute("VrScale"), 3.0f);
 }
 
 //-----------------------------------------------------------------------
@@ -160,15 +162,15 @@ void cHudModel_Throw::OnAttackUp()
 
 ///////////////////////////////
 	//Create entity
-	cMatrixf mtxStart = cMatrixf::Identity;
-	iHudModel *pHand = mpInit->mpPlayerHands->GetCurrentModel(VRHelper::DominantHandSlot(mpInit->mpGame));
-	if(pHand == NULL || pHand->UpdatePoseMatrix(mtxStart, 0.0f) == false)
+	//Spawn from the last rendered pose of the held item: as an attachment it
+	//is anchored to the hand knuckles, and that is where the release should
+	//happen (UpdatePoseMatrix alone would return the un-anchored pose).
+	if(IsLastPoseValid() == false)
 	{
-		// No valid hand pose: aborting is safer than spawning at a garbage
-		// transform (UpdatePoseMatrix leaves the matrix untouched on failure).
 		mfChargeCount = 0;
 		return;
 	}
+	cMatrixf mtxStart = GetLastPose();
 
 	iEntity3D *pEntity = mpInit->mpGame->GetScene()->GetWorld3D()->CreateEntity("Throw",mtxStart,
 																				msThrowEntity, true);

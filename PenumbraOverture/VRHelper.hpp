@@ -72,62 +72,61 @@ namespace VRHelper {
     return sum / numContactPoints;
   }
 
-  #define EPSILON 0.000001
-  #define CROSS(dest,v1,v2) \
-          dest[0]=v1[1]*v2[2]-v1[2]*v2[1]; \
-          dest[1]=v1[2]*v2[0]-v1[0]*v2[2]; \
-          dest[2]=v1[0]*v2[1]-v1[1]*v2[0];
-  #define DOT(v1,v2) (v1[0]*v2[0]+v1[1]*v2[1]+v1[2]*v2[2])
-  #define SUB(dest,v1,v2) \
-          dest[0]=v1[0]-v2[0]; \
-          dest[1]=v1[1]-v2[1]; \
-          dest[2]=v1[2]-v2[2]; 
-
-  /* the original jgt code */
-  static inline int intersect_triangle(float orig[3], float dir[3],
-    float vert0[3], float vert1[3], float vert2[3],
-    float *t, float *u, float *v)
+  // Solves the pointer ray against the plane of the 800x600 UI surface and
+  // returns the hit position in UI pixels plus the distance along the ray.
+  // The projected surface is an affine rectangle, so one planar solve covers
+  // the whole quad exactly where the old per-triangle tests only accepted
+  // rays passing through it. Rays that miss the quad still report the point
+  // where they cross the plane, letting callers pin the cursor to the panel
+  // instead of hiding the laser until the wrist finds an exact angle.
+  static inline bool RaycastUIPlane(const cVector3f& origin,
+    const cVector3f& direction, const cVector3f& p00,
+    const cVector3f& p10, const cVector3f& p01,
+    float* xOut, float* yOut, float* tOut)
   {
-    float edge1[3], edge2[3], tvec[3], pvec[3], qvec[3];
-    float det, inv_det;
+    const cVector3f ex = (p10 - p00) / 800.0f;
+    const cVector3f ey = (p01 - p00) / 600.0f;
+    const cVector3f normal = cMath::Vector3Normalize(
+      cMath::Vector3Cross(ex, ey));
 
-    /* find vectors for two edges sharing vert0 */
-    SUB(edge1, vert1, vert0);
-    SUB(edge2, vert2, vert0);
+    const float denom = cMath::Vector3Dot(normal, direction) * -1.0f;
+    // Nearly parallel rays never meet the surface at a useful angle.
+    if(cMath::Abs(denom) < 0.001f)
+      return false;
 
-    /* begin calculating determinant - also used to calculate U parameter */
-    CROSS(pvec, dir, edge2);
+    const cVector3f originOffset = origin - p00;
+    const float distance = cMath::Vector3Dot(normal, originOffset) / denom;
+    // Only surfaces ahead of the controller count as aiming at them; the
+    // depth guard rejects gestures that graze the plane metres away.
+    if(distance <= 0.0f || distance > 10.0f)
+      return false;
 
-    /* if determinant is near zero, ray lies in plane of triangle */
-    det = DOT(edge1, pvec);
+    // Solve the plane hit against the surface axes. The Gram matrix is
+    // orientation independent, so the flipped vertical axis of some UI
+    // surfaces cannot corrupt the cursor position.
+    const cVector3f planeHit = origin + direction * distance;
+    const cVector3f offset = planeHit - p00;
 
-    if (det > -EPSILON && det < EPSILON)
-      return 0;
-    inv_det = 1.0 / det;
+    const float exLength2 = cMath::Vector3Dot(ex, ex);
+    const float eyLength2 = cMath::Vector3Dot(ey, ey);
+    const float exDotEy = cMath::Vector3Dot(ex, ey);
+    const float determinant = exLength2 * eyLength2 - exDotEy * exDotEy;
 
-    /* calculate distance from vert0 to ray origin */
-    SUB(tvec, orig, vert0);
+    const float offsetDotEx = cMath::Vector3Dot(offset, ex);
+    const float offsetDotEy = cMath::Vector3Dot(offset, ey);
 
-    /* calculate U parameter and test bounds */
-    *u = DOT(tvec, pvec) * inv_det;
-    if (*u < 0.0 || *u > 1.0)
-      return 0;
+    const float x = (eyLength2 * offsetDotEx - exDotEy * offsetDotEy) /
+      determinant;
+    const float y = (exLength2 * offsetDotEy - exDotEy * offsetDotEx) /
+      determinant;
 
-    /* prepare to test V parameter */
-    CROSS(qvec, tvec, edge1);
-
-    /* calculate V parameter and test bounds */
-    *v = DOT(dir, qvec) * inv_det;
-    if (*v < 0.0 || *u + *v > 1.0)
-      return 0;
-
-    /* calculate t, ray intersects triangle */
-    *t = DOT(edge2, qvec) * inv_det;
-
-    return 1;
+    if(xOut) *xOut = x;
+    if(yOut) *yOut = y;
+    if(tOut) *tOut = distance;
+    return true;
   }
 
-// Projects the best available controller pose onto a complete 800x600 UI
+  // Projects the best available controller pose onto a complete 800x600 UI
   // surface. The dominant hand remains the primary pointer, while the other
   // hand takes over automatically if SteamVR temporarily loses its pose.
   static inline bool TraceUIPointer(cGame* game, const cMatrixf& uiMatrix,
@@ -159,28 +158,18 @@ namespace VRHelper {
     cVector3f p00 = cMath::MatrixMul(uiMatrix, cVector3f(0.0f, 0.0f, 0.0f));
     cVector3f p01 = cMath::MatrixMul(uiMatrix, cVector3f(0.0f, 600.0f, 0.0f));
     cVector3f p10 = cMath::MatrixMul(uiMatrix, cVector3f(800.0f, 0.0f, 0.0f));
-    cVector3f p11 = cMath::MatrixMul(uiMatrix, cVector3f(800.0f, 600.0f, 0.0f));
 
     float t = 0.0f;
-    float u = 0.0f;
-    float v = 0.0f;
     float x = 0.0f;
     float y = 0.0f;
 
-    if(intersect_triangle(&handPos.v[0], &handForward.v[0],
-      &p00.v[0], &p01.v[0], &p10.v[0], &t, &u, &v) && t > 0.0f)
-    {
-      x = v * 800.0f;
-      y = u * 600.0f;
-    }
-    else if(intersect_triangle(&handPos.v[0], &handForward.v[0],
-      &p11.v[0], &p10.v[0], &p01.v[0], &t, &u, &v) && t > 0.0f)
-    {
-      x = (1.0f - v) * 800.0f;
-      y = (1.0f - u) * 600.0f;
-    }
-    else
+    if(!RaycastUIPlane(handPos, handForward, p00, p10, p01, &x, &y, &t))
       return false;
+
+    // Off-panel rays pin the cursor to the nearest edge instead of hiding
+    // the laser, so pointing near the surface is enough to use it.
+    x = cMath::Clamp(x, 0.0f, 800.0f);
+    y = cMath::Clamp(y, 0.0f, 600.0f);
 
     if(screenPos) *screenPos = cVector2f(x, y);
     if(rayStart) *rayStart = handPos + handForward * 0.03f;

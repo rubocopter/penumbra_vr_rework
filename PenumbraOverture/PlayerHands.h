@@ -60,6 +60,22 @@ enum eHudModelState
 
 //------------------------------------------------
 
+class iHudModel;
+
+//Applies the smoothed finger weights directly to the rig bones after the
+//engine has run its own animation update, bypassing the animation-state
+//path entirely (deterministic: no reliance on state application order).
+class cHandRigPoseCallback : public cMeshEntityCallback
+{
+public:
+	cHandRigPoseCallback(iHudModel* apModel) : mpModel(apModel) {}
+	void AfterAnimationUpdate(cMeshEntity* apMeshEntity, float afTimeStep);
+private:
+	iHudModel *mpModel;
+};
+
+//------------------------------------------------
+
 cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem);
 
 //------------------------------------------------
@@ -109,15 +125,29 @@ public:
   cVector3f mvVrRotOffset;
   cVector3f mvVrTransOffset;
 
+  //While true the finger rigs close into the full grab pose regardless of
+  //the live grip input, so an attached item is seen firmly held.
+  bool mbForceGrabPose;
+  //One-shot diagnostic guard for the forced-grab log line.
+  bool mbForceGrabLogged;
+
+  //Last world pose the model was placed at (attachments refresh it every
+  //frame); consumers such as the throw release read it instead of
+  //re-deriving a raw pose that no longer matches the rendered item.
+  void SetLastPose(const cMatrixf& aMtx){ mmtxLastPose = aMtx; mbLastPoseValid = true; }
+  const cMatrixf& GetLastPose() const { return mmtxLastPose; }
+  bool IsLastPoseValid() const { return mbLastPoseValid; }
+
   virtual bool UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep);
 
 	virtual void Update(float afTimeStep) {}
 
-	void SetHandIndex(int handIndex) {
+  void SetHandIndex(int handIndex) {
     mlHandIndex = handIndex;
   }
 
   void UpdateHandAnimation(float afTimeStep);
+  void ApplyFingerPose();
 
 protected:
 	virtual void ResetExtraData()=0;
@@ -149,10 +179,25 @@ protected:
   //Middle, Ring, Little, Index, Thumb) so every finger follows its own
   //curl value with independent timing and smoothing.
   static const int kFingerTrackNum = 5;
-  cAnimationState *mpFingerAnimState[kFingerTrackNum];
   float mfFingerWeight[kFingerTrackNum];
   int mlBoneIdx[15];
   bool mbHandRigSetup;
+
+  //Precomputed per-bone rotations (bind-relative, about the per-chain fold
+  //axes) for the three poses: relaxed grab, trigger, and the deeper hold
+  //used while an item is attached. Zero-angle bones stay identity.
+  cQuaternion mvGrabRot[15];
+  cQuaternion mvTriggerRot[15];
+  cQuaternion mvHoldRot[15];
+  //Bind-pose local transforms: the callback resets every bone to these
+  //before applying its rotation, so poses never accumulate across frames.
+  cMatrixf mvBindLocal[15];
+  float mfIndexHoldWeight;
+
+  cHandRigPoseCallback *mpPoseCallback;
+
+  cMatrixf mmtxLastPose;
+  bool mbLastPoseValid;
 };
 
 //------------------------------------------------
@@ -197,12 +242,23 @@ public:
 	void SetCurrentModel(int alNum, const tString& asName);
 	iHudModel* GetCurrentModel(int alNum){ return mvCurrentHudModels[alNum];}
 
+	// Extra mesh rendered on the same controller pose as the slot's hand rig,
+	// so an equipped item (flashlight, glowstick, flare) is seen held by a
+	// visible hand instead of replacing it. Equip and clear are instant.
+	void SetAttachmentModel(int alNum, const tString& asName);
+	iHudModel* GetAttachmentModel(int alNum){ return mvAttachmentHudModels[alNum];}
+	// First current or attachment model of slot alNum whose name matches.
+	iHudModel* FindHandModel(int alNum, const tString& asName);
+	// Show/hide both models of slot alNum (hand rig and attachment together).
+	void SetSlotVisible(int alNum, bool abX);
+
 private:
-	cInit *mpInit;
+	cInit* mpInit;
 	cMeshManager *mpMeshManager;
 
 	tHudModelMap m_mapHudModels;
 	iHudModel* mvCurrentHudModels[2];
+	iHudModel* mvAttachmentHudModels[2];
 	int mlCurrentModelNum;
 };
 
