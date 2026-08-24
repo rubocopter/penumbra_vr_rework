@@ -3,14 +3,9 @@
 The VR rework keeps runtime tracking, world placement, player state, and
 gameplay interaction as separate concerns. World scale is always `1.0`.
 
-Current state: this documents the `development` branch. The completion notes
-below describe when each increment was implemented and validated on PS VR2
-hardware; the crouch, hand-rig, and height areas were changed after their
-hardware validation (16–18 August 2026). The crouch and height system has since
-been revalidated and is confirmed correct; the animated hands remain
-experimental, are frozen for now, and still show incorrect visual behaviours.
-Dominant-hand, seated/standing play mode, and player-height settings were added
-on 18 August 2026 and have not yet been validated on hardware.
+This document describes the current `master` branch. Dated validation results
+and known limitations belong in the [release history](RELEASES.md); upcoming
+work belongs in the [roadmap](ROADMAP.md).
 
 ## Coordinate spaces
 
@@ -62,81 +57,46 @@ UI behaviour.
 This avoids a monolithic VR subsystem that would make engine code depend on
 Penumbra entity types.
 
-## Planned increments
+## UI and loading
 
-1. Central TrackingToWorld boundary without a gameplay change. **Complete.**
-2. Independent left/right hand target and held-object state; reuse interaction
-   collision geometry. **Complete. Gameplay interaction is driven by the
-   configured dominant hand (`cGame::vr_dominant_hand`), and a dominant-hand
-   preference can now be set in VR Settings.**
-3. Persistent declarative VR settings and an in-game editor under
-   `Options → VR Settings`. **Complete; editing and persistence validated on
-   PS VR2 hardware.**
-4. Snap/smooth/disabled turn, recenter, movement deadzone, and speed.
-   **Complete; validated on PS VR2 hardware.**
-5. Physical, button, and hybrid crouch with a standing-height baseline and
-   configurable displacement threshold. Button crouch lowers both the gameplay
-   collider and rendered viewpoint without changing world scale. **All three
-   modes were validated on PS VR2 hardware on 14 August 2026. Since then
-   (16–18 August 2026) button crouch lowers the viewpoint through a posture
-   offset in the TrackingToWorld transform by the configured crouch depth
-   (0.25 m default) instead of the deeper original move-state offset, and
-   physical crouch calibrates the standing HMD height during gameplay with a
-   plausibility band (0.90–2.20 m) and hysteresis. The crouch and height system
-   was revalidated on hardware afterwards and is confirmed correct; low-ceiling
-   recovery is still pending.**
-6. Configurable main-menu/cinematic UI distance and scale. Fullscreen surfaces
-   capture a room-space anchor when opened; HMD tracking remains live and
-   recentering rebuilds that anchor. **Complete; placement and recentering
-   validated on PS VR2 hardware.**
-7. Centralized haptic profiles, per-event repeat limits, and gameplay feedback.
-   **Implemented; initial damage and melee behaviour validated on PS VR2, with
-   further per-event tuning still open.**
-8. Staged synchronous loading: submit a black loading frame, keep an opaque
-   compositor fade during the blocking load, then reveal the new map. Map
-   changes, initial/new-game maps, the VR tutorial, and save restoration share
-   this path. **All listed routes validated on PS VR2 hardware.**
-9. Inventory ray/reticle and restored action-popup text.
-   **Implemented, generalized to all interactive UI surfaces, and able to fall
-   back to the other hand if the dominant-hand pose is unavailable. Pointer,
-   fallback, and dominant-hand pose reacquisition validated on PS VR2
-   hardware.**
-10. Room-scale collision reconciliation: when HPL rejects physical head-driven
-    body motion, subtract the rejected component from the VR tracking origin.
-    VR move interactions retain HPL1's native character collision, preventing a
-    held swing door from becoming non-solid to the player. **Validated against
-    the held locked-door bypass and ordinary collision on PS VR2 hardware.**
-11. Cinematic presentation uses a room-anchored surface and scalable text.
-    Opaque letterbox and subtitle bands are omitted so they cannot cover the
-    image; intro-image render state is restored independently, so toggling
-    subtitles cannot suppress the film. **Image rendering was validated with
-    subtitles enabled and disabled; the final no-band presentation extends the
-    already verified disabled-subtitle path to both states.**
-12. Keep the executable Win32 for legacy binary compatibility while marking it
-    Large Address Aware, allowing a 64-bit Windows host to provide the process
-    with a larger user-mode address space. **Implemented and verified in the
-    Release PE header.**
-13. Player physics handles have two explicit lifetime paths. Normal map changes
-    destroy their individual objects while the outgoing world is valid; a full
-    updater reset only nulls the handles and leaves complete-world destruction
-    to MapHandler. This avoids deleting the same HPL1/Newton ownership graph at
-    two different levels. **Revised after dump analysis found heap corruption
-    during new-game reset; tutorial, new, continue, and save routes passed the
-    clean hardware retest.**
-14. Release builds use a full solution rebuild. The legacy Visual Studio
-    dependency metadata did not invalidate `Init.obj` after class-layout
-    changes in `SaveHandler.h` and `MapHandler.h`; mixing its old allocation
-    sizes with their new constructors caused startup heap corruption. MSBuild
-    also receives `/FS` so parallel compiler processes serialize PDB writes.
-    **Build pipeline corrected and its clean Release output validated across all
-    startup/load routes on hardware.**
-15. Dominant hand, seated/standing play mode, and player height. Handedness is
-    a semantic preference: `cGame::vr_dominant_hand` (default Right) drives
-    gameplay interaction, pointer origin, throw velocity, and haptic routing;
-    `cSteamVRInput::SetHandedness` only affects pose gating (the dominant hand
-    gates `interact`) and the legacy fallback buttons, leaving SteamVR
-    bindings untouched. Seated play mode applies a height offset at the
-    TrackingToWorld boundary instead of changing world scale, with a chair
-    baseline captured from HMD height. Player height is a separate semantic
-    value with a Calibrate button that measures the HMD height. **Implemented
-    on 18 August 2026; hardware validation pending.**
+Fullscreen menus, cinematics, the death screen, and message surfaces capture a
+room-space anchor when opened. HMD tracking remains live while the surface
+stays stable; recentering rebuilds the anchor. `UIDistance`, `UIScale`, and
+`SubtitleScale` change presentation without altering tracking or world scale.
+
+Blocking transitions use a staged path: submit a black loading frame, keep the
+SteamVR compositor fade opaque during the synchronous load, and reveal the new
+state only after it has presented a frame. Map changes, the tutorial, new game,
+continue, and explicit save loading share this path.
+
+## Hands and equipped objects
+
+`cSteamVRInput` exposes logical left/right poses plus a skeletal hand summary.
+`PlayerHands.cpp` turns per-finger curl values into smoothed, rotation-only rig
+poses; devices without skeletal data use a grip/trigger closing sequence.
+Tracking input remains an engine concern, while rig geometry and gameplay
+meaning stay in Penumbra.
+
+Target and held-body state is recorded independently for both hands. The
+configured dominant hand drives interaction, pointer origin, throwing, and
+haptics; the off hand remains available for UI fallback and the notebook.
+Invalid poses hide and release only the affected hand.
+
+Equipped lights, melee weapons, and thrown objects are separate attachments on
+top of the visible hand rig. They share the controller pose, apply a fixed palm
+socket plus per-item transform, and retain their original gameplay logic. This
+presentation layer is experimental; current visual limitations are listed in
+the [roadmap](ROADMAP.md) and [release history](RELEASES.md).
+
+## Runtime and build constraints
+
+- Rendering uses the established OpenVR compositor path; SteamVR Input actions
+  have a legacy OpenVR polling fallback. Native OpenXR is not implemented.
+- The executable remains Win32 because Newton, FLTK, SDL, OpenAL, Cg, and other
+  checked-in dependencies are 32-bit. It is marked Large Address Aware for more
+  memory headroom on 64-bit Windows.
+- Release builds perform a full solution `Rebuild`. Legacy project metadata can
+  otherwise reuse objects compiled against old class layouts and corrupt the
+  heap. `/FS` serializes parallel PDB writes.
+- World scale remains `1.0`; calibration, seated play, crouch, turning, and
+  recentering operate through explicit offsets or the TrackingToWorld boundary.

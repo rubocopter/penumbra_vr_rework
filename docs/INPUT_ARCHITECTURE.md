@@ -41,8 +41,8 @@ hand's L2/L1/triangle/square, UI select on L2+R2, UI drag on the left stick,
 UI back on the dominant triangle, UI close on L1/cross/options). Pause and
 recenter are deliberately NOT mirrored: they stay on the same physical
 controls as the default layout (Options and left Create, or the equivalent
-per profile), because sharing a physical input between two actions of the
-same hand set proved unreliable in SteamVR. The global set (poses, haptics,
+per profile). SteamVR does not reliably support sharing one physical input
+between two actions in the same hand set. The global set (poses, haptics,
 skeletons) is not mirrored because those actions are physical and
 hand-agnostic.
 
@@ -208,19 +208,21 @@ without inheriting positional or height translation.
 
 ## Hand animation boundary
 
-The skeletal summary follows the same boundary as the poses: `cSteamVRInput`
-reads the device skeleton (with an animation-layer fallback for drivers that
-only expose estimated data) and stores one normalized grip/trigger pair per
-hand on the tracked-hand state. `PlayerHands.cpp` consumes only that summary:
-it builds two rotation-only pose tracks per hand (HandGrab, HandTrigger) at rig
-setup and blends their weights by grip and trigger. The hand animation is
-experimental: joints, angles, and axes were retuned from bind geometry in
-August 2026 and are frozen for now; see `docs/ROADMAP.md` for the known
-limitations.
+`cSteamVRInput` reads the device skeletal summary and falls back to SteamVR's
+animation summary when a driver exposes only estimated data. The tracked-hand
+state stores grip, trigger, and the five per-finger curl values without exposing
+SteamVR calls to gameplay code.
+
+`PlayerHands.cpp` consumes that summary. Devices with skeletal data drive each
+finger independently; other devices synthesize a staggered closing sequence
+from grip and trigger. A soft dead zone and exponential smoothing are applied
+before rotation-only poses are written to the rig bones. The current mesh and
+pose limits are presentation concerns tracked in the [roadmap](ROADMAP.md), not
+part of the runtime input contract.
 
 ## Hand interaction state
 
-Penumbra now records target and held-body ownership separately for the left and
+Penumbra records target and held-body ownership separately for the left and
 right hands. Target detection may run for both hands, but the currently exposed
 R2 interaction deliberately mirrors only the configured dominant-hand target
 into the legacy `PickedBody` slot used by original entity callbacks. This
@@ -232,29 +234,21 @@ The immutable overlap shape is allocated once per loaded physics world and
 reused by both sequential hand queries. Invalid hand poses are skipped, and an
 entity being destroyed clears any matching hand target or held-body reference.
 
-## Validated lifecycle
+## Failure and recovery lifecycle
 
-The clean Release milestone was exercised on PS VR2 Sense hardware through
-Steam launch, tutorial, new game, continue, save restoration, and repeated
-gameplay/UI transitions. A lost action pose hides and releases that hand; the
-other hand remains available for pointing, and SteamVR can reacquire the pose
-without retaining a stale tracked-device index. The same validation covered
-inventory pointing, action selection, crouch, and locked-door collision. The
-bundled Vive mapping remains a compatibility profile and still needs a
-Vive-specific hardware pass.
+If the action manifest cannot initialize or mandatory handles cannot be
+resolved, the runtime uses legacy OpenVR polling. During normal action-based
+input, a brief period with no active action origins keeps the last good state
+for 500 ms; only a longer dropout enters the legacy path. This avoids swallowing
+held input while SteamVR refreshes bindings.
 
-This describes the 14 August 2026 milestone build. The crouch and hand-rig
-areas changed afterwards (16–18 August 2026). The crouch and height system has
-been revalidated and is confirmed correct; the hand animation remains
-experimental and currently shows incorrect visual behaviour. Dominant-hand,
-seated/standing play mode, and player-height settings were added on
-18 August 2026 and await hardware validation. The left-handed mirror
-(equipment slots bound to the dominant/off hand, mirrored SteamVR action sets
-and legacy fallback, notebook always on the off hand with its lateral
-placement targeted at the visible book rectangle (hand at the book's outer
-edge, book extending toward the body in both modes), interact target
-detection accepting the left rig name
-`LeftHand` and running for the dominant hand only, asymmetric PS VR2/Touch
-face-button mirrors, per-profile pause and recenter shared between modes, and
-bare-hands resets on handedness change and notebook open) was added on
-19 August 2026 and awaits a final PS VR2 regression pass.
+A lost action pose hides the affected hand, blocks its spatial selection, and
+releases any held interaction. The other hand remains available for UI
+pointing. When the pose returns, the logical hand reacquires it without keeping
+a stale tracked-device index.
+
+`hpl.log` records whether SteamVR actions or legacy polling are active, the
+detected controller types, bundled-profile matches, and pose acquisition or
+loss. Dated hardware coverage and regression results are kept in the
+[release history](RELEASES.md) so this architecture document can remain
+descriptive rather than historical.
