@@ -24,8 +24,10 @@
 #include "EffectHandler.h"
 #include "GameLadder.h"
 #include "GameArea.h"
+#include "GameObject.h"
 
 #include "VRHelper.hpp"
+#include "VRHaptics.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -255,6 +257,132 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             handState);
         }
 
+      }
+    }
+
+    /////////////////////////////////////////////////
+    // Direct hand-to-object nudge: both hands can push
+    // nearby physics objects without pressing any button.
+    {
+      iCollideShape *nudgeShape = mpPlayer->GetVRHandNudgeShape();
+      if (nudgeShape != NULL)
+      {
+        for (int h = 0; h < eVRHandIndex_Count; ++h)
+        {
+          TrackedController& trackedHand = h == eVRHandIndex_Left
+            ? mpInit->mpGame->vr_left_hand
+            : mpInit->mpGame->vr_right_hand;
+          if (!trackedHand.IsPoseValid()) continue;
+
+          iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(h);
+          if (!pHandModel) continue;
+          cMatrixf handPose;
+          if (!pHandModel->UpdatePoseMatrix(handPose, 0.0f)) continue;
+
+          cVector3f vHandCenter = handPose.GetTranslation();
+
+          // Skip if hand is occupied (holding an object)
+          if (mpPlayer->GetVRHeldBody((eVRHandIndex)h) != NULL) continue;
+
+          cVector3f vWorldVel =
+            mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(trackedHand.GetVelocity());
+          float fSpeed = vWorldVel.Length();
+          if (fSpeed < 0.03f) continue; // ignore micro-movements
+
+          cMatrixf nudgeMtx = cMath::MatrixTranslate(vHandCenter);
+
+          // Check which bodies overlap the nudge shape
+          cPhysicsBodyIterator bodyIt = pPhysicsWorld->GetBodyIterator();
+          while (bodyIt.HasNext())
+          {
+            iPhysicsBody *pBody = bodyIt.Next();
+            if (pBody->GetUserData() == NULL) continue;
+            if (pBody->GetMass() <= 0.0f) continue; // skip statics
+
+            // Inventory items stay excluded, while ordinary physics objects
+            // and hinged doors participate. The latter mirrors the player's
+            // head/body collision, which can already push an open door.
+            iGameEntity *pNudgeEntity = (iGameEntity*)pBody->GetUserData();
+            bool bNudgeable =
+              pNudgeEntity->GetType() == eGameEntityType_Object ||
+              pNudgeEntity->GetType() == eGameEntityType_SwingDoor;
+            if (!bNudgeable) continue;
+
+            // Never push character/player capsules; shoving yourself downward
+            // tunnels the player capsule through the floor.
+            if (pBody->IsCharacter() || pBody->IsPlayer()) continue;
+
+            // Skip if any hand is already holding this body
+            if (mpPlayer->GetVRHeldBody(eVRHandIndex_Left) == pBody ||
+                mpPlayer->GetVRHeldBody(eVRHandIndex_Right) == pBody)
+              continue;
+
+            // Cheap broad-phase reject before the narrow shape test
+            cBoundingVolume *pBV = pBody->GetBV();
+            if ((pBV->GetWorldCenter() - vHandCenter).Length() >
+                pBV->GetRadius() + 0.15f)
+              continue;
+
+            cCollideData collideData;
+            collideData.SetMaxSize(1);
+            if (!pPhysicsWorld->CheckShapeCollision(
+                  pBody->GetShape(), pBody->GetLocalMatrix(),
+                  nudgeShape, nudgeMtx, collideData, 1))
+              continue;
+
+            // Only push when the hand is moving INTO the object
+            cVector3f vContact = VRHelper::CollideCenter(
+              collideData.mvContactPoints, collideData.mlNumOfPoints);
+            cVector3f vToObj = vContact - vHandCenter;
+            if (cMath::Vector3Dot(vWorldVel, vToObj) <= 0.0f)
+              continue;
+
+            // Match a fraction of the hand speed instead of adding the same
+            // delta-v every frame. Repeated overlap frames therefore converge
+            // on a modest push speed rather than stacking into a launch.
+            cVector3f vPushDir = cMath::Vector3Normalize(vWorldVel);
+            bool bGentleGrabCandidate = false;
+            if (pNudgeEntity->GetType() == eGameEntityType_Object)
+            {
+              cGameObject *pObject = (cGameObject*)pNudgeEntity;
+              bGentleGrabCandidate =
+                pObject->GetInteractMode() == eObjectInteractMode_Grab ||
+                pObject->GetInteractMode() == eObjectInteractMode_Move;
+            }
+
+            const float fPushFraction = bGentleGrabCandidate ? 0.18f : 0.45f;
+            const float fMaxPushSpeed = bGentleGrabCandidate ? 0.35f : 0.9f;
+            const float fMaxDeltaV = bGentleGrabCandidate ? 0.12f : 0.35f;
+            float fDesiredPushSpeed = cMath::Clamp(
+              fSpeed * fPushFraction, 0.0f, fMaxPushSpeed);
+            cVector3f vContactVelocity = pBody->GetLinearVelocity() +
+              cMath::Vector3Cross(pBody->GetAngularVelocity(),
+                vContact - pBody->GetWorldPosition());
+            float fCurrentPushSpeed = cMath::Vector3Dot(
+              vContactVelocity, vPushDir);
+            float fDeltaV = cMath::Clamp(
+              fDesiredPushSpeed - fCurrentPushSpeed, 0.0f, fMaxDeltaV);
+            if (fDeltaV <= 0.005f) continue;
+            pBody->AddImpulseAtPosition(
+              vPushDir * (fDeltaV * pBody->GetMass()), vContact);
+
+            static unsigned long slNextNudgeLogMs = 0;
+            unsigned long lNudgeNowMs = GetApplicationTime();
+            if (lNudgeNowMs >= slNextNudgeLogMs)
+            {
+              slNextNudgeLogMs = lNudgeNowMs + 1000;
+              Log(" [VR nudge +%lu ms] %s hand pushed '%s' type=%d dv=%.2f.\n",
+                lNudgeNowMs, h == eVRHandIndex_Left ? "left" : "right",
+                pBody->GetName().c_str(), (int)pNudgeEntity->GetType(), fDeltaV);
+            }
+
+            // Subtle haptic pulse on the touching hand, scaled to the push
+            eVRHapticHand hapticHand = (h == eVRHandIndex_Left)
+              ? eVRHapticHand_Left : eVRHapticHand_Right;
+            cVRHaptics::Play(mpInit, eVRHapticEvent_Interaction, hapticHand,
+              cMath::Clamp(fDeltaV, 0.05f, 0.5f));
+          }
+        }
       }
     }
 
