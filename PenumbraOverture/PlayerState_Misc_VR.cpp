@@ -205,38 +205,65 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           cVector3f vPickedPos;
           iPhysicsBody* pPickedBody = NULL;
 
-          // Find the closest body
-          touchedObject* closestTarget = NULL;
-          float fClosestDist = 9999.0f;
+          // Pick the best candidate per class: small items (PickUp/Item) win
+          // over furniture so a key inside a drawer is not shadowed by the
+          // drawer body overlapping the same hand area.
+          touchedObject* bestItemTarget = NULL;
+          float fBestItemDist = 9999.0f;
+          touchedObject* bestOtherTarget = NULL;
+          float fBestOtherDist = 9999.0f;
 
-          for (auto touchedBody : targets) {
-            if (touchedBody.planeDistance > fClosestDist)
-              continue;
+          for (auto& touchedBody : targets) {
+            const bool bIsItemClass =
+              touchedBody.crosshair == eCrossHairState_PickUp ||
+              touchedBody.crosshair == eCrossHairState_Item;
 
-            eCrossHairState interactType = touchedBody.crosshair;
-            if (interactType == eCrossHairState_PickUp || interactType == eCrossHairState_Item) {
-              // These types of objects require line-of-sight
-              mpPlayer->GetPickRay()->Clear();
-              pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), mpPlayer->GetCamera()->GetPosition(), touchedBody.physicsBody->GetWorldPosition(), true, false, true);
-              mpPlayer->GetPickRay()->CalculateResults();
-
-              if (mpPlayer->GetPickedBody() == touchedBody.physicsBody) {
-                useTraceResults = true;
-
-                break;
+            if (bIsItemClass) {
+              if (touchedBody.planeDistance < fBestItemDist) {
+                fBestItemDist = touchedBody.planeDistance;
+                bestItemTarget = &touchedBody;
               }
             }
-            else {
-              closestTarget = &touchedBody;
-              fClosestDist = touchedBody.planeDistance;
-
-              vPickedPos = VRHelper::CollideCenter(touchedBody.collideData.mvContactPoints, touchedBody.collideData.mlNumOfPoints);
-              fPickedDist = touchedBody.planeDistance;
-              pPickedBody = touchedBody.physicsBody;
+            else if (touchedBody.planeDistance < fBestOtherDist) {
+              fBestOtherDist = touchedBody.planeDistance;
+              bestOtherTarget = &touchedBody;
             }
           }
 
-          if (!useTraceResults) {
+          bool bSelected = false;
+
+          if (bestItemTarget != NULL) {
+            // Items normally need line-of-sight, but when the hand is
+            // physically touching the item (e.g. a key lying inside an open
+            // drawer whose geometry occludes the camera ray) touch wins.
+            mpPlayer->GetPickRay()->Clear();
+            pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), mpPlayer->GetCamera()->GetPosition(),
+              bestItemTarget->physicsBody->GetWorldPosition(), true, false, true);
+            mpPlayer->GetPickRay()->CalculateResults();
+
+            bool bHasLOS = mpPlayer->GetPickedBody() == bestItemTarget->physicsBody;
+            float fPalmDist = (bestItemTarget->physicsBody->GetBV()->GetWorldCenter() - handCenter).Length();
+
+            if (bHasLOS || fPalmDist < 0.2f)
+            {
+              mpPlayer->GetPickRay()->Clear();
+              mpPlayer->GetPickRay()->mpPickedBody = bestItemTarget->physicsBody;
+              mpPlayer->GetPickRay()->mfPickedDist = bestItemTarget->planeDistance;
+              mpPlayer->GetPickRay()->mvPickedPos =
+                VRHelper::CollideCenter(bestItemTarget->collideData.mvContactPoints,
+                  bestItemTarget->collideData.mlNumOfPoints);
+              bSelected = true;
+            }
+          }
+
+          if (!bSelected && !useTraceResults && bestOtherTarget != NULL) {
+            vPickedPos = VRHelper::CollideCenter(bestOtherTarget->collideData.mvContactPoints,
+              bestOtherTarget->collideData.mlNumOfPoints);
+            fPickedDist = bestOtherTarget->planeDistance;
+            pPickedBody = bestOtherTarget->physicsBody;
+          }
+
+          if (!useTraceResults && !bSelected) {
             mpPlayer->GetPickRay()->Clear();
 
             mpPlayer->GetPickRay()->mpPickedBody = pPickedBody;
