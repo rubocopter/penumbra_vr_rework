@@ -100,16 +100,34 @@ if ($missingSpanishEntries -or $unexpectedSpanishEntries) {
     throw "English and Spanish language keys do not match.`n$($details -join "`n")"
 }
 
-$literalTranslationKeys = @{}
-$translationPattern = 'kTranslate\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
-Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture') -Recurse -Include '*.cpp', '*.h' -File |
+# Read every engine and game source exactly once; the checks below each used
+# to rescan the whole tree separately.
+$vrSourceRoots = @(
+    (Join-Path $repositoryRoot 'HPL1Engine\include'),
+    (Join-Path $repositoryRoot 'HPL1Engine\sources'),
+    (Join-Path $repositoryRoot 'PenumbraOverture')
+)
+$sourceFiles = Get-ChildItem -LiteralPath $vrSourceRoots -Recurse -Include '*.cpp', '*.h', '*.hpp' -File |
+    Sort-Object FullName |
     ForEach-Object {
-        $sourceText = Get-Content -Raw -LiteralPath $_.FullName
-        foreach ($match in [regex]::Matches($sourceText, $translationPattern)) {
-            $key = $match.Groups[1].Value + '/' + $match.Groups[2].Value
-            $literalTranslationKeys[$key] = $true
+        [pscustomobject]@{
+            FullName = $_.FullName
+            RelativePath = $_.FullName.Substring($repositoryRoot.Length + 1)
+            Content = Get-Content -Raw -LiteralPath $_.FullName
         }
     }
+
+$literalTranslationKeys = @{}
+$translationPattern = 'kTranslate\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
+foreach ($sourceFile in $sourceFiles) {
+    if (-not $sourceFile.RelativePath.StartsWith('PenumbraOverture\')) {
+        continue
+    }
+    foreach ($match in [regex]::Matches($sourceFile.Content, $translationPattern)) {
+        $key = $match.Groups[1].Value + '/' + $match.Groups[2].Value
+        $literalTranslationKeys[$key] = $true
+    }
+}
 
 $missingLiteralTranslations = @($literalTranslationKeys.Keys | Where-Object {
     -not $englishEntries.ContainsKey($_) -or -not $spanishEntries.ContainsKey($_)
@@ -124,25 +142,24 @@ $legacyVRSpaceSymbols = @(
     'vr_player_pos',
     'ViveToWorldSpace'
 )
-$vrSourceRoots = @(
-    (Join-Path $repositoryRoot 'HPL1Engine\include'),
-    (Join-Path $repositoryRoot 'HPL1Engine\sources'),
-    (Join-Path $repositoryRoot 'PenumbraOverture')
-)
 
 foreach ($legacySymbol in $legacyVRSpaceSymbols) {
-    $legacyMatches = Get-ChildItem -LiteralPath $vrSourceRoots -Recurse -Include '*.cpp', '*.h', '*.hpp' -File |
-        Select-String -SimpleMatch $legacySymbol
-    if ($legacyMatches) {
+    $legacyMatch = $sourceFiles | Where-Object {
+        $_.Content.IndexOf($legacySymbol, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    } | Select-Object -First 1
+    if ($legacyMatch) {
         throw "Legacy VR-space symbol '$legacySymbol' bypasses the TrackingToWorld boundary."
     }
 }
 
-$rawGameplayHapticCalls = Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture') -Recurse -Include '*.cpp', '*.h' -File |
-    Where-Object { $_.Name -notin @('VRHaptics.cpp', 'VRHaptics.h') } |
-    Select-String -SimpleMatch 'vr_input.TriggerHaptic'
-if ($rawGameplayHapticCalls) {
-    throw 'Gameplay haptics must be routed through PenumbraOverture\VRHaptics.cpp.'
+$hapticOffender = $sourceFiles | Where-Object {
+    $_.RelativePath.StartsWith('PenumbraOverture\') -and
+    (Split-Path -Leaf $_.RelativePath) -notin @('VRHaptics.cpp', 'VRHaptics.h') -and
+    $_.Content.IndexOf('vr_input.TriggerHaptic', [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+} | Select-Object -First 1
+if ($hapticOffender) {
+    throw ("Gameplay haptics must be routed through PenumbraOverture\VRHaptics.cpp " +
+        "(found in $($hapticOffender.RelativePath)).")
 }
 
 $steamVRInputHeader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\include\input\SteamVRInput.h')
@@ -309,8 +326,16 @@ if (($penumbraProjectSource | Select-String -Pattern ([regex]::Escape('<Addition
 }
 
 $buildScriptSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'scripts\build.ps1')
-if ($buildScriptSource -notmatch [regex]::Escape("'/t:Rebuild'")) {
-    throw 'The legacy solution must be fully rebuilt so class-layout header changes cannot reuse ABI-stale object files.'
+foreach ($requiredRebuildGuardSnippet in @(
+    'Get-BuildInputFingerprint',
+    '.rebuild-guard-',
+    "'/t:Build'",
+    "'/t:Rebuild'"
+)) {
+    if ($buildScriptSource -notmatch [regex]::Escape($requiredRebuildGuardSnippet)) {
+        throw ("The build must force a full rebuild whenever header or project inputs changed, " +
+            "because class-layout changes cannot reuse ABI-stale object files (missing guard snippet: '$requiredRebuildGuardSnippet').")
+    }
 }
 
 $sceneSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\sources\scene\Scene.cpp')
@@ -321,12 +346,12 @@ if ($sceneSource -notmatch [regex]::Escape('mVRMainUIAnchor = head_mat') -or
 
 $mapHandlerSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\MapHandler.cpp')
 $mapLoadTextSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\MapLoadText.cpp')
+$saveHandlerSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\SaveHandler.cpp')
 foreach ($requiredLoadingSnippet in @(
     'BeginMapLoad()', 'BeginInitialMapLoad(', 'CompletePendingMapChange()',
     'BeginVRBlockingLoad()', 'CompletePendingGameLoad()',
     'FadeToColor(0.08f', 'mbLoadingFramePresented = true'
 )) {
-    $saveHandlerSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\SaveHandler.cpp')
     if (($mapHandlerSource + $mapLoadTextSource + $saveHandlerSource) -notmatch [regex]::Escape($requiredLoadingSnippet)) {
         throw "The staged VR loading path is missing '$requiredLoadingSnippet'."
     }
