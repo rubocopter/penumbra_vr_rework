@@ -35,6 +35,32 @@
       "skeleton": [],
       "sources": []
     },
+    "/actions/offhand": {
+      "chords": [],
+      "haptics": [],
+      "poses": [],
+      "skeleton": [],
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/offhand/in/interact"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/left/input/trigger"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/offhand/in/interact"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/trigger"
+        }
+      ]
+    },
     "/actions/gameplay": {
       "chords": [],
       "haptics": [],

@@ -46,9 +46,10 @@ between two actions in the same hand set. The global set (poses, haptics,
 skeletons) is not mirrored because those actions are physical and
 hand-agnostic.
 
-PS VR2 also binds both physical triggers to `/actions/offhand/in/interact` in a
+Every bundled profile binds both physical triggers (PS VR2: L2/R2; all other families: the index triggers) to `/actions/offhand/in/interact` in a
 small dedicated action set. At runtime `cSteamVRInput` restricts that set to the
-physical controller opposite the configured dominant hand, so L2/R2 can report
+physical controller opposite the configured dominant hand, so the off-hand
+trigger can report
 off-hand interaction without activating the rest of the mirrored gameplay
 layout. The input state records which controller produced the press edge and
 keeps raw trigger polling only as a compatibility fallback for profiles that do

@@ -221,6 +221,8 @@ In menus, use either trigger to select, the left stick click to drag or combine,
 
 Either bare hand can highlight and grab a nearby object. The hand that presses its trigger owns the grab, supplies release velocity, and receives pickup/drop feedback. If that hand has no target, interaction may fall back to a target already touching the other bare hand.
 
+Every bundled profile ships a default binding for the off-hand trigger — L2/R2 on PS VR2 Sense and the index trigger on all other controller families — so off-hand grabbing works without manual mapping.
+
 Moving an unoccupied hand into an ordinary dynamic prop or hinged door applies a bounded impulse at the contact point. Inventory pickups are excluded, and grabbable or movable props receive gentler limits so they remain easy to collect. This is a dynamic-object interaction proxy rather than a rigid hand collider: the rendered hand can still pass through static walls and scenery.
 
 The original game exposes one active player-interaction state. Consequently, both hands can initiate interaction, but holding two different physics objects simultaneously or constraining one object with both hands is not yet supported.
@@ -264,7 +266,7 @@ The bundled profiles provide feedback for UI selection, object pickup and drop, 
 
 ## Hardware compatibility
 
-PS VR2 Sense is the only controller family with a complete hardware pass. Other profiles are bundled but still need complete device-specific testing. See the [release history](RELEASES.md) for the dated validation record and current limitations.
+PS VR2 Sense is the only controller family with a complete hardware pass. Other profiles are bundled but still need complete device-specific testing. Every bundled profile does ship default trigger bindings for off-hand interact, following each device's standard SteamVR inputs; those bindings are unvalidated on hardware outside PS VR2 Sense. See the [release history](RELEASES.md) for the dated validation record and current limitations.
 
 | Profile | Coverage | Notes |
 | --- | --- | --- |
