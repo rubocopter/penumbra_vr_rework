@@ -1,6 +1,6 @@
 # Release history
 
-## Unreleased — 25 August 2026
+## v0.1.0-alpha.5 — 25 August 2026
 
 **Natural hand interaction, firm tracked grabs, and off-hand grabbing.**
 
