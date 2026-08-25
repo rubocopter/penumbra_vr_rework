@@ -78,9 +78,17 @@ Tracking input remains an engine concern, while rig geometry and gameplay
 meaning stay in Penumbra.
 
 Target and held-body state is recorded independently for both hands. The
-configured dominant hand drives interaction, pointer origin, throwing, and
-haptics; the off hand remains available for UI fallback and the notebook.
-Invalid poses hide and release only the affected hand.
+configured dominant hand remains the default for tools and pointer origin, but
+either bare hand can select and initiate a world interaction. Grab ownership,
+throw velocity, hand visibility, and pickup/drop haptics follow the controller
+that pressed interact. Invalid poses hide and release only the affected hand.
+
+Unoccupied hands use a small overlap proxy to nudge dynamic props and hinged
+doors with bounded contact-point impulses. Inventory items are excluded and
+grabbable props use gentler limits. This does not create rigid collision against
+static scenery. The original global player-state machine also limits the current
+implementation to one active grab; simultaneous and two-point holds remain
+future work.
 
 Equipped lights, melee weapons, and thrown objects are separate attachments on
 top of the visible hand rig. They share the controller pose, apply a fixed palm

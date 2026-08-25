@@ -5,6 +5,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 ## Current focus
 
 - Hand and equipped-object polish — fist wrap, thumb behaviour, and per-item placement
+- Two-hand interaction — simultaneous object ownership and optional two-point constraints for large props
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
 
@@ -13,6 +14,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Improve grip poses and per-item alignment without destabilizing the current rig
 - Validate Index, Touch, Pico, WMR, and Vive profiles on real hardware
 - Refine notebook, ladder, door, and held-object interactions for tracked controllers
+- Design a two-hand state model without breaking the original single-state interaction callbacks
 - Low-ceiling recovery for physical crouch
 - Prototype an OpenXR backend behind the existing runtime boundary and compare it with the SteamVR path
 
@@ -37,3 +39,5 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Graphics presets (Performance/Balanced/Quality) and render scale setting
 - Equipped objects in hand — first experimental pass with melee and throwing preserved
 - Left-handed mirror — fully mirrored action sets, equipment slots, notebook on off hand
+- Bare off-hand targeting and grabbing on PS VR2 Sense
+- Dynamic hand nudge for physics props and hinged doors, excluding inventory items

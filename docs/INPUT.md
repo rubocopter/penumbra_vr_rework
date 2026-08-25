@@ -56,6 +56,7 @@ The physical labels below describe the bundled profiles, not universal in-game p
 | Triangle | Holster the equipped tool or weapon |
 | Cross | Jump |
 | R2 | Interact, or use the equipped tool or weapon |
+| L2, while the off hand is bare | Interact with or grab a nearby object using the off hand |
 | R1 | Inventory |
 | Circle | Examine |
 | Options | Pause menu |
@@ -191,7 +192,7 @@ The `pico4_controller` (Pico 4 and Pico 4 Ultra) and `pico_neo3_controller` (Pic
 
 ## Left-handed controls
 
-Set **Options → VR Settings → Handedness** to **Left** to mirror the controls between hands. Movement, turning, gameplay actions, inventory, and UI controls all change sides; the dominant hand continues to control interaction, tools, throwing, pointing, and haptics, while the notebook remains on the off hand.
+Set **Options → VR Settings → Handedness** to **Left** to mirror the controls between hands. Movement, turning, gameplay actions, inventory, and UI controls all change sides. The dominant hand remains the default for tools and pointing, while either bare hand can target, grab, throw, and receive interaction haptics; the notebook remains on the off hand.
 
 Pause and recenter stay on the same physical controls in both modes. Changing handedness safely holsters an equipped tool and turns off a hand-held light before the controls switch.
 
@@ -208,12 +209,21 @@ The PS VR2 left-handed gameplay layout is:
 | Circle (right) | Holster the equipped tool or weapon |
 | Square (left) | Jump |
 | L2 | Interact, or use the equipped tool or weapon |
+| R2, while the off hand is bare | Interact with or grab a nearby object using the off hand |
 | L1 | Inventory |
 | Triangle (left) | Examine |
 | Options (right) | Pause menu |
 | Create (left) | Recenter horizontal view |
 
 In menus, use either trigger to select, the left stick click to drag or combine, Triangle to go back, and L1, Cross, or Options to close the screen.
+
+## Hand interaction and collision
+
+Either bare hand can highlight and grab a nearby object. The hand that presses its trigger owns the grab, supplies release velocity, and receives pickup/drop feedback. If that hand has no target, interaction may fall back to a target already touching the other bare hand.
+
+Moving an unoccupied hand into an ordinary dynamic prop or hinged door applies a bounded impulse at the contact point. Inventory pickups are excluded, and grabbable or movable props receive gentler limits so they remain easy to collect. This is a dynamic-object interaction proxy rather than a rigid hand collider: the rendered hand can still pass through static walls and scenery.
+
+The original game exposes one active player-interaction state. Consequently, both hands can initiate interaction, but holding two different physics objects simultaneously or constraining one object with both hands is not yet supported.
 
 ## VR settings
 
@@ -250,7 +260,7 @@ The same screen offers Performance, Balanced, and Quality graphics presets, plus
 
 ## Haptic feedback
 
-The bundled profiles provide feedback for UI selection, object pickup and drop, successful item use, melee impact, quick-light changes, and damage. Most feedback is sent to the dominant hand, quick-light feedback to the off hand, and damage feedback to both hands.
+The bundled profiles provide feedback for UI selection, object pickup and drop, hand nudge, successful item use, melee impact, quick-light changes, and damage. Pickup, drop, and nudge feedback follows the interacting hand; most tool feedback is sent to the dominant hand, quick-light feedback to the off hand, and damage feedback to both hands.
 
 ## Hardware compatibility
 

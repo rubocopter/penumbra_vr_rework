@@ -1,5 +1,35 @@
 # Release history
 
+## Unreleased — 25 August 2026
+
+**Natural hand interaction, firm tracked grabs, and off-hand grabbing.**
+
+### Added
+
+- Bare off-hand interaction on PS VR2 Sense: L2 in the default right-handed profile and R2 in the mirrored left-handed profile can target and grab nearby objects
+- Dedicated `/actions/offhand` SteamVR action set, restricted at runtime to the physical off-hand controller without activating the complete mirrored gameplay layout
+- Direct hand nudge for dynamic world objects and hinged doors, with contact-point impulses and subtle per-hand haptics
+- Per-hand interaction-source and held-body ownership so tracking, visibility, throwing, and haptics follow the controller that initiated the grab
+- Throttled input and nudge diagnostics in `hpl.log`
+
+### Fixed
+
+- Held physics objects now remain fixed to the rendered palm instead of trailing, floating, or orbiting around the controller
+- Map-defined Newton velocity caps are raised only while grabbing or dragging and restored on release; jointed bodies use a bounded velocity servo
+- Throw velocity is transformed into world space and clamped to reject controller spikes
+- Create/recenter remains available in both dominant-hand modes through the global action set
+- Pickup items touched by the palm take priority over overlapping furniture, while normal line-of-sight checks remain in place away from direct contact
+- Item-use rays now follow the aim pose rotation; the item indicator is smaller, view-facing, and anchored to the ray origin
+- Hand nudge excludes inventory items and held bodies, and applies gentler limits to grabbable/movable props so pickups are not launched accidentally
+
+### Known limitations
+
+- Interaction still uses one global player state: both hands can initiate a grab, but simultaneous two-object holding and two-hand constraints on one object are not implemented
+- Hand nudge is an impulse-based proxy for dynamic bodies, not a rigid hand collider against static level geometry; rendered hands can still pass visually through walls
+- Off-hand grabbing has been hardware-tested on PS VR2 Sense; other controller profiles still need device-specific bindings and validation
+
+---
+
 ## v0.1.0-alpha.4 — 24 August 2026
 
 **Graphics presets and first pass of equipped objects in hands** (experimental, very green state).

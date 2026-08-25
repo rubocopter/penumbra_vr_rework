@@ -46,6 +46,14 @@ between two actions in the same hand set. The global set (poses, haptics,
 skeletons) is not mirrored because those actions are physical and
 hand-agnostic.
 
+PS VR2 also binds both physical triggers to `/actions/offhand/in/interact` in a
+small dedicated action set. At runtime `cSteamVRInput` restricts that set to the
+physical controller opposite the configured dominant hand, so L2/R2 can report
+off-hand interaction without activating the rest of the mirrored gameplay
+layout. The input state records which controller produced the press edge and
+keeps raw trigger polling only as a compatibility fallback for profiles that do
+not yet bind the dedicated action.
+
 The PS VR2 and Touch drivers expose asymmetric face buttons (PS VR2 left:
 square/triangle, right: cross/circle; Touch left: x/y, right: a/b), so each
 mirrored binding moves an action to the same physical button position on the
@@ -61,21 +69,22 @@ book rectangle instead of the surface: the hand goes to the book's outer
 edge (UI x=225 for the left off hand, x=575 for the right off hand, because
 in this engine the same local +X points toward the body only on the left
 hand) and the book extends about a book width (0.24 m at 1/1450) toward the
-body centre in both dominant modes. This geometry lesson (anchor to the
-visible object, not the surface origin) is what a future equipped-object
-hold needs so the hand is seen holding the item, and to animate the grab
-motion. Grab-target detection
-runs for the dominant hand only (`cPlayerState_Normal_VR`), so the off hand
-never highlights or grabs anything.
+body centre in both dominant modes. The same geometry rule now applies to
+physics grabs: the pickup transform is measured against the rendered hand-rig
+pose and the actual contact point is placed in the palm. Grab-target detection
+runs for both hands in `cPlayerState_Normal_VR`; an off hand carrying an
+attachment remains excluded so interaction cannot compete with a light or tool.
 
-`cSteamVRInput` resolves both sets once at startup. `Update` activates the set
-that matches `mHandedness` (plus the global set), reads every action through
-`ActionFor` so consumer code never sees a hand, and treats a handedness change
+`cSteamVRInput` resolves the mirrored, global, and off-hand sets once at startup.
+`Update` activates the gameplay/UI set that matches `mHandedness`, the global
+set, and—during gameplay—the off-hand set restricted to the opposite physical
+controller. Intent actions still pass through `ActionFor`, while interaction
+additionally exposes its source hand to gameplay. A handedness change is treated
 like a context change: edges are suppressed for one frame so a held button
-cannot fire on the mirrored action it was swapped onto. `UpdateLegacyState`
-mirrors the same layout for the OpenVR polling fallback by reading the
-dominant-hand state where the default layout used the right hand and the
-off-hand state where it used the left hand.
+cannot fire on the action it was swapped onto. `UpdateLegacyState` mirrors the
+same layout for the OpenVR polling fallback by reading the dominant-hand state
+where the default layout used the right hand and the off-hand state where it
+used the left hand.
 
 Recenter is the one action that receives special handling in `Update`. It is a
 global action read hand-agnostically before the context branch, and its edge
@@ -173,7 +182,7 @@ Changes that can remain inside HPL1 without rewriting interaction mechanics:
 Changes that require Penumbra gameplay work:
 
 - using keys and inventory items on world entities;
-- one-hand or two-hand grabbing;
+- simultaneous two-object holding or two-point grabbing;
 - door and drawer manipulation;
 - melee/tool semantics;
 - inventory context behaviour;
@@ -223,16 +232,27 @@ part of the runtime input contract.
 ## Hand interaction state
 
 Penumbra records target and held-body ownership separately for the left and
-right hands. Target detection may run for both hands, but the currently exposed
-R2 interaction deliberately mirrors only the configured dominant-hand target
-into the legacy `PickedBody` slot used by original entity callbacks. This
-removes the old first-hand-wins behaviour without prematurely enabling L2
-interaction; changing the dominant hand in VR Settings reselects which hand
-drives interaction, pointer, throw velocity, and haptics.
+right hands. Target detection runs for both bare hands; the controller that
+produces the interaction edge is preferred, and gameplay falls back to the other
+hand only when the pressing hand has no target. Before invoking an original
+entity callback, Penumbra mirrors the chosen target into the legacy `PickedBody`
+slot and records explicit grab ownership. The grab state then follows that
+hand's rendered palm pose and routes release velocity, visibility, and haptics
+to the same controller.
 
 The immutable overlap shape is allocated once per loaded physics world and
 reused by both sequential hand queries. Invalid hand poses are skipped, and an
 entity being destroyed clears any matching hand target or held-body reference.
+An additional small sphere supplies impulse-based hand nudge for ordinary
+dynamic objects and swing doors. Inventory items and already-held bodies are
+excluded; grabbable props receive lower speed and delta-velocity limits. Because
+this proxy applies impulses only to dynamic bodies, it does not stop the visible
+hand against static walls.
+
+Although ownership is stored per hand, Penumbra still has one global active
+player-interaction state. A bare off hand can initiate and own the current grab,
+but simultaneous two-object holds and two-hand constraints on one body require a
+future state-machine change.
 
 ## Failure and recovery lifecycle
 
