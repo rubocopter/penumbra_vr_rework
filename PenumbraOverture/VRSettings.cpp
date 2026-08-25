@@ -67,6 +67,16 @@ namespace
 		default: return "Standing";
 		}
 	}
+
+	const char *HRTFModeName(eVRHRTFMode aMode)
+	{
+		switch(aMode)
+		{
+		case eVRHRTFMode_On: return "On";
+		case eVRHRTFMode_Off: return "Off";
+		default: return "Auto";
+		}
+	}
 }
 
 cVRSettings::cVRSettings()
@@ -85,7 +95,8 @@ cVRSettings::cVRSettings()
 	  mfSubtitleScale(kDefaultSubtitleScale),
 	  mHandedness(eVRHandedness_Right),
 	  mPlayMode(eVRPlayMode_Standing),
-	  mfPlayerHeight(kDefaultPlayerHeight)
+	  mfPlayerHeight(kDefaultPlayerHeight),
+	  mHRTFMode(eVRHRTFMode_Auto)
 {
 }
 
@@ -134,14 +145,21 @@ void cVRSettings::Load(cConfigFile *apConfig)
 
 	mfPlayerHeight = Clamp(apConfig->GetFloat("VR", "PlayerHeight", kDefaultPlayerHeight), 1.40f, 2.10f);
 
+	// Binaural rendering through OpenAL Soft. Auto lets the runtime enable
+	// HRTF only when the output device reports itself as headphones.
+	const tString sHRTF = cString::ToLowerCase(apConfig->GetString("VR", "HRTF", "Auto"));
+	if(sHRTF == "on") mHRTFMode = eVRHRTFMode_On;
+	else if(sHRTF == "off") mHRTFMode = eVRHRTFMode_Off;
+	else mHRTFMode = eVRHRTFMode_Auto;
+
 	Log(" VR settings: move speed %.2f, dead zone %.2f, height offset %.2f m; "
 		"turn %s, snap %.0f deg, smooth %.0f deg/s, turn dead zone %.2f; "
 		"UI distance %.2f m, scale %.2f; render scale %.2f; crouch %s, depth %.2f m; subtitle scale %.2f; "
-		"handedness %s, play mode %s, player height %.2f m.\n",
+		"handedness %s, play mode %s, player height %.2f m; hrtf %s.\n",
 		mfMoveSpeed, mfMoveDeadZone, mfHeightOffset, TurnModeName(mTurnMode),
 		mfSnapTurnAngle, mfSmoothTurnSpeed, mfTurnDeadZone, mfUIDistance, mfUIScale,
 		mfRenderScale, CrouchModeName(mCrouchMode), mfPhysicalCrouchDepth, mfSubtitleScale,
-		HandednessName(mHandedness), PlayModeName(mPlayMode), mfPlayerHeight);
+		HandednessName(mHandedness), PlayModeName(mPlayMode), mfPlayerHeight, HRTFModeName(mHRTFMode));
 }
 
 void cVRSettings::Save(cConfigFile *apConfig) const
@@ -164,6 +182,7 @@ void cVRSettings::Save(cConfigFile *apConfig) const
 	apConfig->SetString("VR", "Handedness", HandednessName(mHandedness));
 	apConfig->SetString("VR", "PlayMode", PlayModeName(mPlayMode));
 	apConfig->SetFloat("VR", "PlayerHeight", mfPlayerHeight);
+	apConfig->SetString("VR", "HRTF", HRTFModeName(mHRTFMode));
 	apConfig->SetInt("VR", "SettingsVersion", 1);
 }
 

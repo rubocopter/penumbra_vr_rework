@@ -41,6 +41,13 @@ enum eVRPlayMode
 	eVRPlayMode_Seated
 };
 
+enum eVRHRTFMode
+{
+	eVRHRTFMode_Auto,
+	eVRHRTFMode_On,
+	eVRHRTFMode_Off
+};
+
 class cVRSettings
 {
 public:
@@ -65,6 +72,7 @@ public:
 	eVRHandedness GetHandedness() const { return mHandedness; }
 	eVRPlayMode GetPlayMode() const { return mPlayMode; }
 	float GetPlayerHeight() const { return mfPlayerHeight; }
+	eVRHRTFMode GetHRTFMode() const { return mHRTFMode; }
 
 	void SetMoveSpeed(float afValue) { mfMoveSpeed = Clamp(afValue, 0.25f, 3.0f); }
 	void SetMoveDeadZone(float afValue) { mfMoveDeadZone = Clamp(afValue, 0.0f, 0.9f); }
@@ -82,6 +90,7 @@ public:
 	void SetHandedness(eVRHandedness aHandedness) { mHandedness = aHandedness; }
 	void SetPlayMode(eVRPlayMode aPlayMode) { mPlayMode = aPlayMode; }
 	void SetPlayerHeight(float afValue) { mfPlayerHeight = Clamp(afValue, 1.40f, 2.10f); }
+	void SetHRTFMode(eVRHRTFMode aMode) { mHRTFMode = aMode; }
 
 private:
 	static float Clamp(float afValue, float afMinimum, float afMaximum);
@@ -102,6 +111,7 @@ private:
 	eVRHandedness mHandedness;
 	eVRPlayMode mPlayMode;
 	float mfPlayerHeight;
+	eVRHRTFMode mHRTFMode;
 };
 
 #endif // GAME_VR_SETTINGS_H

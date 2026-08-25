@@ -251,7 +251,7 @@ mpGameSetup = apGameSetup;
 						aVars.GetBool("UseEnvironmentalAudio", false),
 						aVars.GetInt("MaxSoundChannels",32),
 						aVars.GetInt("StreamUpdateFreq",10), 
-						aVars.GetBool("UseSoundThreading",true),
+						aVars.GetBool("UseSoundThreading",false),
 						aVars.GetBool("UseVoiceManagement",true),
 						aVars.GetInt("MaxMonoChannelsHint",0),
 						aVars.GetInt("MaxStereoChannelsHint",0),

@@ -66,6 +66,45 @@
 // MUST include Last as Unix X11 header defined DestroyAll which blows up MapHandler.h class definition
 #include "impl/SDLGameSetup.h"
 
+#ifdef WIN32
+	#include <windows.h>
+#endif
+
+//-----------------------------------------------------------------------
+
+// OpenAL Soft reads alsoft.ini from the executable directory after any
+// user-wide config, so keys defined here win. HRTF must be settled before
+// the audio device opens, so this runs during init and whenever settings
+// are saved from the menu.
+static void WriteOpenALSoftConfig(eVRHRTFMode aMode)
+{
+#ifdef WIN32
+	char sExePath[MAX_PATH];
+	if (GetModuleFileNameA(NULL, sExePath, MAX_PATH) == 0) return;
+
+	std::string sPath(sExePath);
+	const size_t lSlash = sPath.find_last_of("\\/");
+	if (lSlash == std::string::npos) return;
+	sPath.resize(lSlash + 1);
+	sPath += "alsoft.ini";
+
+	// Only this key is owned by the mod; every other OpenAL Soft option
+	// keeps whatever the system or user configuration provides.
+	const char *sValue = aMode == eVRHRTFMode_On ? "true" :
+	                      aMode == eVRHRTFMode_Off ? "false" : "auto";
+
+	FILE *pFile = fopen(sPath.c_str(), "w");
+	if (pFile == NULL)
+	{
+		Warning("Couldn't write '%s'\n", sPath.c_str());
+		return;
+	}
+	fprintf(pFile, "[general]\nhrtf = %s\n", sValue);
+	fclose(pFile);
+	Log(" Wrote '%s' with hrtf = %s\n", sPath.c_str(), sValue);
+#endif
+}
+
 //Global init...
 cInit* gpInit;
 
@@ -317,6 +356,7 @@ bool cInit::Init(tString asCommandLine)
 #endif
 
 	mVRSettings.Load(mpConfig);
+	WriteOpenALSoftConfig(mVRSettings.GetHRTFMode());
 
 	//Init is not done, so we do not know if it is okay.
 	if (gbUsingUserSettings) {
@@ -383,7 +423,9 @@ bool cInit::Init(tString asCommandLine)
 	mbUseSoundHardware = mpConfig->GetBool("Sound","UseSoundHardware",false);
 	//mbForceGenericSoundDevice = mpConfig->GetBool("Sound", "ForceGeneric", false);
 	mlStreamUpdateFreq = mpConfig->GetInt("Sound","StreamUpdateFreq",10);
-	mbUseSoundThreading = mpConfig->GetBool("Sound","UseThreading",true);
+	// OpenAL Soft already mixes on its own internal thread; the legacy
+	// wrapper thread races against it when EFX is active and must stay off.
+	mbUseSoundThreading = mpConfig->GetBool("Sound","UseThreading",false);
 	//mbUseVoiceManagement = mpConfig->GetBool("Sound","UseVoiceManagement", true);
 	mlMaxMonoChannelsHint = mpConfig->GetInt("Sound","MaxMonoChannelsHint",0);
 	mlMaxStereoChannelsHint = mpConfig->GetInt("Sound","MaxStereoChannelsHint",0);
@@ -404,6 +446,7 @@ bool cInit::Init(tString asCommandLine)
 	Vars.AddInt("LogicUpdateRate",60);
 	Vars.AddBool("UseSoundHardware",mbUseSoundHardware);
 	Vars.AddBool("ForceGeneric", mpConfig->GetBool("Sound", "ForceGeneric", false));
+	Vars.AddBool("UseEnvironmentalAudio", mpConfig->GetBool("Sound", "UseEnvironmentalAudio", true));
 	Vars.AddInt("MaxSoundChannels",mlMaxSoundChannels);
 	Vars.AddInt("StreamUpdateFreq",mlStreamUpdateFreq);
     Vars.AddBool("UseSoundThreading", mbUseSoundThreading);
@@ -710,6 +753,7 @@ void cInit::ApplyVRSettings(bool abSave)
 	{
 		mVRSettings.Save(mpConfig);
 		mpConfig->Save();
+		WriteOpenALSoftConfig(mVRSettings.GetHRTFMode());
 	}
 }
 

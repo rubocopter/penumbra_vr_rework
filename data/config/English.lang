@@ -414,6 +414,11 @@
     <Entry Name="VRDetectionDepth">Detection depth:</Entry>
     <Entry Name="VRRenderScale">Render scale:</Entry>
     <Entry Name="TipVRRenderScale">Multiplies the SteamVR recommended eye buffer size. Needs an application restart to take effect.</Entry>
+    <Entry Name="VRHRTF">Binaural audio (HRTF):</Entry>
+    <Entry Name="TipVRHRTF">Headphone spatialization for positional sounds. Auto enables it only when Windows reports headphones. Needs an application restart to take effect.</Entry>
+    <Entry Name="VRHRTFAuto">Auto</Entry>
+    <Entry Name="VRHRTFOn">Headphones</Entry>
+    <Entry Name="VRHRTFOff">Off</Entry>
     <Entry Name="VRGraphicsPreset">Graphics preset:</Entry>
     <Entry Name="TipVRGraphicsPreset">Applies bundles of render scale, shadows, shader quality, and texture quality. Restart to apply the new render scale.</Entry>
     <Entry Name="VRPresetPerformance">Performance</Entry>

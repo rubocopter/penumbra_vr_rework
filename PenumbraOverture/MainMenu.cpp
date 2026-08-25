@@ -1022,6 +1022,7 @@ enum eVRMenuSetting
 	eVRMenuSetting_UIDistance,
 	eVRMenuSetting_UIScale,
 	eVRMenuSetting_RenderScale,
+	eVRMenuSetting_HRTF,
 	eVRMenuSetting_SubtitleScale,
 	eVRMenuSetting_LastEnum
 };
@@ -1052,6 +1053,7 @@ static const char *VRSettingsTextName(eVRMenuSetting aSetting)
 	case eVRMenuSetting_UIDistance: return "VRUIDistance";
 	case eVRMenuSetting_UIScale: return "VRUIScale";
 	case eVRMenuSetting_RenderScale: return "VRRenderScale";
+	case eVRMenuSetting_HRTF: return "VRHRTF";
 	case eVRMenuSetting_SubtitleScale: return "VRSubtitleScale";
 	default: return "";
 	}
@@ -1123,6 +1125,13 @@ switch(aSetting)
 	case eVRMenuSetting_RenderScale:
 		sprintf_s(sValue, sizeof(sValue), "%.2fx", settings.GetRenderScale());
 		break;
+	case eVRMenuSetting_HRTF:
+		switch(settings.GetHRTFMode())
+		{
+		case eVRHRTFMode_On: return kTranslate("MainMenu", "VRHRTFOn");
+		case eVRHRTFMode_Off: return kTranslate("MainMenu", "VRHRTFOff");
+		default: return kTranslate("MainMenu", "VRHRTFAuto");
+		}
 	case eVRMenuSetting_SubtitleScale:
 		sprintf_s(sValue, sizeof(sValue), "%.0f%%", settings.GetSubtitleScale() * 100.0f);
 		break;
@@ -1223,6 +1232,14 @@ cVRSettings& settings = mpInit->mVRSettings;
 		case eVRMenuSetting_RenderScale:
 			settings.SetRenderScale(settings.GetRenderScale() + 0.05f * direction);
 			break;
+		case eVRMenuSetting_HRTF:
+		{
+			int mode = (int)settings.GetHRTFMode() + direction;
+			if(mode < (int)eVRHRTFMode_Auto) mode = (int)eVRHRTFMode_Off;
+			if(mode > (int)eVRHRTFMode_Off) mode = (int)eVRHRTFMode_Auto;
+			settings.SetHRTFMode((eVRHRTFMode)mode);
+			break;
+		}
 		case eVRMenuSetting_SubtitleScale:
 			settings.SetSubtitleScale(settings.GetSubtitleScale() + 0.10f * direction);
 			break;
@@ -3688,13 +3705,14 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
     eVRMenuSetting_UIDistance,
     eVRMenuSetting_UIScale,
     eVRMenuSetting_RenderScale,
+    eVRMenuSetting_HRTF,
     eVRMenuSetting_SubtitleScale
   };
   static const sVRSettingSection vVRSections[] = {
     { "VRControls", vVRControlsSettings, 1 },
     { "VRMovement", vVRMovementSettings, 8 },
     { "VRCalibration", vVRCalibrationSettings, 3 },
-    { "VRDisplay", vVRDisplaySettings, 4 }
+    { "VRDisplay", vVRDisplaySettings, 5 }
   };
 
   for(int section = 0; section < 4; ++section)
