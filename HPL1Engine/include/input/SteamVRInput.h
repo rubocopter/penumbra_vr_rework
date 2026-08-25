@@ -73,6 +73,11 @@ namespace hpl {
     void SetHandedness(eSteamVRHand hand);
     eSteamVRHand GetHandedness() const { return mHandedness; }
 
+    // Physical controller that produced the last interact press edge; used by
+    // grab targeting to prefer the pressing hand.
+    eSteamVRHand GetInteractSourceHand() const { return mInteractSourceHand; }
+    void SetInteractSourceHand(eSteamVRHand hand) { mInteractSourceHand = hand; }
+
     bool TriggerHaptic(eSteamVRHand hand, float durationSeconds, float frequency, float amplitude);
 
   private:
@@ -121,9 +126,11 @@ namespace hpl {
     cVRInputState mState;
     float mfMoveDeadZone;
     eSteamVRHand mHandedness;
+    eSteamVRHand mInteractSourceHand;
     tString msManifestPath;
 
     vr::VRActionSetHandle_t mGlobalActionSet;
+    vr::VRActionSetHandle_t mOffhandActionSet;
     vr::VRActionSetHandle_t mGameplayActionSet;
     vr::VRActionSetHandle_t mUIActionSet;
     vr::VRActionSetHandle_t mGameplayActionSetLeft;
@@ -142,6 +149,7 @@ namespace hpl {
     vr::VRActionHandle_t mCrouchAction;
     vr::VRActionHandle_t mPauseAction;
     vr::VRActionHandle_t mRecenterAction;
+    vr::VRActionHandle_t mOffhandInteractAction;
 
     vr::VRActionHandle_t mMoveActionLeft;
     vr::VRActionHandle_t mTurnActionLeft;
@@ -175,6 +183,8 @@ namespace hpl {
 
     vr::VRActionHandle_t mLeftSkeletonAction;
     vr::VRActionHandle_t mRightSkeletonAction;
+    vr::VRInputValueHandle_t mLeftInputSource;
+    vr::VRInputValueHandle_t mRightInputSource;
     unsigned long mlLastSkeletonErrorLog;
     int mlLastSkeletonErrorCode;
     int mlLastSkeletonFallbackCode;

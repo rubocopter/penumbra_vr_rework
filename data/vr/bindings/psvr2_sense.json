@@ -42,7 +42,43 @@
           "path": "/user/hand/right/input/skeleton/right"
         }
       ],
-      "sources": []
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/global/in/recenter"
+            }
+          },
+          "mode": "button",
+          "path": "/user/hand/left/input/create"
+        }
+      ]
+    },
+    "/actions/offhand": {
+      "chords": [],
+      "haptics": [],
+      "poses": [],
+      "skeleton": [],
+      "sources": [
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/offhand/in/interact"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/left/input/l2"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/offhand/in/interact"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/r2"
+        }
+      ]
     },
     "/actions/gameplay": {
       "chords": [],
@@ -145,15 +181,6 @@
           },
           "mode": "button",
           "path": "/user/hand/right/input/options"
-        },
-        {
-          "inputs": {
-            "click": {
-              "output": "/actions/global/in/recenter"
-            }
-          },
-          "mode": "button",
-          "path": "/user/hand/left/input/create"
         }
       ]
     },
@@ -225,15 +252,6 @@
           },
           "mode": "button",
           "path": "/user/hand/right/input/options"
-        },
-        {
-          "inputs": {
-            "click": {
-              "output": "/actions/global/in/recenter"
-            }
-          },
-          "mode": "button",
-          "path": "/user/hand/left/input/create"
         }
       ]
     },
@@ -338,15 +356,6 @@
           },
           "mode": "button",
           "path": "/user/hand/right/input/options"
-        },
-        {
-          "inputs": {
-            "click": {
-              "output": "/actions/global/in/recenter"
-            }
-          },
-          "mode": "button",
-          "path": "/user/hand/left/input/create"
         }
       ]
     },
@@ -418,15 +427,6 @@
           },
           "mode": "button",
           "path": "/user/hand/right/input/options"
-        },
-        {
-          "inputs": {
-            "click": {
-              "output": "/actions/global/in/recenter"
-            }
-          },
-          "mode": "button",
-          "path": "/user/hand/left/input/create"
         }
       ]
     }

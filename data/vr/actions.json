@@ -31,6 +31,10 @@
       "type": "boolean"
     },
     {
+      "name": "/actions/offhand/in/interact",
+      "type": "boolean"
+    },
+    {
       "name": "/actions/global/out/left_haptic",
       "type": "vibration"
     },
@@ -179,6 +183,10 @@
       "usage": "leftright"
     },
     {
+      "name": "/actions/offhand",
+      "usage": "leftright"
+    },
+    {
       "name": "/actions/gameplay",
       "usage": "leftright"
     },
@@ -240,6 +248,8 @@
       "/actions/global/in/left_aim": "Left hand aim",
       "/actions/global/in/right_aim": "Right hand aim",
       "/actions/global/in/recenter": "Recenter view",
+      "/actions/offhand": "Off-hand interaction",
+      "/actions/offhand/in/interact": "Interact with off hand",
       "/actions/global/out/left_haptic": "Left hand haptics",
       "/actions/global/out/right_haptic": "Right hand haptics",
       "/actions/gameplay": "Gameplay",
@@ -289,6 +299,8 @@
       "/actions/global/in/left_aim": "Apuntar mano izquierda",
       "/actions/global/in/right_aim": "Apuntar mano derecha",
       "/actions/global/in/recenter": "Recentrar vista",
+      "/actions/offhand": "Interacción con la mano secundaria",
+      "/actions/offhand/in/interact": "Interactuar con la mano secundaria",
       "/actions/global/out/left_haptic": "Vibración de la mano izquierda",
       "/actions/global/out/right_haptic": "Vibración de la mano derecha",
       "/actions/gameplay": "Juego",

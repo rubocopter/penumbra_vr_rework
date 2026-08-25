@@ -19,7 +19,9 @@ namespace hpl {
       mActiveContext(eSteamVRInputContext_Gameplay),
       mActiveHandedness(eSteamVRHand_Right), mfMoveDeadZone(0.15f),
       mHandedness(eSteamVRHand_Right),
+      mInteractSourceHand(eSteamVRHand_Right),
       mGlobalActionSet(vr::k_ulInvalidActionSetHandle),
+      mOffhandActionSet(vr::k_ulInvalidActionSetHandle),
       mGameplayActionSet(vr::k_ulInvalidActionSetHandle),
       mUIActionSet(vr::k_ulInvalidActionSetHandle),
       mGameplayActionSetLeft(vr::k_ulInvalidActionSetHandle),
@@ -37,6 +39,7 @@ namespace hpl {
       mCrouchAction(vr::k_ulInvalidActionHandle),
       mPauseAction(vr::k_ulInvalidActionHandle),
       mRecenterAction(vr::k_ulInvalidActionHandle),
+      mOffhandInteractAction(vr::k_ulInvalidActionHandle),
       mMoveActionLeft(vr::k_ulInvalidActionHandle),
       mTurnActionLeft(vr::k_ulInvalidActionHandle),
       mSprintActionLeft(vr::k_ulInvalidActionHandle),
@@ -63,6 +66,8 @@ namespace hpl {
       mRightHapticAction(vr::k_ulInvalidActionHandle),
       mLeftSkeletonAction(vr::k_ulInvalidActionHandle),
       mRightSkeletonAction(vr::k_ulInvalidActionHandle),
+      mLeftInputSource(vr::k_ulInvalidInputValueHandle),
+      mRightInputSource(vr::k_ulInvalidInputValueHandle),
       mlLastSkeletonErrorLog(0),
       mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
       mbSkeletonFallbackReported(false),
@@ -87,6 +92,7 @@ namespace hpl {
 
     bool resolved = true;
     resolved = ResolveActionSet("/actions/global", mGlobalActionSet) && resolved;
+    resolved = ResolveActionSet("/actions/offhand", mOffhandActionSet) && resolved;
     resolved = ResolveActionSet("/actions/gameplay", mGameplayActionSet) && resolved;
     resolved = ResolveActionSet("/actions/ui", mUIActionSet) && resolved;
     resolved = ResolveActionSet("/actions/gameplay_left", mGameplayActionSetLeft) && resolved;
@@ -105,6 +111,18 @@ namespace hpl {
     resolved = ResolveAction("/actions/gameplay/in/crouch", mCrouchAction) && resolved;
     resolved = ResolveAction("/actions/gameplay/in/pause", mPauseAction) && resolved;
     resolved = ResolveAction("/actions/global/in/recenter", mRecenterAction) && resolved;
+    resolved = ResolveAction("/actions/offhand/in/interact", mOffhandInteractAction) && resolved;
+
+    vr::EVRInputError leftSourceError = vr::VRInput()->GetInputSourceHandle(
+      "/user/hand/left", &mLeftInputSource);
+    vr::EVRInputError rightSourceError = vr::VRInput()->GetInputSourceHandle(
+      "/user/hand/right", &mRightInputSource);
+    if (leftSourceError != vr::VRInputError_None ||
+        rightSourceError != vr::VRInputError_None) {
+      Log(" SteamVR Input could not resolve hand sources (left=%d, right=%d).\n",
+        (int)leftSourceError, (int)rightSourceError);
+      resolved = false;
+    }
 
     resolved = ResolveAction("/actions/ui/in/select", mUISelectAction) && resolved;
     resolved = ResolveAction("/actions/ui/in/drag", mUIDragAction) && resolved;
@@ -148,6 +166,7 @@ namespace hpl {
 
     mbAvailable = true;
     Log(" SteamVR Input initialized with '%s'.\n", msManifestPath.c_str());
+    Log(" [VR build] compiled %s %s\n", __DATE__, __TIME__);
     return true;
   }
 
@@ -170,14 +189,24 @@ namespace hpl {
     const bool suppressContextEdges = !mbUsingActions || !mbHasActiveContext ||
       context != mActiveContext || mHandedness != mActiveHandedness;
 
-    vr::VRActiveActionSet_t activeSets[2];
+    vr::VRActiveActionSet_t activeSets[3];
     memset(activeSets, 0, sizeof(activeSets));
     activeSets[0].ulActionSet = mGlobalActionSet;
-    activeSets[1].ulActionSet = mHandedness == eSteamVRHand_Left
+    const bool bLeftHanded = mHandedness == eSteamVRHand_Left;
+    activeSets[1].ulActionSet = bLeftHanded
       ? (context == eSteamVRInputContext_UI ? mUIActionSetLeft : mGameplayActionSetLeft)
       : (context == eSteamVRInputContext_UI ? mUIActionSet : mGameplayActionSet);
 
-    vr::EVRInputError error = vr::VRInput()->UpdateActionState(activeSets, sizeof(vr::VRActiveActionSet_t), 2);
+    int lActiveSetCount = 2;
+    if (context == eSteamVRInputContext_Gameplay) {
+      activeSets[2].ulActionSet = mOffhandActionSet;
+      activeSets[2].ulRestrictedToDevice = bLeftHanded
+        ? mRightInputSource : mLeftInputSource;
+      lActiveSetCount = 3;
+    }
+
+    vr::EVRInputError error = vr::VRInput()->UpdateActionState(
+      activeSets, sizeof(vr::VRActiveActionSet_t), lActiveSetCount);
     if (error != vr::VRInputError_None) {
       if (!mbFallbackReported) {
         Log(" SteamVR Input update failed with error %d. Falling back to legacy controller polling.\n", (int)error);
@@ -231,7 +260,52 @@ namespace hpl {
       anyActionActive = anyActionActive || turn.active;
 
       nextState.sprint = ReadDigital(ActionFor(mSprintAction, mSprintActionLeft));
-      nextState.interact = ReadDigital(ActionFor(mInteractAction, mInteractActionLeft));
+      // The off-hand has a dedicated action set restricted to its physical
+      // controller. This exposes PS VR2 L2/R2 without activating the complete
+      // mirrored gameplay layout. Raw polling remains a fallback for older
+      // profiles that do not bind the dedicated action yet.
+      {
+        cVRButtonState domInteract = ReadDigital(ActionFor(mInteractAction, mInteractActionLeft));
+        cVRButtonState offInteract = ReadDigital(mOffhandInteractAction);
+        TrackedController& offHand = bLeftHanded ? rightHand : leftHand;
+        bool bOffValid = false;
+        bool bOffPressed = false;
+        bool bOffJustPressed = false;
+
+        // Do not consume raw edges while the action system is genuinely down;
+        // ButtonHandler will poll both controllers for the legacy fallback.
+        if (!offInteract.active && (anyActionActive || domInteract.active)) {
+          offHand.UpdateButtonState();
+          const TrackedController::ButtonState& offButtons = offHand.GetButtonState();
+          bOffValid = offButtons.valid_;
+          bOffPressed = offButtons.triggerPressed;
+          bOffJustPressed = offButtons.triggerJustPressed;
+        }
+
+        nextState.interact.pressed = domInteract.pressed || offInteract.pressed || bOffPressed;
+        nextState.interact.justPressed = domInteract.justPressed ||
+          offInteract.justPressed || bOffJustPressed;
+        nextState.interact.justReleased = previousState.interact.pressed && !nextState.interact.pressed;
+        nextState.interact.active = domInteract.active || offInteract.active;
+
+        if (offInteract.justPressed || bOffJustPressed)
+          mInteractSourceHand = mHandedness == eSteamVRHand_Left ? eSteamVRHand_Right : eSteamVRHand_Left;
+        else if (domInteract.justPressed)
+          mInteractSourceHand = mHandedness;
+
+        // Throttled diagnostics distinguish a dead binding from a raw trigger
+        // that SteamVR exposes correctly but does not route to the action.
+        static unsigned long slNextDiagMs = 5000;
+        unsigned long lNowMs = GetApplicationTime();
+        if (lNowMs >= slNextDiagMs) {
+          slNextDiagMs = lNowMs + 2000;
+          Log(" [VR diag +%lu ms] interact: dom(action active=%d down=%d) off(action active=%d down=%d raw valid=%d down=%d) src=%d recenter(active=%d down=%d)\n",
+            lNowMs, (int)domInteract.active, (int)domInteract.pressed,
+            (int)offInteract.active, (int)offInteract.pressed,
+            (int)bOffValid, (int)bOffPressed, (int)mInteractSourceHand,
+            (int)nextState.recenter.active, (int)nextState.recenter.pressed);
+        }
+      }
       nextState.examine = ReadDigital(ActionFor(mExamineAction, mExamineActionLeft));
       nextState.holster = ReadDigital(ActionFor(mHolsterAction, mHolsterActionLeft));
       nextState.inventory = ReadDigital(ActionFor(mInventoryAction, mInventoryActionLeft));
@@ -243,9 +317,10 @@ namespace hpl {
 
       // World interaction needs a current pointing pose. Preserve non-spatial
       // controls such as pause/inventory, but release an in-progress interact
-      // cleanly if the dominant hand's tracking disappears.
-      TrackedController& pointerHand = mHandedness == eSteamVRHand_Left ? leftHand : rightHand;
-      if (!pointerHand.IsPoseValid()) {
+      // cleanly if the controller that initiated it loses tracking.
+      TrackedController& interactHand = mInteractSourceHand == eSteamVRHand_Left ? leftHand : rightHand;
+      if ((nextState.interact.pressed || previousState.interact.pressed) &&
+          !interactHand.IsPoseValid()) {
         nextState.interact.pressed = false;
         nextState.interact.justPressed = false;
         nextState.interact.justReleased = previousState.interact.pressed;
