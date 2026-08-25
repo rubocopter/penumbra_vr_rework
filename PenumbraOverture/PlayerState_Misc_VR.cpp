@@ -82,7 +82,11 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
       const eVRHandIndex handIndex = (eVRHandIndex)i;
       mpPlayer->ClearVRHandTarget(handIndex);
 
-      if (handIndex != dominantIndex)
+// The off hand may also target and grab, but only while it carries no
+      // equipment (flashlight, glowstick, flare); an equipped hand keeps its
+      // original behaviour and never highlights world objects.
+      if (handIndex != dominantIndex &&
+          mpInit->mpPlayerHands->GetAttachmentModel(i) != NULL)
         continue;
 
 // The left and right hand rigs are distinct HUD models named "LeftHand"
@@ -380,18 +384,30 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
 
 void cPlayerState_Normal_VR::OnStartInteract()
 {
-  const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
+  // Prefer the hand that physically pressed interact; fall back to the other
+  // hand when the pressing one has nothing in reach.  Remember which hand
+  // initiated so the grab state tracks that controller.
+  const eVRHandIndex preferredIndex = mpInit->mpGame->vr_input.GetInteractSourceHand() == eSteamVRHand_Left
     ? eVRHandIndex_Left : eVRHandIndex_Right;
-  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(dominantIndex);
+  const eVRHandIndex fallbackIndex = preferredIndex == eVRHandIndex_Left
+    ? eVRHandIndex_Right : eVRHandIndex_Left;
+
+  eVRHandIndex chosen = preferredIndex;
+  if (mpPlayer->GetVRHandTarget(preferredIndex).mpBody == NULL &&
+      mpPlayer->GetVRHandTarget(fallbackIndex).mpBody != NULL)
+    chosen = fallbackIndex;
+
+  const cVRHandTarget& target = mpPlayer->GetVRHandTarget(chosen);
   if (target.mpBody)
   {
 	Log(" [VR interaction +%lu ms] %s target '%s', crosshair %d, distance %.2f.\n",
-	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right",
+	  GetApplicationTime(), chosen == eVRHandIndex_Left ? "left" : "right",
 	  target.mpBody->GetName().c_str(),
 	  (int)target.mCrossHairState, target.mfDistance);
 
     // Keep legacy entity callbacks coherent while the interaction states are
     // migrated incrementally to explicit hand ownership.
+    mpPlayer->SetVRInteractHand(chosen);
     mpPlayer->GetPickRay()->mpPickedBody = target.mpBody;
     mpPlayer->GetPickRay()->mvPickedPos = target.mvPosition;
     mpPlayer->GetPickRay()->mfPickedDist = target.mfDistance;
@@ -402,7 +418,7 @@ void cPlayerState_Normal_VR::OnStartInteract()
 else
   {
 	Log(" [VR interaction +%lu ms] interact pressed with no %s-hand target.\n",
-	  GetApplicationTime(), dominantIndex == eVRHandIndex_Left ? "left" : "right");
+	  GetApplicationTime(), chosen == eVRHandIndex_Left ? "left" : "right");
   }
 }
 

@@ -35,7 +35,17 @@ float cPlayerState_Grab_VR::mfMassDiv = 5.0f;
 cPlayerState_Grab_VR::cPlayerState_Grab_VR(cInit *apInit,cPlayer *apPlayer) : iPlayerState(apInit,apPlayer,ePlayerState_Grab)
 {
 	mpPushBody = NULL;
+	mHandIndex = eVRHandIndex_Right;
 }
+
+//-----------------------------------------------------------------------
+
+// The controller that grabbed the body; slot index matches hand index.
+#define VR_GRAB_HAND() \
+  (mHandIndex == eVRHandIndex_Left ? mpInit->mpGame->vr_left_hand \
+                                   : mpInit->mpGame->vr_right_hand)
+#define VR_GRAB_HAPTIC() \
+  (mHandIndex == eVRHandIndex_Left ? eVRHapticHand_Left : eVRHapticHand_Right)
 
 //-----------------------------------------------------------------------
 
@@ -61,18 +71,48 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
 		}
 	}
 
-  // Move relative to the player's hand
-
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
-  cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
-
+  // Kinematic hold: the body follows the grabbing hand EXACTLY, teleporting
+  // onto the hand matrix every frame (original mod behaviour).  Velocity
+  // servos fight Newton's contact resolution and read as telekinesis rather
+  // than a firm grip.  Hand velocity is still written into the body so world
+  // contacts react and releases inherit momentum.
   mpPushBody->SetGravity(false);
   mpPushBody->SetEnabled(true);
   mpPushBody->SetActive(true);
   mpPushBody->SetAutoDisable(false);
 
+  // Anchor to the RENDERED hand rig pose (controller pose plus the hud model
+  // offsets) so held items sit inside the visible palm instead of floating
+  // beside it.
+  cMatrixf handMat;
+  iHudModel *pGrabModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
+  if (pGrabModel && pGrabModel->UpdatePoseMatrix(handMat, 0.0f))
+  {
+    // pose matrix already includes tracking-to-world
+  }
+  else
+  {
+    handMat = VRHelper::TrackingToWorldSpace(VR_GRAB_HAND().GetMatrix(), mpInit->mpGame);
+  }
+
+  bool bJointed = mpPushBody->GetJointNum() > 0;
+  cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
   mpPushBody->SetWorldMatrix(destMatrix);
-  // mpPushBody->SetCollidePlayer(false);
+
+  TrackedController& grabHand = VR_GRAB_HAND();
+  cVector3f vHandVelW =
+    mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(grabHand.GetVelocity());
+  float fCarriedSpeed = vHandVelW.Length();
+  const float kMaxCarriedSpeed = bJointed ? 3.0f : 20.0f;
+  if (fCarriedSpeed > kMaxCarriedSpeed)
+    vHandVelW = vHandVelW * (kMaxCarriedSpeed / fCarriedSpeed);
+  mpPushBody->SetLinearVelocity(vHandVelW);
+
+  cVector3f vHandAngW =
+    mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(grabHand.GetAngularVelocity());
+  mpPushBody->SetAngularVelocity(vHandAngW * 0.5f);
+
+  mpPushBody->SetCollidePlayer(false);
 
   /////////////////////////////////////////////////
   // Cast ray to see if anything could be examined.
@@ -85,16 +125,12 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
   pPhysicsWorld->CastRay(mpPlayer->GetExamineRay(), vStart, vEnd, true, false, true);
   mpPlayer->GetExamineRay()->CalculateResults();
 
-  //Log("Picked body: %d\n",(size_t)mpPlayer->GetPickedBody());
-
   if (mpPlayer->GetExamineBody())
   {
     iGameEntity *pEntity = (iGameEntity*)mpPlayer->GetExamineBody()->GetUserData();
 
-    //Call entity
     pEntity->PlayerPick();
 
-    //Set cross hair state
     eCrossHairState CrossState = pEntity->GetPickCrossHairState(mpPlayer->GetExamineBody(), true);
 
     if ((CrossState == eCrossHairState_Examine && !pEntity->GetHasBeenExamined()))
@@ -112,9 +148,6 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
   }
 
   /////////////////////////////////////////////////
-  // Cast ray to see if anything is picked for hands.
-  cMatrixf poseMatrix;
-
   for (int i = 0; i < 2; ++i)
     mpPlayer->SetHandCrossHairState(i, eCrossHairState_None);
 }
@@ -253,7 +286,11 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
+  // Remember which controller initiated this grab so tracking, haptics and
+  // the visible hand slot all follow it instead of the dominant hand.
+  mHandIndex = (int)mpPlayer->GetVRInteractHand();
+
+  mpInit->mpPlayerHands->SetSlotVisible(mHandIndex, false);
 	
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -273,7 +310,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 
 	//Get the body to push
 	mpPushBody = mpPlayer->GetPushBody();
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, mpPushBody);
+	mpPlayer->SetVRHeldBody((eVRHandIndex)mHandIndex, mpPushBody);
 	mbHasGravity = mpPushBody->GetGravity();
 	if(mbPickAtPoint==false) mpPushBody->SetGravity(false);
 	mpPushBody->SetAutoDisable(false);
@@ -283,6 +320,15 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 
 	//Set a newer player mass
 	mpPlayer->SetMass(mpPlayer->GetMass() + mpPushBody->GetMass());
+
+	// Newton clamps body velocity to the map-defined MaxLinearSpeed cap every
+	// step; without raising it the tracking servo's requested velocity gets
+	// strangled and held objects trail behind the hand like on a rubber band.
+	bool bHoldingJointed = mpPushBody->GetJointNum() > 0;
+	mfDefaultMaxLinSpeed = mpPushBody->GetMaxLinearSpeed();
+	mfDefaultMaxAngSpeed = mpPushBody->GetMaxAngularSpeed();
+	mpPushBody->SetMaxLinearSpeed(bHoldingJointed ? 4.0f : 20.0f);
+	mpPushBody->SetMaxAngularSpeed(bHoldingJointed ? 6.0f : 30.0f);
 
 	//Lower the mass while holding
 	mfDefaultMass = mpPushBody->GetMass();
@@ -318,8 +364,29 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 							cMath::MatrixMul(	mpPushBody->GetWorldMatrix(),
 												mpPushBody->GetMassCentre());
 
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
-  localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), mpPushBody->GetLocalMatrix());
+  // Compute the grab anchor against the SAME rendered hand pose used during
+  // hold, so the object keeps exactly its visual relationship to the palm.
+  cMatrixf grabAnchorMat;
+  iHudModel *pEnterModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
+  if (pEnterModel && pEnterModel->UpdatePoseMatrix(grabAnchorMat, 0.0f))
+  {
+    // world-space rig pose ready
+  }
+  else
+  {
+    grabAnchorMat = VRHelper::TrackingToWorldSpace(VR_GRAB_HAND().GetMatrix(), mpInit->mpGame);
+  }
+  localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(grabAnchorMat), mpPushBody->GetLocalMatrix());
+
+  // Put the actual contact point in the palm while preserving the object's
+  // orientation at pickup. This removes the long lever arm that made an item
+  // appear to orbit around the controller instead of being firmly held.
+  if (mbPickAtPoint)
+  {
+    cMatrixf localRotation = localPickMatrix.GetRotation();
+    localPickMatrix.SetTranslation(
+      cMath::MatrixMul(localRotation, mvRelPickPoint) * -1.0f);
+  }
 
 	//Set cross hair image.
 	//mpPlayer->SetCrossHairState(eCrossHairState_Grab);
@@ -328,48 +395,60 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 
 mpPushBody->SetCollidePlayer(false);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VR_GRAB_HAPTIC());
 }
 
 //-----------------------------------------------------------------------
 
 void cPlayerState_Grab_VR::LeaveState(iPlayerState* apNextState)
 {
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
+	mpPlayer->SetVRHeldBody((eVRHandIndex)mHandIndex, NULL);
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
+  mpInit->mpPlayerHands->SetSlotVisible(mHandIndex, true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 	mpPushBody->SetGravity(mbHasGravity);
 	mpPushBody->SetActive(true);
 	mpPushBody->SetAutoDisable(true);
-	// mpPushBody->AddForce(cVector3f(0,1,0)*mpPushBody->GetMass());
 
 	if(mpPlayer->mbUseNormalMass==false)
 		mpPushBody->SetMass(mfDefaultMass);
+
+	// Restore the map-defined velocity caps
+	mpPushBody->SetMaxLinearSpeed(mfDefaultMaxLinSpeed);
+	mpPushBody->SetMaxAngularSpeed(mfDefaultMaxAngSpeed);
 
 	//Reset newer player mass
 	mpPlayer->SetMass(mpPlayer->GetDefaultMass());
 
 	mpPlayer->SetSpeedMul(1.0f);
 
-  // Hand velocities live in tracking space; rotate them into world space
-  // before applying them to the body, otherwise the throw whips backwards
-  // whenever the player faces away from the tracking origin's forward axis.
-  // TrackingDirectionToWorld applies only orientation: adding the full T2W
-  // translation would add the player's world position to the velocity.
-  TrackedController& hand = VRHelper::DominantHand(mpInit->mpGame);
+  // Apply hand velocity for the throw.  TrackingDirectionToWorld rotates only
+  // orientation (no translation) so the velocity stays in world space.
+  // Clamped: raw controller velocity spikes would launch light objects hard.
+  TrackedController& hand = VR_GRAB_HAND();
   cVector3f vWorldHandVel =
     mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetVelocity());
   cVector3f vWorldAngVel =
     mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(hand.GetAngularVelocity());
 
-  mpPushBody->SetLinearVelocity(vWorldHandVel * 1.15f);
+  vWorldHandVel = vWorldHandVel * 1.25f;
+  float fThrowSpeed = vWorldHandVel.Length();
+  const float kMaxThrowSpeed = 9.0f;
+  if (fThrowSpeed > kMaxThrowSpeed)
+    vWorldHandVel = vWorldHandVel * (kMaxThrowSpeed / fThrowSpeed);
+
+  float fAngSpeed = vWorldAngVel.Length();
+  const float kMaxThrowAngVel = 12.0f;
+  if (fAngSpeed > kMaxThrowAngVel)
+    vWorldAngVel = vWorldAngVel * (kMaxThrowAngVel / fAngSpeed);
+
+  mpPushBody->SetLinearVelocity(vWorldHandVel);
   mpPushBody->SetAngularVelocity(vWorldAngVel * 0.5f);
 
   mpPushBody->SetCollidePlayer(true);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VR_GRAB_HAPTIC());
 }
 
 //-----------------------------------------------------------------------
@@ -481,9 +560,24 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
   auto destDiff = destTranslation - mvPickPoint; // mpPushBody->GetWorldPosition();
   auto moveDirection = cMath::Vector3Normalize(destDiff);
 
-  mpPushBody->SetLinearVelocity(cVector3f(0.0f, 0.0f, 0.0f));
-  mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
-  mpPushBody->AddForceAtPosition((destDiff * 2500.0f * mpPushBody->GetMass()) / 2.0f, mvPickPoint);
+  if (mpPushBody->GetJointNum() > 0)
+  {
+    // Jointed bodies (chest lids, hinged panels) fight their joint
+    // controllers under the raw spring force, making them nearly impossible
+    // to lift.  Drive them with the grab-style velocity servo instead.
+    cVector3f vDragVel = destDiff * 10.0f;
+    float fDragSpeed = vDragVel.Length();
+    if (fDragSpeed > 3.5f)
+      vDragVel = vDragVel * (3.5f / fDragSpeed);
+    mpPushBody->SetLinearVelocity(vDragVel);
+    mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
+  }
+  else
+  {
+    mpPushBody->SetLinearVelocity(cVector3f(0.0f, 0.0f, 0.0f));
+    mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
+    mpPushBody->AddForceAtPosition((destDiff * 2500.0f * mpPushBody->GetMass()) / 2.0f, mvPickPoint);
+  }
   mlMoveCount = 20;
 
 	//////////////////////////////////////
@@ -671,6 +765,13 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, mpPushBody);
 	mpPushBody->SetAutoDisable(false);
 
+	// Lift the map-defined velocity caps while dragging so the pull force or
+	// servo is not strangled by Newton's per-step clamp.
+	mfDefaultMaxLinSpeed = mpPushBody->GetMaxLinearSpeed();
+	mfDefaultMaxAngSpeed = mpPushBody->GetMaxAngularSpeed();
+	mpPushBody->SetMaxLinearSpeed(mpPushBody->GetJointNum() > 0 ? 5.0f : 10.0f);
+	mpPushBody->SetMaxAngularSpeed(mpPushBody->GetJointNum() > 0 ? 8.0f : 15.0f);
+
 	//The pick point relative to the body
   auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
 	mvPickPoint = handMat.GetTranslation();
@@ -740,6 +841,10 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	}*/
 
   mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
+
+	// Restore the map-defined velocity caps
+	mpPushBody->SetMaxLinearSpeed(mfDefaultMaxLinSpeed);
+	mpPushBody->SetMaxAngularSpeed(mfDefaultMaxAngSpeed);
 
 	////////////////////////////
 	//Pause controllers

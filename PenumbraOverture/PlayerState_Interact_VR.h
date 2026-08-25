@@ -90,6 +90,15 @@ private:
 	float mfSpeedMul;
 
   cMatrixf localPickMatrix;
+
+  // Which controller grabbed the body (dominant by default, off hand allowed
+  // while it carries no equipment)
+  int mHandIndex;
+
+  // Newton hard-clamps body velocities against these map-defined caps, which
+  // would strangle the tracking servo; originals are restored on release.
+  float mfDefaultMaxLinSpeed;
+  float mfDefaultMaxAngSpeed;
 };
 
 //-----------------------------------------------------------------
@@ -165,6 +174,10 @@ private:
 	cPlayerState_Move_BodyCallback_VR *mpCallback;
 
   cMatrixf localPickMatrix;
+
+  // Velocity caps overridden while dragging (restored on release)
+  float mfDefaultMaxLinSpeed;
+  float mfDefaultMaxAngSpeed;
 };
 
 //////////////////////////////////////////////////////////////////////////

@@ -54,6 +54,8 @@ cPlayer::cPlayer(cInit *apInit)  : iUpdateable("Player")
 {
 	mpInit = apInit;
 	mpVRHandInteractionShape = NULL;
+	mpVRHandNudgeShape = NULL;
+	mVRInteractHand = eVRHandIndex_Right;
 	mpCharBody = NULL;
 
 	mpScene = apInit->mpGame->GetScene();
@@ -794,6 +796,13 @@ void cPlayer::DestroyWorldObjects()
 		mpVRHandInteractionShape = NULL;
 	}
 
+	if(mpVRHandNudgeShape != NULL)
+	{
+		if(pPhysicsWorld != NULL)
+			pPhysicsWorld->DestroyShape(mpVRHandNudgeShape);
+		mpVRHandNudgeShape = NULL;
+	}
+
 	if(mpCharBody != NULL)
 	{
 		if(pPhysicsWorld != NULL)
@@ -1041,6 +1050,11 @@ void cPlayer::OnWorldLoad()
 if(mpVRHandInteractionShape == NULL)
 		mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
 			cVector3f(50.0f, 20.0f, 30.0f), NULL);
+
+	// Small sphere used for direct hand-to-object nudge collision.
+	if(mpVRHandNudgeShape == NULL)
+		mpVRHandNudgeShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateSphereShape(
+			cVector3f(0.12f), NULL);
 
 	// Create body
 	// mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", mvSize);
@@ -1622,6 +1636,8 @@ void cPlayer::Reset()
 	// OnWorldExit performs explicit destruction only for normal map transitions.
 	mpCharBody = NULL;
 	mpVRHandInteractionShape = NULL;
+	mpVRHandNudgeShape = NULL;
+	mVRInteractHand = eVRHandIndex_Right;
 	mpWeaponCallback = NULL;
 	mbUpdatingCollisionCallbacks = false;
 
