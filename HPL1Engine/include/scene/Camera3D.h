@@ -197,6 +197,7 @@ namespace hpl {
     void SetVRProjectionMatrix(float top, float left, float right, float bottom);
     void SetVRProjectionMatrix(const cMatrixf& mtx);
     void SetVRViewMatrix(const cMatrixf& mtx);
+    bool IsUsingVRViewMatrix() const { return use_vr_view_matrix; }
     void DisableVRMatrices();
 
 		cMatrixf& GetPrevView(){ return m_mtxPrevView;}

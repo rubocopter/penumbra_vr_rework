@@ -872,11 +872,36 @@ namespace hpl {
 			if(mbCameraIsListener)
 			{
 				cCamera3D* pCamera3D = static_cast<cCamera3D*>(mpActiveCamera);
+
+				cVector3f vListenerPos;
+				cVector3f vForward;
+				cVector3f vUp;
+
+				if (pCamera3D->IsUsingVRViewMatrix())
+				{
+					// The camera view matrix is written during render, so reading it
+					// here would feed the listener last frame's head pose. Build the
+					// listener from the tracking data updated this frame instead.
+					const cMatrixf mtxHeadPose = gGame->vr_tracking.GetHeadWorldPose();
+					const cMatrixf mtxInvHeadRotation =
+							cMath::MatrixInverse(mtxHeadPose.GetRotation());
+
+					vListenerPos = mtxHeadPose.GetTranslation();
+					vForward = mtxInvHeadRotation.GetForward()*-1.0f;
+					vUp = mtxInvHeadRotation.GetUp();
+				}
+				else
+				{
+					vListenerPos = pCamera3D->GetPosition();
+					vForward = pCamera3D->GetForward();
+					vUp = pCamera3D->GetUp();
+				}
+
 				mpSound->GetLowLevel()->SetListenerAttributes(
-						pCamera3D->GetPosition(),
+						vListenerPos,
 						cVector3f(0,0,0),
-						pCamera3D->GetForward()*-1.0f,
-						pCamera3D->GetUp());
+						vForward*-1.0f,
+						vUp);
 			}
 
 			if(mbUpdateMap && mpCurrentWorld3D)
