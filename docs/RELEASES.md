@@ -1,11 +1,30 @@
 # Release history
 
-## Unreleased
+## v0.1.0-alpha.6 — 25 August 2026
+
+**A complete spatial-audio chain: binaural HRTF, occlusion muffling, distance absorption, ambient reverb, and a low-latency head-tracked listener — on a bundled OpenAL Soft runtime.**
+
+### Added
+
+- Bundled OpenAL Soft 1.25.2 (Win32) as an app-local library: guaranteed EFX and HRTF support on every machine regardless of the installed OpenAL runtime; LGPL license shipped under `licenses/`
+- Binaural audio (HRTF) row in Options → VR Settings → Display with **Auto** (the runtime enables it only when Windows reports headphones), **Headphones** (forced), and **Off**; persisted as `[VR] HRTF` in `settings.cfg` and applied through an app-local `alsoft.ini` written at startup — restart required, like render scale
+- Global environmental reverb tuned for Penumbra's mine galleries: restrained wet mix (bus trim 0.32), 2.6 s decay whose treble falls faster than its body, high diffusion; routed through EFX for world sounds only, leaving UI and streams untouched
+- Occlusion muffles instead of just attenuating: blocked sounds drive a per-source low-pass filter that follows the same fade curve as the volume cut (HF gain 0.2 when hidden → 1.0 in the open)
+- Distance air absorption on the same filter: audible sources lose treble progressively down to ~55% HF gain at max range, so far things read as far before any wall is involved
+- Spanish localization for the new setting
 
 ### Fixed
 
-- VR audio listener now follows the tracked head pose of the current frame instead of the previous frame's camera matrix, removing a one-frame pan lag on positional sounds (cave drips, wind, thrown objects) during fast head turns and after recentering
-- Validated on hardware with ambient positional audio and thrown dynamite
+- The VR audio listener follows the tracked head pose of the current frame instead of the previous frame's camera matrix, removing a one-frame pan lag on positional sounds during fast head turns and after recentering
+- Device opening no longer forces legacy Creative router names ("Generic Software") that modern runtimes reject; unknown or unset names open the runtime's default output
+- OALWrapper hardened for first-time EFX activation: per-source filters are created on demand instead of dereferencing a permanent NULL (startup access violation), the EFX manager initializes its thread state before any failure path can tear it down, and failed device opens no longer route into the silent NULL driver
+- Legacy wrapper sound thread disabled by default — it races against OpenAL Soft's internal mixer once EFX is active; OpenAL Soft already mixes on its own thread
+
+### Known limitations
+
+- Environmental reverb is a single global preset; per-zone or map-driven environments remain future work
+- HRTF has been validated informally on PS VR2 Sense headphone output only; other headsets follow the same OpenAL path but lack a dedicated hardware pass
+- Occlusion raycasts still sample every 30 updates (~0.5 s); very fast doors can pop between muffled and clear states
 
 ---
 

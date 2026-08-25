@@ -22,6 +22,8 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 
 - Make OpenXR the default only after feature parity and regression testing
 - Replace or substantially rework the hand asset if independent ring/middle motion, thumb wrap, and finger splay cannot be achieved with the current mesh
+- Per-zone or map-driven reverb environments on top of the global mine preset
+- Custom HRTF dataset selection alongside the OpenAL Soft built-in set
 
 ## Completed
 
@@ -42,3 +44,4 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Bare off-hand targeting and grabbing on PS VR2 Sense
 - Dynamic hand nudge for physics props and hinged doors, excluding inventory items
 - Low-latency VR audio listener — OpenAL orientation/position built from fresh head tracking data each update instead of the previous render's camera matrix
+- Spatial-audio chain on bundled OpenAL Soft 1.25.2: binaural HRTF toggle (Auto/Headphones/Off), global mine-gallery reverb, occlusion muffling through per-source low-pass filters, and distance treble absorption

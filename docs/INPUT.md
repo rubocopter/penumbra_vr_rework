@@ -231,7 +231,7 @@ The original game exposes one active player-interaction state. Consequently, bot
 
 Open **Options → VR Settings** to change controls, movement, calibration, and display options. Aim at a row and use R2 to increase or select the next value, R3 to decrease or select the previous value, and Circle to return.
 
-Changes are saved immediately. Render scale requires a restart. Settings that do not apply to the selected turn or crouch mode are shown greyed out.
+Changes are saved immediately. Render scale and HRTF require a restart. Settings that do not apply to the selected turn or crouch mode are shown greyed out.
 
 | Setting | Default | Valid range | Effect |
 | --- | ---: | ---: | --- |
@@ -248,6 +248,7 @@ Changes are saved immediately. Render scale requires a restart. Settings that do
 | `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored menus, cinematics, messages, and subtitles |
 | `UIScale` | `1.0` | `0.5`–`2.0` | Size of the room-anchored UI surface |
 | `RenderScale` | `1.0` | `0.5`–`2.0` | Multiplies SteamVR's recommended eye-buffer size; requires a restart |
+| `HRTF` | `Auto` | `Auto`, `Headphones`, `Off` | Binaural spatialization for positional sounds. Auto enables it only when Windows reports headphones; requires a restart |
 | `CrouchMode` | `Hybrid` | `Physical`, `Button`, `Hybrid` | Chooses body movement, the crouch button, or either |
 | `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Sets physical crouch detection depth and the button-crouch view offset |
 | `SubtitleScale` | `1.35` | `0.75`–`2.0` | Scales cinematic subtitles, radio text, and gameplay messages |

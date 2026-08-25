@@ -1,6 +1,6 @@
 # Penumbra: Overture VR Rework
 
-A community-made PCVR rework that brings **Penumbra: Overture** to full room-scale VR with motion-controlled hands and physical interactions.
+A community-made PCVR rework that brings **Penumbra: Overture** to full room-scale VR with motion-controlled hands, physical interactions, and a complete spatial-audio chain built for horror.
 
 > Experimental public alpha. You must own **Penumbra: Overture** on Steam; the original game is not included.
 
@@ -11,6 +11,7 @@ A community-made PCVR rework that brings **Penumbra: Overture** to full room-sca
 - Full room-scale PCVR — walk, crouch, lean, reach
 - Motion-controlled hands with animated fingers and visible equipped objects
 - Physical interaction — pick up, throw, and manipulate objects naturally
+- **Hear the dark**: binaural HRTF audio, creatures that sound muffled through walls, distant sources that lose their treble, and a mine-gallery reverb that makes corridors breathe
 - Standing or seated play, left- or right-handed controls, and height calibration
 - Snap, smooth, or physical-only turning plus adjustable movement and crouch modes
 - Performance, Balanced, and Quality presets with adjustable render scale
@@ -18,6 +19,16 @@ A community-made PCVR rework that brings **Penumbra: Overture** to full room-sca
 - Room-anchored menus and cinematics with scalable subtitles (no letterboxing)
 - Reversible installer that backs up every original file it replaces
 - Spanish localization for VR tutorial, menus, and controller notes
+
+## Spatial audio
+
+Penumbra is about what you hear coming. This rework rebuilds the entire acoustic chain on top of a bundled OpenAL Soft runtime, so it behaves identically on every machine:
+
+1. **Positional tracking** — the listener follows your head pose in real time, not last frame's render matrix
+2. **Binaural HRTF** — optional headphone spatialization with elevation cues, set to Auto, Headphones, or Off in VR Settings
+3. **Distance absorption** — far sources dull progressively even in line of sight
+4. **Occlusion** — walls and closed doors muffle treble with a smooth fade, so a creature behind a door sounds held back until you open it
+5. **Ambient reverb** — a restrained stone-gallery tail that gives large spaces depth without washing out the mix
 
 ## Quick start
 
