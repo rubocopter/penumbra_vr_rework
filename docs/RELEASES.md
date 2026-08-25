@@ -1,5 +1,14 @@
 # Release history
 
+## Unreleased
+
+### Fixed
+
+- VR audio listener now follows the tracked head pose of the current frame instead of the previous frame's camera matrix, removing a one-frame pan lag on positional sounds (cave drips, wind, thrown objects) during fast head turns and after recentering
+- Validated on hardware with ambient positional audio and thrown dynamite
+
+---
+
 ## v0.1.0-alpha.5 — 25 August 2026
 
 **Natural hand interaction, firm tracked grabs, and off-hand grabbing.**

@@ -41,3 +41,4 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Left-handed mirror — fully mirrored action sets, equipment slots, notebook on off hand
 - Bare off-hand targeting and grabbing on PS VR2 Sense
 - Dynamic hand nudge for physics props and hinged doors, excluding inventory items
+- Low-latency VR audio listener — OpenAL orientation/position built from fresh head tracking data each update instead of the previous render's camera matrix
