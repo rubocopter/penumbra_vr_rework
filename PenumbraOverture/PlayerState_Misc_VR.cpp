@@ -935,7 +935,10 @@ void cPlayerState_UseItem_VR::OnUpdate(float afTimeStep)
   cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantAimMatrix(mpInit->mpGame), mpInit->mpGame);
 
   vStart = handMat.GetTranslation();
-  vEnd = vStart + cMath::MatrixMul(cMath::MatrixInverse(handMat.GetRotation()), cVector3f(0.0f, 0.0f, -1.0f));
+  // Rotate the view-space forward (-Z) by the aim rotation.  The former
+  // inverse-rotation math mirrored the laser across orientations and pointed
+  // it in wildly wrong directions.
+  vEnd = vStart + cMath::MatrixMul(handMat.GetRotation(), cVector3f(0.0f, 0.0f, -1.0f));
 
   mvUseLineStart = vStart;
   mvUseLineEnd = vEnd;
@@ -972,8 +975,20 @@ void cPlayerState_UseItem_VR::OnPostSceneDraw() {
   mpLowGfx->SetDepthTestActive(false);
   mpLowGfx->PushMatrix(eMatrix_ModelView);
 
-cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
-  mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(((cCamera3D*)mpInit->mpGame->GetScene()->GetCamera())->GetViewMatrix(), handMat ));
+  // Anchor the item card at the laser origin, billboarded to face the eyes,
+  // so it reads as a label riding the beam instead of a decal glued to the
+  // grip pose.
+  cCamera3D* pCam3D = (cCamera3D*)mpInit->mpGame->GetScene()->GetCamera();
+  cVector3f vBeamDir = mvUseLineEnd - mvUseLineStart;
+  if (vBeamDir.Length() > 0.0001f) vBeamDir.Normalise();
+  else vBeamDir = pCam3D->GetForward();
+
+  cMatrixf iconMat = cMath::MatrixInverse(pCam3D->GetViewMatrix().GetRotation());
+  iconMat = cMath::MatrixMul(
+    cMath::MatrixTranslate(mvUseLineStart + vBeamDir * 0.06f), iconMat);
+  iconMat = cMath::MatrixMul(pCam3D->GetViewMatrix(), iconMat);
+
+  mpLowGfx->SetMatrix(eMatrix_ModelView, iconMat);
 
   auto ofs = itemMat->GetTextureOffset(eMaterialTexture_Diffuse);
 
@@ -982,7 +997,7 @@ cMatrixf handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit-
 
   cColor color = mpPlayer->GetItemFlash() ? cColor(1.0f, 1.0f) : cColor(1.0f, 0.0f, 0.0f, 1.0f);
 
-  float scaleFactor = 0.85f;
+  float scaleFactor = 0.4f;
 
   vtx[0] = cVertex(cVector3f(-ofs.w * scaleFactor, ofs.h * scaleFactor, 0), cVector2f(ofs.x, ofs.y), color);
   vtx[1] = cVertex(cVector3f(ofs.w * scaleFactor, ofs.h * scaleFactor, 0), cVector2f(ofs.x + ofs.w, ofs.y), cColor(1.0f, 1.0f));
