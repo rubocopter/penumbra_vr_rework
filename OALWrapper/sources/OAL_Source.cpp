@@ -809,43 +809,67 @@ void cOAL_Source::UpdateFiltering(unsigned int alSends)
 
 //--------------------------------------------------------------------------------
 
-void cOAL_Source::SetFilterType(eOALFilterType aType )
-{
-	if (!gpDevice->IsEFXActive())
-		return;
-	
-	mpFilter->SetType(aType);
-}
+	void cOAL_Source::SetFilterType(eOALFilterType aType )
+	{
+		if (!gpDevice->IsEFXActive())
+			return;
+
+		// The per-source filter used to be left NULL forever; any EFX-active
+		// caller would then crash on a null dereference. Create it on demand.
+		if (!mpFilter)
+		{
+			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
+			if (!mpFilter) return;
+			mpFilter->SetType(aType);
+			return;
+		}
+		mpFilter->SetType(aType);
+	}
+
+	//--------------------------------------------------------------------------------
+
+	void cOAL_Source::SetFilterGain (float afGain)
+	{
+		if (!gpDevice->IsEFXActive())
+			return;
+
+		if (!mpFilter)
+		{
+			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
+			if (!mpFilter) return;
+		}
+		mpFilter->SetGain(afGain);
+	}
+
+	//--------------------------------------------------------------------------------
+
+	void cOAL_Source::SetFilterGainHF(float afGainHF)
+	{
+		if (!gpDevice->IsEFXActive())
+			return;
+
+		if (!mpFilter)
+		{
+			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
+			if (!mpFilter) return;
+		}
+		mpFilter->SetGainHF(afGainHF);
+	}
 
 //--------------------------------------------------------------------------------
 
-void cOAL_Source::SetFilterGain (float afGain)
-{
-	if (!gpDevice->IsEFXActive())
-		return;
-	
-	mpFilter->SetGain(afGain);
-}
+	void cOAL_Source::SetFilterGainLF(float afGainLF)
+	{
+		if (!gpDevice->IsEFXActive())
+			return;
 
-//--------------------------------------------------------------------------------
-
-void cOAL_Source::SetFilterGainHF(float afGainHF)
-{
-	if (!gpDevice->IsEFXActive())
-		return;
-	
-	mpFilter->SetGainHF(afGainHF);
-}
-
-//--------------------------------------------------------------------------------
-
-void cOAL_Source::SetFilterGainLF(float afGainLF)
-{
-	if (!gpDevice->IsEFXActive())
-		return;
-	
-	mpFilter->SetGainLF(afGainLF);
-}
+		if (!mpFilter)
+		{
+			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
+			if (!mpFilter) return;
+		}
+		mpFilter->SetGainLF(afGainLF);
+	}
 
 //--------------------------------------------------------------------------------
 

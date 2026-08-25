@@ -63,7 +63,9 @@ LPALGETFILTERIV alGetFilteriv = NULL;
 LPALGETFILTERF alGetFilterf = NULL;
 LPALGETFILTERFV alGetFilterfv = NULL;
 
-cOAL_EFXManager::cOAL_EFXManager() : mlNumSlots(0), mpvSlots(NULL), mplstEffectList(NULL), mplstFilterList(NULL)  
+cOAL_EFXManager::cOAL_EFXManager() : mlNumSlots(0), mlNumSends(0),
+									mbUsingThread(false), mpUpdaterThread(NULL), mlThreadWaitTime(0),
+									mpvSlots(NULL), mplstEffectList(NULL), mplstFilterList(NULL)
 {
 }
 
@@ -220,12 +222,16 @@ void cOAL_EFXManager::Destroy()
 
 	LogMsg("",eOAL_LogVerbose_Medium, eOAL_LogMsg_Command, "Destroying EFX Manager...\n" );
 
-	if ( mbUsingThread )							
+	if ( mbUsingThread && mpUpdaterThread )
 	{
 		LogMsg("",eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Stopping Slot updater...\n" );
 		mbUsingThread = false;
 		SDL_WaitThread ( mpUpdaterThread, 0 );
 		mpUpdaterThread = NULL;
+	}
+	else
+	{
+		mbUsingThread = false;
 	}
 
 	LogMsg("",eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Destroying Effect Slots...\n" );
