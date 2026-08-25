@@ -206,7 +206,14 @@ namespace hpl {
 
     OAL_SetupLogging(mbLogSounds, eOAL_LogOutput_File, eOAL_LogVerbose_High, "HPL_OpenAL_SWDevice");
 
-    cInitParams.msDeviceName = "Generic Software";
+		// Legacy Creative router names mean nothing to modern runtimes like
+		// OpenAL Soft: unknown device names fail to open and push boot into
+		// the NULL-driver fallback. Route those aliases (and an unset name)
+		// to the wrapper's "default output" sentinel instead.
+		if (asDeviceName == "Generic Software" || asDeviceName == "Generic Hardware" || asDeviceName.empty())
+			cInitParams.msDeviceName = "NULL";
+		else
+			cInitParams.msDeviceName = asDeviceName;
     /*
 		if ( abUseHardware )
 		{
@@ -300,7 +307,32 @@ namespace hpl {
 				OAL_EffectSlot_AttachEffect(0, (cOAL_Effect*)mpEffect);
 				OAL_EffectSlot_SetAutoAdjust(0, false);
 
-				SetEnvVolume(1.0f);
+				// Global ambience preset: a large mine gallery. Restrained wet
+				// mix, tail that loses treble faster than body, high diffusion
+				// so it reads as stone air instead of an echo effect.
+				OAL_Effect_Reverb_SetDensity(mpEffect, 0.70f);
+				OAL_Effect_Reverb_SetDiffusion(mpEffect, 0.90f);
+				OAL_Effect_Reverb_SetGain(mpEffect, 0.28f);
+				OAL_Effect_Reverb_SetGainHF(mpEffect, 0.77f);
+				OAL_Effect_Reverb_SetGainLF(mpEffect, 1.0f);
+				OAL_Effect_Reverb_SetDecayTime(mpEffect, 2.6f);
+				OAL_Effect_Reverb_SetDecayHFRatio(mpEffect, 0.55f);
+				OAL_Effect_Reverb_SetDecayLFRatio(mpEffect, 1.0f);
+				OAL_Effect_Reverb_SetReflectionsGain(mpEffect, 0.15f);
+				OAL_Effect_Reverb_SetReflectionsDelay(mpEffect, 0.016f);
+				OAL_Effect_Reverb_SetLateReverbGain(mpEffect, 0.85f);
+				OAL_Effect_Reverb_SetLateReverbDelay(mpEffect, 0.030f);
+				OAL_Effect_Reverb_SetEchoTime(mpEffect, 0.25f);
+				OAL_Effect_Reverb_SetEchoDepth(mpEffect, 0.0f);
+				OAL_Effect_Reverb_SetModulationTime(mpEffect, 0.25f);
+				OAL_Effect_Reverb_SetModulationDepth(mpEffect, 0.0f);
+				OAL_Effect_Reverb_SetAirAbsorptionGainHF(mpEffect, 0.894f);
+				OAL_Effect_Reverb_SetHFReference(mpEffect, 5000.0f);
+				OAL_Effect_Reverb_SetLFReference(mpEffect, 250.0f);
+				OAL_Effect_Reverb_SetRoomRolloffFactor(mpEffect, 0.0f);
+
+				// Master trim on the reverb bus keeps the tail felt, not heard.
+				SetEnvVolume(0.32f);
 
 				Log("  Setting up Environmental Audio...Success.\n");
 			}

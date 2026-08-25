@@ -929,20 +929,33 @@ namespace hpl {
 					fVolume *= apEntry->mfNormalVolume;
 				}
 
-				float fBlock = pSound->GetBlockVolumeMul() + 
+				float fBlock = pSound->GetBlockVolumeMul() +
 					apEntry->mfBlockMul * (1 - pSound->GetBlockVolumeMul());
-				
+
+				// Two independent causes of treble loss feed one source
+				// low-pass filter: occlusion (walls) and air absorption with
+				// range. Occlusion follows the block fade curve so openings
+				// "clear" smoothly; distance is evaluated per frame from the
+				// current listener separation.
+				float fOcclusionHF = 0.2f + fBlock*0.8f;
+
+				float fRangeNorm = 0;
+				float fDistDelta = fDist - pSound->GetMinDistance();
+				float fDistSpan = pSound->GetMaxDistance() - pSound->GetMinDistance();
+				if(fDistSpan > 0 && fDistDelta > 0)
+					fRangeNorm = fDistDelta/fDistSpan;
+				float fDistanceHF = 1.0f - fRangeNorm * 0.45f;
+
+				pSound->SetFilterGainHF(fOcclusionHF * fDistanceHF);
+
 				if(aTypes & apEntry->mEffectType)
 				{
 					pSound->SetVolume(fBlock * fVolume * apEntry->mfNormalVolumeMul * mfVolume);
-					//pSound->SetFilterGainHF(fBlock * fVolume * apEntry->mfNormalVolumeMul * mfVolume);
 				}
 				else
 				{
 					pSound->SetVolume(fBlock * fVolume * apEntry->mfNormalVolumeMul);
 				}
-
-				//pSound->SetFilterGainHF(0.1f);
 				
 				//Log("Vol: %f\n",fBlock * fVolume * apEntry->mfNormalVolumeMul);
 				//Log("%s Block: %f\n",apEntry->msName.c_str(),apEntry->mfBlockMul);
