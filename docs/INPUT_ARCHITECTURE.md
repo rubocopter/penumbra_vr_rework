@@ -18,7 +18,13 @@ fallback and existing game scripts continue to work.
 | Normalize both controller paths into intent-named state | HPL1 | `cVRInputState`, `SteamVRInput.cpp` |
 | Read keyboard and mouse actions | HPL1 | `HPL1Engine/sources/input/` and `cInput` |
 | Convert tracking poses into Penumbra world space | HPL1 | `HPL1Engine/include/game/VRTracking.h` |
-| Define physical controller bindings | Data/runtime | `data/vr/actions.json`, `data/vr/bindings/*.json` |
+| Define physical controller bindings | Data/runtime | `data/vr/actions.json`, `data/vr/bindings/*.json` (generated — edit `scripts/generate-bindings.ps1`) |
+
+> **The binding JSONs are generated.** `scripts/generate-bindings.ps1` holds the
+> single declarative source: per-controller input vocabularies plus explicit
+> ordered row lists per action set. Run it without arguments to regenerate the
+> files, or with `-Check` (wired into `scripts/build.ps1`, so CI enforces it)
+> to verify they have not drifted. Never hand-edit `data/vr/bindings/*.json`.
 
 HPL1 should expose device-independent facts: a logical hand pose is valid, an
 action changed state, an analog axis has a value, a haptic request should be
