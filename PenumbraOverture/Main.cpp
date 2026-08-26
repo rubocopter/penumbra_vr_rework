@@ -26,8 +26,82 @@
 	#include <windows.h>
 #endif
 
+//-----------------------------------------------------------------------
+
+#ifdef WIN32
+
+// Automatic crash reporting: when anything machine-specific (audio driver,
+// GPU driver, compositor, SteamVR) takes the process down, write a minidump
+// next to the executable plus one flushed line into hpl.log. Support then
+// only ever needs files the game produced by itself. dbghelp.dll ships with
+// every Windows installation and is resolved at runtime, so nothing new is
+// linked and nothing has to be preinstalled on the player's machine.
+typedef BOOL(WINAPI *MiniDumpWriteDumpFunc)(HANDLE, DWORD, HANDLE, DWORD, void *, void *, void *);
+
+struct MiniDumpExceptionInfo
+{
+	DWORD mlThreadId;
+	EXCEPTION_POINTERS *mpExceptionPointers;
+	BOOL mbClientPointers;
+};
+
+static LONG WINAPI CrashFilter(EXCEPTION_POINTERS *apExceptionPointers)
+{
+	Log("CRASH: unhandled exception 0x%08X at address %p\n",
+		apExceptionPointers != NULL ? apExceptionPointers->ExceptionRecord->ExceptionCode : 0,
+		apExceptionPointers != NULL ? apExceptionPointers->ExceptionRecord->ExceptionAddress : NULL);
+
+	char sExePath[MAX_PATH];
+	if(GetModuleFileNameA(NULL, sExePath, MAX_PATH) == 0) return EXCEPTION_EXECUTE_HANDLER;
+
+	std::string sDumpPath(sExePath);
+	const size_t lSlash = sDumpPath.find_last_of("\\/");
+	if(lSlash == std::string::npos) return EXCEPTION_EXECUTE_HANDLER;
+	sDumpPath.resize(lSlash + 1);
+	sDumpPath += "penumbravr_crash.dmp";
+
+	HANDLE hFile = CreateFileA(sDumpPath.c_str(), GENERIC_WRITE, 0, NULL,
+							CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if(hFile == INVALID_HANDLE_VALUE)
+	{
+		Log("CRASH: could not create '%s' (error %lu)\n", sDumpPath.c_str(), GetLastError());
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+
+	HMODULE hDbgHelp = LoadLibraryA("dbghelp.dll");
+	bool bWritten = false;
+	if(hDbgHelp != NULL)
+	{
+		MiniDumpWriteDumpFunc pWriteDump =
+			(MiniDumpWriteDumpFunc)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
+		if(pWriteDump != NULL)
+		{
+			MiniDumpExceptionInfo Info;
+			Info.mlThreadId = GetCurrentThreadId();
+			Info.mpExceptionPointers = apExceptionPointers;
+			Info.mbClientPointers = FALSE;
+
+			bWritten = pWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+								hFile, 0, &Info, NULL, NULL) != FALSE;
+		}
+	}
+	CloseHandle(hFile);
+
+	Log("CRASH: %s '%s'\n", bWritten ? "minidump written to" : "failed writing", sDumpPath.c_str());
+
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+#endif
+
+//-----------------------------------------------------------------------
+
 int hplMain(const tString& asCommandLine)
 {
+#ifdef WIN32
+	SetUnhandledExceptionFilter(CrashFilter);
+#endif
+
 	cInit *pInit = hplNew( cInit, () );
 
 	bool bRet = pInit->Init(asCommandLine);
