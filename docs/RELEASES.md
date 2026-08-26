@@ -1,5 +1,28 @@
 # Release history
 
+## v0.1.0-alpha.6.1 — 26 August 2026
+
+**Hotfix release: startup crash resilience on upgraded installs, occlusion filtering that actually reaches OpenAL, self-service crash reporting, and a packaged-in Visual C++ runtime.**
+
+### Fixed
+
+- Upgraded installations no longer re-enable the legacy sound updater thread: builds up to alpha.5 wrote `[Sound] UseThreading=true` into `settings.cfg`, silently racing OpenAL Soft's internal mixer once EFX was active (startup crash around the first menu sounds). The stored value is now ignored with a logged warning; the thread stays off for everyone
+- Occlusion muffling and distance air absorption reach OpenAL for real: source filters created on demand had no type, so every `SetGainHF` call was rejected and alpha.6's advertised low-pass behaviour never applied
+- VR eye framebuffer allocation failures (driver limits or the 32-bit address space at high render scales) now verify framebuffer completeness and retry at half size instead of leaving rendering broken; eye descriptors are zero-initialized before any failed attempt destroys partial GL objects
+
+### Added
+
+- Automatic crash reporting: unhandled exceptions write `penumbravr_crash.dmp` next to the executable and a flushed `CRASH:` line into `hpl.log` — support requests only ever need files the game produced by itself
+- Stale-binding diagnostics: when move/turn actions stay inactive while other controls work (a SteamVR binding stored by an older alpha; reported on Valve Index), the log explains the one-time fix — SteamVR ▸ Settings ▸ Controllers ▸ Reset to default — and the troubleshooting guide documents it
+- App-local Visual C++ 2022 runtime (`msvcp140.dll`, `vcruntime140.dll`) ships inside the package; players no longer need the redistributable installed
+
+### Known limitations
+
+- SteamVR still prefers bindings it saved on first launch over newer bundled defaults; the mod detects and reports the situation but cannot override the user's stored profile programmatically
+- Environmental reverb remains a single global preset; per-zone environments remain future work
+
+---
+
 ## v0.1.0-alpha.6 — 25 August 2026
 
 **A complete spatial-audio chain: binaural HRTF, occlusion muffling, distance absorption, ambient reverb, and a low-latency head-tracked listener — on a bundled OpenAL Soft runtime.**
