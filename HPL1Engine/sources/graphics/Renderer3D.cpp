@@ -89,7 +89,24 @@ namespace hpl {
     //Attach depth buffer to FBO
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, framebufferDesc.m_nDepthBufferId);
 
-    return true;
+    // Huge eye buffers can exceed the driver's texture limits or the 32-bit
+    // address space; both fail as an incomplete framebuffer instead of a hard
+    // error. Report completeness so the caller can retry at a smaller size.
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    return status == GL_FRAMEBUFFER_COMPLETE;
+  }
+
+  void DestroyFrameBuffer(FramebufferDesc &framebufferDesc)
+  {
+    if(framebufferDesc.m_nRenderFramebufferId != 0)
+      glDeleteFramebuffers(1, &framebufferDesc.m_nRenderFramebufferId);
+    if(framebufferDesc.m_nDepthBufferId != 0)
+      glDeleteRenderbuffers(1, &framebufferDesc.m_nDepthBufferId);
+    if(framebufferDesc.m_nRenderTextureId != 0)
+      glDeleteTextures(1, &framebufferDesc.m_nRenderTextureId);
+    framebufferDesc.m_nRenderFramebufferId = 0;
+    framebufferDesc.m_nDepthBufferId = 0;
+    framebufferDesc.m_nRenderTextureId = 0;
   }
 
 	cRenderer3D::cRenderer3D(iLowLevelGraphics *apLowLevelGraphics,cResources* apResources,
@@ -117,6 +134,11 @@ namespace hpl {
 		mbLog = false;
 
 		mfVRRenderScale = 1.0f;
+
+		// Zeroed so a failed framebuffer attempt can safely destroy partial
+		// GL object names before anything was generated.
+		memset(&leftEyeDesc, 0, sizeof(leftEyeDesc));
+		memset(&rightEyeDesc, 0, sizeof(rightEyeDesc));
 
 		mfRenderTime =0;
 
@@ -314,8 +336,26 @@ namespace hpl {
     Log("   vr eye buffer %ux%u (recommended size x %.2f)\n",
       m_nVRRenderWidth, m_nVRRenderHeight, fScale);
 
-    CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, leftEyeDesc);
-    CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, rightEyeDesc);
+    // Allocation failures (driver limits, 32-bit address space) surface as an
+    // incomplete framebuffer rather than a hard error. Retry at half size
+    // until it completes so a demanding RenderScale degrades instead of
+    // leaving rendering broken or crashing.
+    while(CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, leftEyeDesc) == 0 ||
+          CreateFrameBuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight, rightEyeDesc) == 0)
+    {
+      DestroyFrameBuffer(leftEyeDesc);
+      DestroyFrameBuffer(rightEyeDesc);
+      if(m_nVRRenderWidth <= 512 || m_nVRRenderHeight <= 512)
+      {
+        Error("Failed to create complete VR eye framebuffers even at %ux%u\n",
+          m_nVRRenderWidth, m_nVRRenderHeight);
+        return;
+      }
+      m_nVRRenderWidth /= 2;
+      m_nVRRenderHeight /= 2;
+      Log("   vr eye buffer allocation failed; retrying at %ux%u\n",
+        m_nVRRenderWidth, m_nVRRenderHeight);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
