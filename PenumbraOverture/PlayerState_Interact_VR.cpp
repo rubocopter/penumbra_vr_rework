@@ -274,6 +274,11 @@ bool cPlayerState_Grab_VR::OnMoveSideways(float afMul, float afTimeStep)
 
 void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
 {
+	Log(" [VR DBG +%lu ms] Grab_VR::EnterState body='%s' joints=%d\n",
+	    GetApplicationTime(),
+	    mpPlayer->GetPushBody() ? mpPlayer->GetPushBody()->GetName().c_str() : "NULL",
+	    mpPlayer->GetPushBody() ? mpPlayer->GetPushBody()->GetJointNum() : 0);
+
 	//Detach the body if stuck to a sticky area
 	cGameStickArea *pStickArea = mpInit->mpMapHandler->GetBodyStickArea(mpPlayer->GetPushBody());
 	if(pStickArea)
@@ -565,7 +570,6 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   if (mpPushBody->GetJointNum() > 0)
   {
-    // Jointed bodies — angular velocity along hinge pin.
     iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
     if (pJoint)
     {
@@ -575,27 +579,60 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
       float fRadius = vToBody.Length();
       if (fRadius < 0.01f) fRadius = 0.3f;
 
-      cVector3f vPerpDir = cMath::Vector3Normalize(
-          cMath::Vector3Cross(vPinDir, vToBody));
+      ePhysicsJointType jointType = pJoint->GetType();
 
-      cVector3f vDragVel = destDiff * 10.0f;
-      float fDotPerp = cMath::Vector3Dot(vDragVel, vPerpDir);
-      cVector3f vAllowedVel = vPerpDir * fDotPerp;
-
-      float fAllowedSpeed = vAllowedVel.Length();
-      if (fAllowedSpeed > 3.5f)
-        fAllowedSpeed = 3.5f;
-
-      float fAngSpeed = fAllowedSpeed / fRadius;
-      cVector3f vAngVel = vPerpDir * fAngSpeed;
-
-      float fAngMag = vAngVel.Length();
-      float fMaxAng = 12.0f;
-      if (fAngMag > fMaxAng)
-        vAngVel = vAngVel * (fMaxAng / fAngMag);
-
-      mpPushBody->SetLinearVelocity(cVector3f(0, 0, 0));
-      mpPushBody->SetAngularVelocity(vAngVel);
+      if (jointType == ePhysicsJointType_Slider)
+      {
+        // Prismatic/slider joint (drawers, chests): project velocity onto pinDir
+        cVector3f vDragVel = destDiff * 10.0f;
+        float fDotSlide = cMath::Vector3Dot(vDragVel, vPinDir);
+        cVector3f vSlideVel = vPinDir * fDotSlide;
+        float fSlideSpeed = vSlideVel.Length();
+        if (fSlideSpeed > 3.5f)
+          vSlideVel = vSlideVel * (3.5f / fSlideSpeed);
+        mpPushBody->SetLinearVelocity(vSlideVel);
+        mpPushBody->SetAngularVelocity(cVector3f(0, 0, 0));
+        static unsigned long slNextJointLogMs = 0;
+        unsigned long lNowMs = GetApplicationTime();
+        if (lNowMs >= slNextJointLogMs)
+        {
+          slNextJointLogMs = lNowMs + 500;
+          Log(" [VR joint +%lu ms] SLIDER body='%s' pin=(%.3f %.3f %.3f) slideVel=(%.3f %.3f %.3f)\n",
+              lNowMs, mpPushBody->GetName().c_str(),
+              vPinDir.x, vPinDir.y, vPinDir.z,
+              vSlideVel.x, vSlideVel.y, vSlideVel.z);
+        }
+      }
+      else
+      {
+        // Hinge joint (doors): project onto tangent to arc
+        cVector3f vPerpDir = cMath::Vector3Normalize(
+            cMath::Vector3Cross(vPinDir, vToBody));
+        cVector3f vDragVel = destDiff * 10.0f;
+        float fDotPerp = cMath::Vector3Dot(vDragVel, vPerpDir);
+        cVector3f vAllowedVel = vPerpDir * fDotPerp;
+        float fAllowedSpeed = vAllowedVel.Length();
+        if (fAllowedSpeed > 3.5f)
+          fAllowedSpeed = 3.5f;
+        float fAngSpeed = fAllowedSpeed / fRadius;
+        cVector3f vAngVel = vPerpDir * fAngSpeed;
+        float fAngMag = vAngVel.Length();
+        float fMaxAng = 12.0f;
+        if (fAngMag > fMaxAng)
+          vAngVel = vAngVel * (fMaxAng / fAngMag);
+        mpPushBody->SetLinearVelocity(cVector3f(0, 0, 0));
+        mpPushBody->SetAngularVelocity(vAngVel);
+        static unsigned long slNextJointLogMs = 0;
+        unsigned long lNowMs = GetApplicationTime();
+        if (lNowMs >= slNextJointLogMs)
+        {
+          slNextJointLogMs = lNowMs + 500;
+          Log(" [VR joint +%lu ms] HINGE body='%s' pin=(%.3f %.3f %.3f) angVel=(%.3f %.3f %.3f)\n",
+              lNowMs, mpPushBody->GetName().c_str(),
+              vPinDir.x, vPinDir.y, vPinDir.z,
+              vAngVel.x, vAngVel.y, vAngVel.z);
+        }
+      }
     }
     else
     {
@@ -808,6 +845,10 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 
 	//Get the body to push
 	mpPushBody = mpPlayer->GetPushBody();
+	Log(" [VR DBG +%lu ms] Move_VR::EnterState body='%s' joints=%d\n",
+	    GetApplicationTime(),
+	    mpPushBody ? mpPushBody->GetName().c_str() : "NULL",
+	    mpPushBody ? mpPushBody->GetJointNum() : 0);
 	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, mpPushBody);
 	mpPushBody->SetAutoDisable(false);
 

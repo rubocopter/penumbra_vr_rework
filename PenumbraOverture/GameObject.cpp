@@ -506,6 +506,8 @@ void cGameObject::OnPlayerInteract()
 
 	if(mpInit->mbHasHaptics)
 	{
+		Log(" [VR DBG +%lu ms] GameObject::OnPlayerInteract -> ChangeState(Move) body='%s'\n",
+			GetApplicationTime(), pBody->GetName().c_str());
 		mpInit->mpPlayer->SetPushBody(pBody);
 		mpInit->mpPlayer->mbPickAtPoint = true;
 		mpInit->mpPlayer->mbRotateWithPlayer = false;
