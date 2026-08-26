@@ -36,7 +36,7 @@ Penumbra is about what you hear coming. This rework rebuilds the entire acoustic
 2. Run `Install-PenumbraVR.bat`; it finds the Steam installation and backs up replaced files.
 3. Start SteamVR, then launch **Penumbra: Overture** with Steam's normal **Play** button.
 
-Requires Windows 10/11, SteamVR, a PCVR headset, and the Microsoft Visual C++ 2015–2022 Redistributable (x86). To remove the mod, run `Install-PenumbraVR.bat -Restore`; only files owned by the mod are removed, and backed-up originals are restored.
+Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime ships inside the package since alpha.6.1. To remove the mod, run `Install-PenumbraVR.bat -Restore`; only files owned by the mod are removed, and backed-up originals are restored.
 
 ## Status
 
@@ -44,6 +44,7 @@ Requires Windows 10/11, SteamVR, a PCVR headset, and the Microsoft Visual C++ 20
 
 ## Documentation
 
+- [Troubleshooting and compatibility](docs/TROUBLESHOOTING.md) — crash dumps and logs, laptop GPUs, audio devices, controller resets, non-Steam installs
 - [Controls and VR settings](docs/INPUT.md) — bindings, comfort options, compatibility, and diagnostics
 - [VR architecture](docs/VR_ARCHITECTURE.md) — tracking space, world placement, UI, and hands
 - [Input architecture](docs/INPUT_ARCHITECTURE.md) — input flow and the engine/game boundary
@@ -53,6 +54,13 @@ Requires Windows 10/11, SteamVR, a PCVR headset, and the Microsoft Visual C++ 20
 ## About
 
 This is a community-maintained continuation of [veryjos/penumbra_vr](https://github.com/veryjos/penumbra_vr). It is unofficial and is not affiliated with Frictional Games, Valve, or Sony Interactive Entertainment.
+
+## Development
+
+- `scripts/build.ps1` — validates the project, builds Release Win32, runs the unit tests, and (with `-Package` / `-Deploy`) produces or installs a release layout
+- `scripts/generate-bindings.ps1` — regenerates the SteamVR controller bindings; the build fails if the shipped JSONs drift from this spec
+- `tests/VRTrackingTest` — unit tests for the pure VR math, executed by every build
+- `.github/workflows/build.yml` — CI compiles and packages Win32 on every push, PR, and tag
 
 ## License
 

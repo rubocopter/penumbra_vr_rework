@@ -45,3 +45,10 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Dynamic hand nudge for physics props and hinged doors, excluding inventory items
 - Low-latency VR audio listener — OpenAL orientation/position built from fresh head tracking data each update instead of the previous render's camera matrix
 - Spatial-audio chain on bundled OpenAL Soft 1.25.2: binaural HRTF toggle (Auto/Headphones/Off), global mine-gallery reverb, occlusion muffling through per-source low-pass filters, and distance treble absorption
+- Startup crash hardening — legacy sound-updater thread force-disabled on upgraded installs, typed on-demand EFX filters, eye-framebuffer completeness checks with half-size retries
+- Automatic crash reporting — minidump plus exception line written by the game itself, no event-viewer archaeology needed
+- Environment fingerprinting in `hpl.log` — Windows build, RAM and free process address space, real GPU/driver, audio devices
+- Stale-binding diagnostics for dead sticks with the documented one-time SteamVR reset
+- Generated controller bindings — single declarative spec in `scripts/generate-bindings.ps1` with build-time drift enforcement
+- Unit tests for the pure VR math (tracking space, stick dead zones) executed by every build
+- CI pipeline building and packaging Release Win32 on every push, PR, and tag

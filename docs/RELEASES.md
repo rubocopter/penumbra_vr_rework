@@ -1,5 +1,24 @@
 # Release history
 
+## Unreleased
+
+Accumulated on `master` after v0.1.0-alpha.6.1; becomes the next release's notes.
+
+### Fixed
+
+- Locomotion no longer computes the head-rotation inverse twice per frame
+- The sound source filter is only pushed to the driver when it actually changes, instead of re-issuing identical state for every audible sound each update
+- VR eye framebuffer descriptors are zero-initialized, so a failed allocation attempt cannot destroy unrelated GL object names
+
+### Added
+
+- Release identifier (`Penumbra VR vX.Y.Z`) logged at the very start of every boot, independent of the SteamVR input path
+- Environment fingerprint in `hpl.log`: Windows build, RAM and free 32-bit address space, real GPU vendor/renderer/driver — plus remaining address space recorded at crash time
+- Controller bindings are now generated from a single declarative spec (`scripts/generate-bindings.ps1`); the build fails if the shipped JSONs drift from it
+- Unit tests for the pure VR math (tracking-space transform, recenter invariant, stick dead zone) run on every build and in CI
+
+---
+
 ## v0.1.0-alpha.6.1 — 26 August 2026
 
 **Hotfix release: startup crash resilience on upgraded installs, occlusion filtering that actually reaches OpenAL, self-service crash reporting, and a packaged-in Visual C++ runtime.**
