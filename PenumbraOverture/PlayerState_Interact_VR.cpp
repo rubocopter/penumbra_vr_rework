@@ -562,10 +562,23 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   if (mpPushBody->GetJointNum() > 0)
   {
-    // Jointed bodies (chest lids, hinged panels) fight their joint
+    // Jointed bodies (chest lids, hinged panels, drawers) fight their joint
     // controllers under the raw spring force, making them nearly impossible
     // to lift.  Drive them with the grab-style velocity servo instead.
+    //
+    // For bodies constrained to a hinge (drawers, doors) the raw velocity
+    // direction often does not align with the allowed sliding axis, causing
+    // the constraint solver to reject most of the motion.  Project onto the
+    // hinge pin so the servo only drives the body along its single degree
+    // of freedom.
     cVector3f vDragVel = destDiff * 10.0f;
+    iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+    if (pJoint)
+    {
+      cVector3f vPinDir = pJoint->GetPinDir();
+      float fDot = cMath::Vector3Dot(vDragVel, vPinDir);
+      vDragVel = vPinDir * fDot;
+    }
     float fDragSpeed = vDragVel.Length();
     if (fDragSpeed > 3.5f)
       vDragVel = vDragVel * (3.5f / fDragSpeed);
