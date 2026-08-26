@@ -72,7 +72,7 @@ namespace hpl {
       mlLastSkeletonErrorCode(0), mlLastSkeletonFallbackCode(0),
       mbSkeletonFallbackReported(false),
       mbProfilesIdentified(false), mlNextProfileAttempt(0), mlProfileAttempts(0),
-      mlActionsIdleSince(0) {
+      mlActionsIdleSince(0), mlSticksInactiveSince(0), mbSticksWarningReported(false) {
   }
 
   bool cSteamVRInput::Initialize() {
@@ -343,6 +343,26 @@ namespace hpl {
         nextState.examine.active || nextState.holster.active || nextState.inventory.active ||
         nextState.notebook.active || nextState.quickLight.active || nextState.jump.active ||
         nextState.crouch.active || nextState.pause.active;
+
+      // Stale-binding signature: a controller profile saved by an older alpha
+      // can leave the joystick actions unbound while every other control works
+      // (reported on Index). The legacy fallback never engages because other
+      // actions keep the action context alive, so sticks die silently. Call
+      // that out once instead of leaving an opaque "sticks don't work" report.
+      if (move.active || turn.active) {
+        mlSticksInactiveSince = 0;
+        mbSticksWarningReported = false;
+      }
+      else if (anyActionActive && !mbSticksWarningReported) {
+        const unsigned long sticksNow = GetApplicationTime();
+        if (mlSticksInactiveSince == 0) mlSticksInactiveSince = sticksNow;
+        if (sticksNow - mlSticksInactiveSince > 20000) {
+          Log(" [VR input] move/turn actions never activate while other controls do; a stored "
+              "controller binding predates this build. Reset it via SteamVR > Settings > "
+              "Controllers > Penumbra: Overture > 'Reset to default' to restore stick movement.\n");
+          mbSticksWarningReported = true;
+        }
+      }
     }
     else {
       nextState.uiSelect = ReadDigital(ActionFor(mUISelectAction, mUISelectActionLeft));

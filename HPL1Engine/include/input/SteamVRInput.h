@@ -193,6 +193,8 @@ namespace hpl {
     unsigned long mlNextProfileAttempt;
     unsigned int mlProfileAttempts;
     unsigned long mlActionsIdleSince;
+    unsigned long mlSticksInactiveSince;
+    bool mbSticksWarningReported;
   };
 }
 
