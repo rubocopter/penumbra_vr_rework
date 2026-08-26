@@ -22,6 +22,10 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'check-project.ps1')
 
+# Bindings are generated from scripts/generate-bindings.ps1; fail before
+# building when the JSON files on disk drifted from that spec.
+& (Join-Path $PSScriptRoot 'generate-bindings.ps1') -Check | Out-Null
+
 # Fingerprint of every input that can change class layouts or compile flags:
 # headers across the tree plus the project files themselves. Source bodies
 # (.cpp) are deliberately excluded because reusing their object files is safe
@@ -121,6 +125,20 @@ if (($characteristics -band 0x20) -eq 0) {
     throw "Built executable is missing IMAGE_FILE_LARGE_ADDRESS_AWARE: $executablePath"
 }
 Write-Host 'Verified Large Address Aware in the executable PE header.' -ForegroundColor Green
+
+# Unit tests: the pure VR math (tracking space, dead zones) must pass before
+# anything else is allowed to proceed.
+$testProjectPath = Join-Path $repositoryRoot 'tests\VRTrackingTest\VRTrackingTest.vcxproj'
+$testExecutablePath = Join-Path $repositoryRoot "build\bin\$Configuration\tests\VRTrackingTest.exe"
+& $msbuildPath $testProjectPath "/p:Configuration=$Configuration" '/p:Platform=Win32' -nologo -verbosity:minimal
+if ($LASTEXITCODE -ne 0) {
+    throw "Unit test project failed to build with exit code $LASTEXITCODE"
+}
+& $testExecutablePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Unit tests failed with exit code $LASTEXITCODE"
+}
+Write-Host 'Unit tests passed.' -ForegroundColor Green
 
 if ($Package -or $Deploy) {
     & (Join-Path $PSScriptRoot 'package.ps1') -Configuration $Configuration

@@ -1,4 +1,5 @@
 #include "input/SteamVRInput.h"
+#include "input/VRAnalog.hpp"
 
 #include "system/LowLevelSystem.h"
 
@@ -166,7 +167,6 @@ namespace hpl {
 
     mbAvailable = true;
     Log(" SteamVR Input initialized with '%s'.\n", msManifestPath.c_str());
-    Log(" [VR build] compiled %s %s\n", __DATE__, __TIME__);
     return true;
   }
 
@@ -874,17 +874,9 @@ bool cSteamVRInput::UpdatePoseAction(vr::VRActionHandle_t handle, TrackedControl
   }
 
   void cSteamVRInput::ApplyMoveDeadZone(float& x, float& y) const {
-    const float magnitude = sqrtf(x * x + y * y);
-    if (magnitude <= mfMoveDeadZone || magnitude <= 0.0001f) {
-      x = 0.0f;
-      y = 0.0f;
-      return;
-    }
-
-    float scaledMagnitude = (magnitude - mfMoveDeadZone) / (1.0f - mfMoveDeadZone);
-    if (scaledMagnitude > 1.0f) scaledMagnitude = 1.0f;
-    x = (x / magnitude) * scaledMagnitude;
-    y = (y / magnitude) * scaledMagnitude;
+    // The formula lives in VRAnalog.hpp so the unit tests exercise the same
+    // code path as gameplay.
+    hpl::ApplyStickDeadZone(x, y, mfMoveDeadZone);
   }
 
   tString cSteamVRInput::FindManifestPath() const {
