@@ -504,7 +504,19 @@ void cGameObject::OnPlayerInteract()
 		return;
 	}
 
-	if(mpInit->mbHasHaptics) return;
+	if(mpInit->mbHasHaptics)
+	{
+		mpInit->mpPlayer->SetPushBody(pBody);
+		mpInit->mpPlayer->mbPickAtPoint = true;
+		mpInit->mpPlayer->mbRotateWithPlayer = false;
+		mpInit->mpPlayer->mbUseNormalMass = false;
+		mpInit->mpPlayer->mfGrabMassMul = 1;
+		mpInit->mpPlayer->mfHapticTorqueMul = 1.0f;
+		mpInit->mpPlayer->mbCanBeThrown = true;
+		mpInit->mpPlayer->mbGrabbingMoveBody = true;
+		mpInit->mpPlayer->ChangeState(ePlayerState_Move);
+		return;
+	}
 
 	switch(mInteractMode)
 	{

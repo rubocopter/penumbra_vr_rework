@@ -171,9 +171,12 @@ private:
 	ePlayerMoveState mPrevMoveState;
 	ePlayerState mPrevState;
 
-	cPlayerState_Move_BodyCallback_VR *mpCallback;
+  cPlayerState_Move_BodyCallback_VR *mpCallback;
 
   cMatrixf localPickMatrix;
+
+  cVector3f mvSlideAxis;
+  bool mbHasSlideAxis;
 
   // Velocity caps overridden while dragging (restored on release)
   float mfDefaultMaxLinSpeed;

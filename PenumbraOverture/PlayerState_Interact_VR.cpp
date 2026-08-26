@@ -23,6 +23,7 @@
 #include "Player.h"
 #include "MapHandler.h"
 #include "GameStickArea.h"
+#include "GameObject.h"
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
 
@@ -528,6 +529,8 @@ cPlayerState_Move_VR::cPlayerState_Move_VR(cInit *apInit,cPlayer *apPlayer) : iP
 {
 	mpPushBody = NULL;
 	mpCallback = hplNew( cPlayerState_Move_BodyCallback_VR, (apPlayer, apInit->mpGame->GetStepSize()) );
+	mbHasSlideAxis = false;
+	mvSlideAxis = cVector3f(0, 0, 0);
 }
 
 cPlayerState_Move_VR::~cPlayerState_Move_VR()
@@ -562,15 +565,7 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   if (mpPushBody->GetJointNum() > 0)
   {
-    // Jointed bodies (chest lids, hinged panels, drawers) fight their joint
-    // controllers under the raw spring force, making them nearly impossible
-    // to lift.  Drive them with the grab-style velocity servo instead.
-    //
-    // For bodies constrained to a hinge, Newton's constraint solver
-    // overwrites SetLinearVelocity during integration, so we must drive
-    // the motion through angular velocity along the hinge pin instead.
-    // The solver translates angular velocity around the pin into the
-    // correct linear sliding along the pin direction.
+    // Jointed bodies — angular velocity along hinge pin.
     iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
     if (pJoint)
     {
@@ -580,14 +575,19 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
       float fRadius = vToBody.Length();
       if (fRadius < 0.01f) fRadius = 0.3f;
 
-      cVector3f vDragVel = destDiff * 10.0f;
-      float fDragSpeed = vDragVel.Length();
-      if (fDragSpeed > 3.5f)
-        fDragSpeed = 3.5f;
+      cVector3f vPerpDir = cMath::Vector3Normalize(
+          cMath::Vector3Cross(vPinDir, vToBody));
 
-      float fAngSpeed = fDragSpeed / fRadius;
-      cVector3f vAngVel = cMath::Vector3Normalize(
-          cMath::Vector3Cross(vToBody, vDragVel)) * fAngSpeed;
+      cVector3f vDragVel = destDiff * 10.0f;
+      float fDotPerp = cMath::Vector3Dot(vDragVel, vPerpDir);
+      cVector3f vAllowedVel = vPerpDir * fDotPerp;
+
+      float fAllowedSpeed = vAllowedVel.Length();
+      if (fAllowedSpeed > 3.5f)
+        fAllowedSpeed = 3.5f;
+
+      float fAngSpeed = fAllowedSpeed / fRadius;
+      cVector3f vAngVel = vPerpDir * fAngSpeed;
 
       float fAngMag = vAngVel.Length();
       float fMaxAng = 12.0f;
@@ -606,6 +606,17 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
       mpPushBody->SetLinearVelocity(vDragVel);
       mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
     }
+  }
+  else if (mbHasSlideAxis)
+  {
+    cVector3f vDragVel = destDiff * 10.0f;
+    float fDotSlide = cMath::Vector3Dot(vDragVel, mvSlideAxis);
+    cVector3f vSlideVel = mvSlideAxis * fDotSlide;
+    float fSlideSpeed = vSlideVel.Length();
+    if (fSlideSpeed > 3.5f)
+      vSlideVel = vSlideVel * (3.5f / fSlideSpeed);
+    mpPushBody->SetLinearVelocity(vSlideVel);
+    mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
   }
   else
   {
@@ -858,6 +869,60 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
     mpPushBody->SetCollidePlayer(true);
       Log(" [VR collision +%lu ms] swing-door interaction kept player collision enabled.\n",
         GetApplicationTime());
+  }
+
+  if (mpPushBody->GetJointNum() > 0)
+  {
+    iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+    cVector3f vPin = pJoint ? pJoint->GetPinDir() : cVector3f(0,0,0);
+    cVector3f vPiv = pJoint ? pJoint->GetPivotPoint() : cVector3f(0,0,0);
+    cVector3f vBody = mpPushBody->GetWorldPosition();
+    Log(" [VR hinge +%lu ms] body '%s' joints=%d pin=(%.3f %.3f %.3f) pivot=(%.3f %.3f %.3f) body=(%.3f %.3f %.3f) dist=%.3f\n",
+        GetApplicationTime(),
+        mpPushBody->GetName().c_str(),
+        mpPushBody->GetJointNum(),
+        vPin.x, vPin.y, vPin.z,
+        vPiv.x, vPiv.y, vPiv.z,
+        vBody.x, vBody.y, vBody.z,
+        (vBody - vPiv).Length());
+  }
+
+  mbHasSlideAxis = false;
+  mvSlideAxis = cVector3f(0, 0, 0);
+  if (pEntity && pEntity->GetType() == eGameEntityType_Object && mpPushBody->GetJointNum() == 0)
+  {
+    cGameObject *pObject = static_cast<cGameObject*>(pEntity);
+    if (pObject->GetInteractMode() == eObjectInteractMode_Move ||
+        pObject->GetInteractMode() == eObjectInteractMode_Grab)
+    {
+      iPhysicsBody *pFrame = NULL;
+      iPhysicsBody *pDrawer = mpPushBody;
+      for (int b = 0; b < pObject->GetBodyNum(); ++b)
+      {
+        iPhysicsBody *pCandidate = pObject->GetBody(b);
+        if (pCandidate && pCandidate != mpPushBody && pCandidate->GetMass() == 0.0f)
+        {
+          pFrame = pCandidate;
+          break;
+        }
+      }
+      if (pFrame)
+      {
+        cVector3f vFramePos = pFrame->GetWorldPosition();
+        cVector3f vDrawerPos = pDrawer->GetWorldPosition();
+        cVector3f vAxis = vDrawerPos - vFramePos;
+        float fLen = vAxis.Length();
+        if (fLen > 0.01f)
+        {
+          mvSlideAxis = cMath::Vector3Normalize(vAxis);
+          mbHasSlideAxis = true;
+          Log(" [VR slide +%lu ms] body '%s' slide axis=(%.3f %.3f %.3f) dist=%.3f\n",
+              GetApplicationTime(),
+              mpPushBody->GetName().c_str(),
+              mvSlideAxis.x, mvSlideAxis.y, mvSlideAxis.z, fLen);
+        }
+      }
+    }
   }
 
 	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
