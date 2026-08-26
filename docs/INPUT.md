@@ -291,6 +291,14 @@ After closing the game, open `Documents/Penumbra Overture/Episode1/hpl.log`:
 
 If one controller loses tracking, its hand and pointer disappear and any held interaction is released. The other hand remains available for UI pointing.
 
+### Sticks dead but buttons working (Valve Index and others)
+
+SteamVR remembers the controller binding it selected for this game on first launch. If that binding was stored by an older alpha, updating the mod does not replace it: every button keeps working while the joystick actions stay unbound, and movement plus turning die silently. The log calls this out after ~20 seconds of gameplay:
+
+- `[VR input] move/turn actions never activate while other controls do; ...`
+
+Fix it once per controller type in SteamVR: **Settings ▸ Controllers ▸ Penumbra: Overture ▸ Reset to default**, then restart the game. The same reset also applies after manually editing any binding.
+
 ### PS VR2 Bluetooth stability
 
 PS VR2 Sense controllers connect to the PC independently over Bluetooth, so the headset can keep tracking while either hand disconnects. If SteamVR records `playstation_vr2: Send operation timed out. Closing device`, check the Bluetooth connection and driver before troubleshooting the game bindings.
