@@ -566,24 +566,46 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
     // controllers under the raw spring force, making them nearly impossible
     // to lift.  Drive them with the grab-style velocity servo instead.
     //
-    // For bodies constrained to a hinge (drawers, doors) the raw velocity
-    // direction often does not align with the allowed sliding axis, causing
-    // the constraint solver to reject most of the motion.  Project onto the
-    // hinge pin so the servo only drives the body along its single degree
-    // of freedom.
-    cVector3f vDragVel = destDiff * 10.0f;
+    // For bodies constrained to a hinge, Newton's constraint solver
+    // overwrites SetLinearVelocity during integration, so we must drive
+    // the motion through angular velocity along the hinge pin instead.
+    // The solver translates angular velocity around the pin into the
+    // correct linear sliding along the pin direction.
     iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
     if (pJoint)
     {
       cVector3f vPinDir = pJoint->GetPinDir();
-      float fDot = cMath::Vector3Dot(vDragVel, vPinDir);
-      vDragVel = vPinDir * fDot;
+      cVector3f vPivot = pJoint->GetPivotPoint();
+      cVector3f vToBody = mpPushBody->GetWorldPosition() - vPivot;
+      float fRadius = vToBody.Length();
+      if (fRadius < 0.01f) fRadius = 0.3f;
+
+      cVector3f vDragVel = destDiff * 10.0f;
+      float fDragSpeed = vDragVel.Length();
+      if (fDragSpeed > 3.5f)
+        fDragSpeed = 3.5f;
+
+      float fAngSpeed = fDragSpeed / fRadius;
+      cVector3f vAngVel = cMath::Vector3Normalize(
+          cMath::Vector3Cross(vToBody, vDragVel)) * fAngSpeed;
+
+      float fAngMag = vAngVel.Length();
+      float fMaxAng = 12.0f;
+      if (fAngMag > fMaxAng)
+        vAngVel = vAngVel * (fMaxAng / fAngMag);
+
+      mpPushBody->SetLinearVelocity(cVector3f(0, 0, 0));
+      mpPushBody->SetAngularVelocity(vAngVel);
     }
-    float fDragSpeed = vDragVel.Length();
-    if (fDragSpeed > 3.5f)
-      vDragVel = vDragVel * (3.5f / fDragSpeed);
-    mpPushBody->SetLinearVelocity(vDragVel);
-    mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
+    else
+    {
+      cVector3f vDragVel = destDiff * 10.0f;
+      float fDragSpeed = vDragVel.Length();
+      if (fDragSpeed > 3.5f)
+        vDragVel = vDragVel * (3.5f / fDragSpeed);
+      mpPushBody->SetLinearVelocity(vDragVel);
+      mpPushBody->SetAngularVelocity(cVector3f(0.0f, 0.0f, 0.0f));
+    }
   }
   else
   {
