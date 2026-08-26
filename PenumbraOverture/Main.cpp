@@ -51,6 +51,17 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS *apExceptionPointers)
 		apExceptionPointers != NULL ? apExceptionPointers->ExceptionRecord->ExceptionCode : 0,
 		apExceptionPointers != NULL ? apExceptionPointers->ExceptionRecord->ExceptionAddress : NULL);
 
+	// Address-space exhaustion is the classic silent killer of 32-bit VR
+	// builds; record how much was left at the moment of death.
+	MEMORYSTATUSEX vMemory;
+	memset(&vMemory, 0, sizeof(vMemory));
+	vMemory.dwLength = sizeof(vMemory);
+	if(GlobalMemoryStatusEx(&vMemory))
+	{
+		Log("CRASH: %.0f MB of process address space still free\n",
+			vMemory.ullAvailVirtual / (1024.0 * 1024.0));
+	}
+
 	char sExePath[MAX_PATH];
 	if(GetModuleFileNameA(NULL, sExePath, MAX_PATH) == 0) return EXCEPTION_EXECUTE_HANDLER;
 

@@ -105,6 +105,55 @@ static void WriteOpenALSoftConfig(eVRHRTFMode aMode)
 #endif
 }
 
+// Environment fingerprint written right after the log file is set up: remote
+// bug reports are nearly undiagnosable without knowing which audio stack,
+// GPU driver and OS build actually produced them.
+static void LogEnvironment(void)
+{
+#ifdef WIN32
+	#pragma pack(push, 8)
+	struct OsVersionInfo
+	{
+		unsigned long mlSize;
+		unsigned long mlMajor;
+		unsigned long mlMinor;
+		unsigned long mlBuild;
+		unsigned long mlPlatform;
+		wchar_t msCsdVersion[128];
+	};
+	#pragma pack(pop)
+	typedef long (WINAPI *RtlGetVersionFunc)(OsVersionInfo *);
+
+	HMODULE hNtDll = GetModuleHandleA("ntdll.dll");
+	if(hNtDll != NULL)
+	{
+		RtlGetVersionFunc pGetVersion =
+			(RtlGetVersionFunc)GetProcAddress(hNtDll, "RtlGetVersion");
+		if(pGetVersion != NULL)
+		{
+			OsVersionInfo vInfo;
+			memset(&vInfo, 0, sizeof(vInfo));
+			vInfo.mlSize = sizeof(vInfo);
+			if(pGetVersion(&vInfo) == 0)
+			{
+				Log(" Environment: Windows %lu.%lu build %lu\n",
+					vInfo.mlMajor, vInfo.mlMinor, vInfo.mlBuild);
+			}
+		}
+	}
+
+	MEMORYSTATUSEX vMemory;
+	memset(&vMemory, 0, sizeof(vMemory));
+	vMemory.dwLength = sizeof(vMemory);
+	if(GlobalMemoryStatusEx(&vMemory))
+	{
+		Log(" Environment: %.0f MB RAM, %.0f MB of 4096 MB process address space free\n",
+			vMemory.ullTotalPhys / (1024.0 * 1024.0),
+			vMemory.ullAvailVirtual / (1024.0 * 1024.0));
+	}
+#endif
+}
+
 //Global init...
 cInit* gpInit;
 
@@ -323,6 +372,9 @@ bool cInit::Init(tString asCommandLine)
 	// LOG FILE SETUP /////////////////////
 	SetLogFile(sPersonalDir+PERSONAL_RELATIVEROOT PERSONAL_RELATIVEGAME _W("hpl.log"));
 	SetUpdateLogFile(sPersonalDir+PERSONAL_RELATIVEROOT PERSONAL_RELATIVEGAME _W("hpl_update.log"));
+
+	Log(" Penumbra VR %s (built %s %s)\n", PENUMBRA_VR_VERSION, __DATE__, __TIME__);
+	LogEnvironment();
 
 	
 	// MAIN INIT /////////////////////

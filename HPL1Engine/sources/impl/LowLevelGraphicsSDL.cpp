@@ -280,6 +280,17 @@ namespace hpl {
 		//Inits GL stuff
 		//Set Shade model and clear color.
 		glShadeModel(GL_SMOOTH);
+
+		// Environment fingerprint: which driver really created the context
+		// (Optimus laptops can pick the wrong GPU; old engines suffer most).
+		const char* sGlVendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+		const char* sGlRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+		const char* sGlVersion = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+		Log("  OpenGL vendor: %s / renderer: %s / version: %s\n",
+			sGlVendor ? sGlVendor : "(null)",
+			sGlRenderer ? sGlRenderer : "(null)",
+			sGlVersion ? sGlVersion : "(null)");
+
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
 		//Depth Test setup
