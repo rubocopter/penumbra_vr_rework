@@ -47,7 +47,8 @@ cOAL_Source::cOAL_Source(cOAL_SourceManager *apSourceManager, int alId, int alSe
 																					  mbPaused(false), 
 																					  mbNeedsReset(true),
 																					  mpFilter(NULL),
-																					  mpDirectFilter(NULL)
+																					  mpDirectFilter(NULL),
+																					  mlAppliedFilterId(0)
 {
 	LogMsg("",eOAL_LogVerbose_High, eOAL_LogMsg_Info, "", "cOAL_Source constructor called...\n" );
 	if(apSourceManager)
@@ -884,20 +885,24 @@ void cOAL_Source::SetFilterEnabled(bool abEnabled, int alFlags)
 	if(!gpDevice->IsEFXActive())
 		return;
 
+	// The periodic sound updates push the same filter onto the source over
+	// and over; re-issuing identical AL_DIRECT_FILTER / AL_AUXILIARY_SEND_
+	// FILTER state every frame floods the driver with redundant changes.
+	// Only touch the source when the wanted filter differs from the one it
+	// already carries.
+	const unsigned int lWantedFilterId = (abEnabled && mpFilter) ? mpFilter->GetObjectID() : 0;
+	if(lWantedFilterId == mlAppliedFilterId)
+		return;
+
 	if(alFlags & 0x00000001)
 	{
-		if(abEnabled)
-			SetDirectFilter(mpFilter);
-		else
-			SetDirectFilter(NULL);
+		SetDirectFilter(abEnabled ? mpFilter : NULL);
 	}
 	if(alFlags & 0x00000002)
 	{
-		if(abEnabled)
-			SetAuxSendFilter(0,mpFilter);
-		else
-			SetAuxSendFilter(0,NULL);
+		SetAuxSendFilter(0, abEnabled ? mpFilter : NULL);
 	}
+	mlAppliedFilterId = lWantedFilterId;
 }
 
 //--------------------------------------------------------------------------------

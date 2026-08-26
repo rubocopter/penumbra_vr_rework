@@ -749,11 +749,13 @@ if(actionInputActive && vrUIContext && vrInput.uiSelect.justPressed)
           if (vrInput.moveActive) {
             const cMatrixf headWorldRotation =
               mpInit->mpGame->vr_tracking.GetHeadWorldPose().GetRotation();
-            cVector3f headForward = cMath::MatrixInverse(headWorldRotation).GetForward();
+            const cMatrixf mtxInvHeadRotation = cMath::MatrixInverse(headWorldRotation);
+
+            cVector3f headForward = mtxInvHeadRotation.GetForward();
             headForward.y = 0.0f;
             headForward = cMath::Vector3Normalize(headForward);
 
-            cVector3f headRight = cMath::MatrixInverse(headWorldRotation).GetRight();
+            cVector3f headRight = mtxInvHeadRotation.GetRight();
             headRight.y = 0.0f;
             headRight = cMath::Vector3Normalize(headRight);
 

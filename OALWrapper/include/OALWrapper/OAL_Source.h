@@ -178,6 +178,11 @@ private:
 	cOAL_Filter*	mpFilter;
 	cOAL_Filter*	mpDirectFilter;
 
+	// Object id of the filter currently attached to the source (direct and
+	// send 0), used to skip redundant driver state changes when the periodic
+	// gain updates push an unchanged filter.
+	unsigned int	mlAppliedFilterId;
+
 	void Queue(cOAL_Buffer* apBuffer);
 	cOAL_Buffer* Unqueue();
 
