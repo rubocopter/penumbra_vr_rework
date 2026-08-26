@@ -837,6 +837,10 @@ void cOAL_Source::UpdateFiltering(unsigned int alSends)
 		{
 			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
 			if (!mpFilter) return;
+			// A freshly created filter has no type until SetType runs; gain
+			// changes are rejected for typeless filters, so default to the
+			// low-pass shape this source filtering path is built around.
+			mpFilter->SetType(eOALFilterType_LowPass);
 		}
 		mpFilter->SetGain(afGain);
 	}
@@ -852,6 +856,7 @@ void cOAL_Source::UpdateFiltering(unsigned int alSends)
 		{
 			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
 			if (!mpFilter) return;
+			mpFilter->SetType(eOALFilterType_LowPass);
 		}
 		mpFilter->SetGainHF(afGainHF);
 	}
@@ -867,6 +872,7 @@ void cOAL_Source::UpdateFiltering(unsigned int alSends)
 		{
 			mpFilter = gpDevice->GetEFXManager()->CreateFilter();
 			if (!mpFilter) return;
+			mpFilter->SetType(eOALFilterType_LowPass);
 		}
 		mpFilter->SetGainLF(afGainLF);
 	}

@@ -424,8 +424,16 @@ bool cInit::Init(tString asCommandLine)
 	//mbForceGenericSoundDevice = mpConfig->GetBool("Sound", "ForceGeneric", false);
 	mlStreamUpdateFreq = mpConfig->GetInt("Sound","StreamUpdateFreq",10);
 	// OpenAL Soft already mixes on its own internal thread; the legacy
-	// wrapper thread races against it when EFX is active and must stay off.
-	mbUseSoundThreading = mpConfig->GetBool("Sound","UseThreading",false);
+	// wrapper threads race against it when EFX is active and must stay off.
+	// Builds up to alpha.5 defaulted this key to true and wrote it back to
+	// settings.cfg on exit, so an upgraded installation would silently
+	// re-enable the race and crash around the first sounds of the menu.
+	// Force the migrated-safe value no matter what the stored config says.
+	if(mpConfig->GetBool("Sound","UseThreading",false))
+	{
+		Warning("Ignoring stale '[Sound] UseThreading' setting; the sound updater thread is no longer supported.\n");
+	}
+	mbUseSoundThreading = false;
 	//mbUseVoiceManagement = mpConfig->GetBool("Sound","UseVoiceManagement", true);
 	mlMaxMonoChannelsHint = mpConfig->GetInt("Sound","MaxMonoChannelsHint",0);
 	mlMaxStereoChannelsHint = mpConfig->GetInt("Sound","MaxStereoChannelsHint",0);
