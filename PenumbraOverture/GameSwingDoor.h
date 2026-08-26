@@ -75,6 +75,7 @@ public:
 	void SetupPhysics(cWorld3D *apWorld);
 
 	void SetLocked(bool abX);
+	bool IsLocked() const { return mbLocked; }
 
 	//SaveObject implementation
 	iGameEntity_SaveData* CreateSaveData();

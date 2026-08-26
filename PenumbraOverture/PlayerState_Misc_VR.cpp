@@ -25,6 +25,7 @@
 #include "GameLadder.h"
 #include "GameArea.h"
 #include "GameObject.h"
+#include "GameSwingDoor.h"
 
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
@@ -555,9 +556,9 @@ void cPlayerState_Normal_VR::OnStartInteract()
   const cVRHandTarget& target = mpPlayer->GetVRHandTarget(chosen);
   if (target.mpBody)
   {
-	Log(" [VR interaction +%lu ms] %s target '%s', crosshair %d, distance %.2f.\n",
-	  GetApplicationTime(), chosen == eVRHandIndex_Left ? "left" : "right",
-	  target.mpBody->GetName().c_str(),
+	Log(" [VR DBG +%lu ms] OnStartInteract target='%s' type=%d crosshair=%d dist=%.2f\n",
+	  GetApplicationTime(), target.mpBody->GetName().c_str(),
+	  (int)((iGameEntity*)target.mpBody->GetUserData())->GetType(),
 	  (int)target.mCrossHairState, target.mfDistance);
 
     // Keep legacy entity callbacks coherent while the interaction states are
@@ -567,6 +568,19 @@ void cPlayerState_Normal_VR::OnStartInteract()
     mpPlayer->GetPickRay()->mvPickedPos = target.mvPosition;
     mpPlayer->GetPickRay()->mfPickedDist = target.mfDistance;
     iGameEntity *pEntity = (iGameEntity*)target.mpBody->GetUserData();
+
+    if (pEntity->GetType() == eGameEntityType_SwingDoor)
+    {
+      cGameSwingDoor *pDoor = static_cast<cGameSwingDoor*>(pEntity);
+      if (pDoor->IsLocked())
+      {
+        Log(" [VR interaction +%lu ms] door '%s' is locked - buzz haptic, reject interact.\n",
+            GetApplicationTime(), pDoor->GetName().c_str());
+        eVRHapticHand hapticHand = (chosen == eVRHandIndex_Left) ? eVRHapticHand_Left : eVRHapticHand_Right;
+        cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, hapticHand);
+        return;
+      }
+    }
 
     pEntity->PlayerInteract();
   }

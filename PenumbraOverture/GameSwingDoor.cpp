@@ -220,18 +220,16 @@ void cGameSwingDoor::OnPlayerInteract()
 	}
 	else
 	{
-		mpInit->mpPlayer->mbPickAtPoint = true;
+		mpInit->mpPlayer->mbPickAtPoint = false;
 		mpInit->mpPlayer->mbRotateWithPlayer = false;
 		mpInit->mpPlayer->mbUseNormalMass = false;
 		mpInit->mpPlayer->mfGrabMassMul = 1;
 
-		mpInit->mpPlayer->mfHapticTorqueMul = 1.0f;
-
-		mpInit->mpPlayer->mbCanBeThrown = true;
+		mpInit->mpPlayer->mbCanBeThrown = false;
 		mpInit->mpPlayer->mbGrabbingMoveBody = true;
 
 		mpInit->mpPlayer->SetPushBody(mpInit->mpPlayer->GetPickedBody());
-		mpInit->mpPlayer->ChangeState(ePlayerState_Grab);
+		mpInit->mpPlayer->ChangeState(ePlayerState_Move);
 	}
 		
 }

@@ -536,6 +536,10 @@ cPlayerState_Move_VR::cPlayerState_Move_VR(cInit *apInit,cPlayer *apPlayer) : iP
 	mpCallback = hplNew( cPlayerState_Move_BodyCallback_VR, (apPlayer, apInit->mpGame->GetStepSize()) );
 	mbHasSlideAxis = false;
 	mvSlideAxis = cVector3f(0, 0, 0);
+	mbHingeLimitsStored = false;
+	mfOriginalMinAngle = 0.0f;
+	mfOriginalMaxAngle = 0.0f;
+	mfHingeLightnessFactor = 1.0f;
 }
 
 cPlayerState_Move_VR::~cPlayerState_Move_VR()
@@ -560,7 +564,11 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   //mpPushBody->SetLinearVelocity(mpPushBody->GetWorldPosition() - pos);
 
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
+  auto handMat = VRHelper::TrackingToWorldSpace(
+      mpPlayer->GetVRInteractHand() == eVRHandIndex_Left
+          ? mpInit->mpGame->vr_left_hand.GetMatrix()
+          : mpInit->mpGame->vr_right_hand.GetMatrix(),
+      mpInit->mpGame);
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -605,33 +613,38 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
       }
       else
       {
-        // Hinge joint (doors): project onto tangent to arc
+        // Hinge joint (doors): angular velocity must be ALONG the pin axis.
+        // The desired linear velocity at the contact point is vPerpDir * fAllowedSpeed.
+        // For a hinge, v = ω × r, so ω must be along the pin:
+        // ω = ±pin * (fAllowedSpeed / fRadius)
+        // Sign determined by whether vPerpDir matches Cross(pin, vToBody).
         cVector3f vPerpDir = cMath::Vector3Normalize(
             cMath::Vector3Cross(vPinDir, vToBody));
         cVector3f vDragVel = destDiff * 10.0f;
         float fDotPerp = cMath::Vector3Dot(vDragVel, vPerpDir);
-        cVector3f vAllowedVel = vPerpDir * fDotPerp;
-        float fAllowedSpeed = vAllowedVel.Length();
-        if (fAllowedSpeed > 3.5f)
-          fAllowedSpeed = 3.5f;
+        float fAllowedSpeed = fabsf(fDotPerp);
+        // Apply lightness factor for heavy hinged objects (taquilla, cofre)
+        fAllowedSpeed *= mfHingeLightnessFactor;
+        if (fAllowedSpeed > 3.5f * mfHingeLightnessFactor)
+          fAllowedSpeed = 3.5f * mfHingeLightnessFactor;
         float fAngSpeed = fAllowedSpeed / fRadius;
-        cVector3f vAngVel = vPerpDir * fAngSpeed;
-        float fAngMag = vAngVel.Length();
-        float fMaxAng = 12.0f;
-        if (fAngMag > fMaxAng)
-          vAngVel = vAngVel * (fMaxAng / fAngMag);
-        mpPushBody->SetLinearVelocity(cVector3f(0, 0, 0));
-        mpPushBody->SetAngularVelocity(vAngVel);
+        // Angular velocity along pin axis; sign from fDotPerp
+        cVector3f vAngVel = vPinDir * fAngSpeed * (fDotPerp >= 0.0f ? 1.0f : -1.0f);
+
         static unsigned long slNextJointLogMs = 0;
         unsigned long lNowMs = GetApplicationTime();
         if (lNowMs >= slNextJointLogMs)
         {
           slNextJointLogMs = lNowMs + 500;
-          Log(" [VR joint +%lu ms] HINGE body='%s' pin=(%.3f %.3f %.3f) angVel=(%.3f %.3f %.3f)\n",
+          Log(" [VR joint +%lu ms] HINGE body='%s' pin=(%.3f %.3f %.3f) angVel=(%.3f %.3f %.3f) lightness=%.1f\n",
               lNowMs, mpPushBody->GetName().c_str(),
               vPinDir.x, vPinDir.y, vPinDir.z,
-              vAngVel.x, vAngVel.y, vAngVel.z);
+              vAngVel.x, vAngVel.y, vAngVel.z,
+              mfHingeLightnessFactor);
         }
+
+        mpPushBody->SetLinearVelocity(cMath::Vector3Cross(vAngVel, vToBody));
+        mpPushBody->SetAngularVelocity(vAngVel);
       }
     }
     else
@@ -859,9 +872,13 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPushBody->SetMaxLinearSpeed(mpPushBody->GetJointNum() > 0 ? 5.0f : 10.0f);
 	mpPushBody->SetMaxAngularSpeed(mpPushBody->GetJointNum() > 0 ? 8.0f : 15.0f);
 
-	//The pick point relative to the body
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
-	mvPickPoint = handMat.GetTranslation();
+//The pick point relative to the body
+  auto handMat = VRHelper::TrackingToWorldSpace(
+      mpPlayer->GetVRInteractHand() == eVRHandIndex_Left
+          ? mpInit->mpGame->vr_left_hand.GetMatrix()
+          : mpInit->mpGame->vr_right_hand.GetMatrix(),
+      mpInit->mpGame);
+  mvPickPoint = handMat.GetTranslation();
 
 	/////////////////////////////////////////
 	//Check if all controllers should be paused.
@@ -926,6 +943,32 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
         vPiv.x, vPiv.y, vPiv.z,
         vBody.x, vBody.y, vBody.z,
         (vBody - vPiv).Length());
+
+    // For hinge joints: save original limits, pause controllers, apply lightness factor
+    if (pJoint && pJoint->GetType() == ePhysicsJointType_Hinge)
+    {
+      iPhysicsJointHinge *pHinge = static_cast<iPhysicsJointHinge*>(pJoint);
+      mfOriginalMinAngle = pHinge->GetMinAngle();
+      mfOriginalMaxAngle = pHinge->GetMaxAngle();
+      mbHingeLimitsStored = true;
+      // DO NOT widen limits - keep original limits to prevent objects flipping over
+      // Just pause the controllers (spring) so the player can move freely within limits
+      // Lightness factor: heavier bodies get more assistance
+      float fMass = mpPushBody->GetMass();
+      if (fMass > 10.0f)
+        mfHingeLightnessFactor = 2.0f;
+      else if (fMass > 5.0f)
+        mfHingeLightnessFactor = 1.5f;
+      else
+        mfHingeLightnessFactor = 1.2f;
+      // Increase max angular speed cap for lightness factor
+      mpPushBody->SetMaxAngularSpeed(8.0f * mfHingeLightnessFactor);
+    }
+    else
+    {
+      mbHingeLimitsStored = false;
+      mfHingeLightnessFactor = 1.0f;
+    }
   }
 
   mbHasSlideAxis = false;
@@ -996,6 +1039,19 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 		{
 			mpPushBody->GetJoint(i)->SetAllControllersPaused(false);
 		}
+	}
+
+	// Restore hinge joint angle limits
+	if (mbHingeLimitsStored && mpPushBody->GetJointNum() > 0)
+	{
+	  iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+	  if (pJoint && pJoint->GetType() == ePhysicsJointType_Hinge)
+	  {
+	    iPhysicsJointHinge *pHinge = static_cast<iPhysicsJointHinge*>(pJoint);
+	    pHinge->SetMinAngle(mfOriginalMinAngle);
+	    pHinge->SetMaxAngle(mfOriginalMaxAngle);
+	  }
+	  mbHingeLimitsStored = false;
 	}
 
 	////////////////////////////

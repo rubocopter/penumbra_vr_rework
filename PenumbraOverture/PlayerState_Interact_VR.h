@@ -181,6 +181,14 @@ private:
   // Velocity caps overridden while dragging (restored on release)
   float mfDefaultMaxLinSpeed;
   float mfDefaultMaxAngSpeed;
+
+  // For hinge joints: store original angle limits to restore on release
+  bool mbHingeLimitsStored;
+  float mfOriginalMinAngle;
+  float mfOriginalMaxAngle;
+
+  // Lightness factor for heavy hinged objects (taquilla, cofre)
+  float mfHingeLightnessFactor;
 };
 
 //////////////////////////////////////////////////////////////////////////
