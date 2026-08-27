@@ -26,12 +26,16 @@
 #include "GameArea.h"
 #include "GameObject.h"
 #include "GameSwingDoor.h"
+#include "scene/PortalContainer.h"
 
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
 
 namespace
 {
+  const float kVRNudgeMinHandSpeed = 0.03f;
+  const float kVRNudgeBroadPhasePadding = 0.15f;
+
   iPhysicsJoint *GetVRNudgeJoint(iPhysicsBody *apBody)
   {
     if (apBody == NULL) return NULL;
@@ -104,9 +108,9 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
   struct touchedObject {
     iPhysicsBody* physicsBody;
     float planeDistance;
-    float touchDistance;
+    float touchDistanceSq;
     eCrossHairState crosshair;
-    cCollideData collideData;
+    cVector3f touchPoint;
   };
 
   if (collider != NULL) {
@@ -175,15 +179,25 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
           iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
 
+          // Reject bodies by their cheap bounding volume before asking every
+          // candidate to calculate its interaction state. This avoids doing
+          // script/state work for bodies that cannot touch the hand.
+          cBoundingVolume handBV = collider->GetBoundingVolume();
+          handBV.SetTransform(cMath::MatrixMul(mtxTouch,
+            handBV.GetTransform()));
+
           ////////////////////////////////
           //Iterate bodies
           float fClosestHitDist = 9999.0f;
           cVector3f vClosestHitPos;
           iPhysicsMaterial* pClosestHitMat = NULL;
-          cPhysicsBodyIterator it = pPhysicsWorld->GetBodyIterator();
+          cPortalContainerEntityIterator it =
+            pWorld->GetPortalContainer()->GetEntityIterator(&handBV);
+          cCollideData collideData;
+          collideData.SetMaxSize(1);
           while (it.HasNext())
           {
-            iPhysicsBody *pBody = it.Next();
+            iPhysicsBody *pBody = static_cast<iPhysicsBody*>(it.Next());
 
             iGameEntity *pEntity = NULL;
             if (pBody->GetUserData())
@@ -191,14 +205,15 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             else
               continue;
 
+            if (pBody->IsActive() == false) continue;
+            if (cMath::CheckCollisionBV(handBV, *pBody->GetBV()) == false)
+              continue;
+
             // Skip the object if it can't be interacted with anyway
             eCrossHairState interactState = pEntity->GetCompletePickCrosshairState(pBody);
 
             if (interactState == eCrossHairState_None)
               continue;
-
-            cCollideData collideData;
-            collideData.SetMaxSize(12);
 
             if (pPhysicsWorld->CheckShapeCollision(pBody->GetShape(), pBody->GetLocalMatrix(),
               collider,
@@ -229,15 +244,15 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
                 float planeDistance = cMath::PlaneToPointDist(cPlanef(mpPlayer->GetCamera()->GetForward(), mpPlayer->GetCamera()->GetPosition()), pBody->GetBV()->GetWorldCenter());
                 const cVector3f vTouchPoint = VRHelper::CollideCenter(
                   collideData.mvContactPoints, collideData.mlNumOfPoints);
-                const float fTouchDistance = (vTouchPoint - handCenter).Length();
+                const float fTouchDistanceSq = (vTouchPoint - handCenter).SqrLength();
 
                 //Other entity
                 touchedObject target = {
                   pBody,
                   planeDistance,
-                  fTouchDistance,
+                  fTouchDistanceSq,
                   interactState,
-                  collideData
+                  vTouchPoint
                 };
 
                 targets.push_back(target);
@@ -256,9 +271,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           auto HandHasLineOfSight = [&](touchedObject *apTarget) -> bool
           {
             if (apTarget == NULL || apTarget->physicsBody == NULL) return false;
-            cVector3f vTarget = VRHelper::CollideCenter(
-              apTarget->collideData.mvContactPoints,
-              apTarget->collideData.mlNumOfPoints);
+            const cVector3f& vTarget = apTarget->touchPoint;
             // At true palm contact, the physical hand collision has already
             // established that this is not a through-wall selection.
             if ((vTarget - handCenter).Length() <= 0.055f) return true;
@@ -272,9 +285,9 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           // over furniture so a key inside a drawer is not shadowed by the
           // drawer body overlapping the same hand area.
           touchedObject* bestItemTarget = NULL;
-          float fBestItemDist = 9999.0f;
+          float fBestItemDistSq = 9999.0f;
           touchedObject* bestOtherTarget = NULL;
-          float fBestOtherDist = 9999.0f;
+          float fBestOtherDistSq = 9999.0f;
 
           for (auto& touchedBody : targets) {
             const bool bIsItemClass =
@@ -282,13 +295,13 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
               touchedBody.crosshair == eCrossHairState_Item;
 
             if (bIsItemClass) {
-              if (touchedBody.touchDistance < fBestItemDist) {
-                fBestItemDist = touchedBody.touchDistance;
+              if (touchedBody.touchDistanceSq < fBestItemDistSq) {
+                fBestItemDistSq = touchedBody.touchDistanceSq;
                 bestItemTarget = &touchedBody;
               }
             }
-            else if (touchedBody.touchDistance < fBestOtherDist) {
-              fBestOtherDist = touchedBody.touchDistance;
+            else if (touchedBody.touchDistanceSq < fBestOtherDistSq) {
+              fBestOtherDistSq = touchedBody.touchDistanceSq;
               bestOtherTarget = &touchedBody;
             }
           }
@@ -309,18 +322,16 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             {
               mpPlayer->GetPickRay()->Clear();
               mpPlayer->GetPickRay()->mpPickedBody = bestItemTarget->physicsBody;
-              mpPlayer->GetPickRay()->mfPickedDist = bestItemTarget->planeDistance;
-              mpPlayer->GetPickRay()->mvPickedPos =
-                VRHelper::CollideCenter(bestItemTarget->collideData.mvContactPoints,
-                  bestItemTarget->collideData.mlNumOfPoints);
+               mpPlayer->GetPickRay()->mfPickedDist = bestItemTarget->planeDistance;
+               mpPlayer->GetPickRay()->mvPickedPos =
+                 bestItemTarget->touchPoint;
               bSelected = true;
             }
           }
 
           if (!bSelected && !useTraceResults && bestOtherTarget != NULL &&
               HandHasLineOfSight(bestOtherTarget)) {
-            vPickedPos = VRHelper::CollideCenter(bestOtherTarget->collideData.mvContactPoints,
-              bestOtherTarget->collideData.mlNumOfPoints);
+            vPickedPos = bestOtherTarget->touchPoint;
             fPickedDist = bestOtherTarget->planeDistance;
             pPickedBody = bestOtherTarget->physicsBody;
           }
@@ -356,6 +367,15 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
       iCollideShape *nudgeShape = mpPlayer->GetVRHandNudgeShape();
       if (nudgeShape != NULL)
       {
+        // Query the engine's spatial index around each active hand instead of
+        // walking every body in the level. The query is deliberately kept
+        // local to this fallback; native hand collision and normal grabbing
+        // remain unchanged.
+        iPhysicsBody *pLeftHeldBody =
+          mpPlayer->GetVRHeldBody(eVRHandIndex_Left);
+        iPhysicsBody *pRightHeldBody =
+          mpPlayer->GetVRHeldBody(eVRHandIndex_Right);
+
         for (int h = 0; h < eVRHandIndex_Count; ++h)
         {
           TrackedController& trackedHand = h == eVRHandIndex_Left
@@ -375,26 +395,38 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           cVector3f vHandCenter = handPose.GetTranslation();
 
           // Skip if hand is occupied (holding an object)
-          if (mpPlayer->GetVRHeldBody((eVRHandIndex)h) != NULL) continue;
+          if ((h == eVRHandIndex_Left ? pLeftHeldBody : pRightHeldBody) != NULL)
+            continue;
 
           cVector3f vWorldVel =
             mpInit->mpGame->vr_tracking.TrackingDirectionToWorld(trackedHand.GetVelocity());
-          float fSpeed = vWorldVel.Length();
-          if (fSpeed < 0.03f) continue; // ignore micro-movements
+          if (vWorldVel.SqrLength() <
+              kVRNudgeMinHandSpeed * kVRNudgeMinHandSpeed)
+            continue; // ignore micro-movements
 
           cMatrixf nudgeMtx = cMath::MatrixTranslate(vHandCenter);
 
-          // Check which bodies overlap the compact nudge sphere.
-          cPhysicsBodyIterator bodyIt = pPhysicsWorld->GetBodyIterator();
+          cBoundingVolume nudgeBV = nudgeShape->GetBoundingVolume();
+          nudgeBV.SetTransform(cMath::MatrixMul(nudgeMtx,
+            nudgeBV.GetTransform()));
+
+          cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
+          cPortalContainerEntityIterator bodyIt =
+            pWorld->GetPortalContainer()->GetEntityIterator(&nudgeBV);
+
+          // Check which nearby bodies overlap the compact nudge sphere.
+          cCollideData collideData;
+          collideData.SetMaxSize(1);
           while (bodyIt.HasNext())
           {
-            iPhysicsBody *pBody = bodyIt.Next();
-            if (pBody->GetUserData() == NULL) continue;
-            if (pBody->GetMass() <= 0.0f) continue; // skip statics
+            iPhysicsBody *pBody = static_cast<iPhysicsBody*>(bodyIt.Next());
+            if (pBody == NULL || pBody->GetUserData() == NULL) continue;
+            if (pBody->IsActive() == false || pBody->GetCollide() == false)
+              continue;
+            const float fBodyMass = pBody->GetMass();
+            if (fBodyMass <= 0.0f) continue; // skip statics
+            if (pBody->IsCharacter() || pBody->IsPlayer()) continue;
 
-            // Small inventory pickups must participate too. Otherwise a hand
-            // stopped by a shelf or locker wall can neither enter farther nor
-            // ease a battery out into reach.
             iGameEntity *pNudgeEntity = (iGameEntity*)pBody->GetUserData();
             bool bNudgeable =
               pNudgeEntity->GetType() == eGameEntityType_Object ||
@@ -402,26 +434,30 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
               pNudgeEntity->GetType() == eGameEntityType_SwingDoor;
             if (!bNudgeable) continue;
 
-            // Never push character/player capsules; shoving yourself downward
-            // tunnels the player capsule through the floor.
-            if (pBody->IsCharacter() || pBody->IsPlayer()) continue;
-
             // Skip if any hand is already holding this body
-            if (mpPlayer->GetVRHeldBody(eVRHandIndex_Left) == pBody ||
-                mpPlayer->GetVRHeldBody(eVRHandIndex_Right) == pBody)
+            if (pLeftHeldBody == pBody || pRightHeldBody == pBody)
               continue;
 
-            // Cheap broad-phase reject before the narrow shape test
+            // The portal query is sector-level, so retain a precise cheap
+            // broad-phase reject before the narrow shape test.
             cBoundingVolume *pBV = pBody->GetBV();
-            if ((pBV->GetWorldCenter() - vHandCenter).Length() >
-                pBV->GetRadius() + 0.15f)
+            const float fBroadPhaseRadius =
+              pBV->GetRadius() + kVRNudgeBroadPhasePadding;
+            if ((pBV->GetWorldCenter() - vHandCenter).SqrLength() >
+                fBroadPhaseRadius * fBroadPhaseRadius)
               continue;
 
-            cCollideData collideData;
-            collideData.SetMaxSize(1);
             if (!pPhysicsWorld->CheckShapeCollision(
                   pBody->GetShape(), pBody->GetLocalMatrix(),
                   nudgeShape, nudgeMtx, collideData, 1))
+              continue;
+
+            // The starting boat locker is unlocked by deactivating lock1.
+            // Do not let the palm-nudge fallback move its hinged body while
+            // that lock entity is still active. Keep this map lookup after
+            // the geometric filters so distant objects pay no locker cost.
+            if (pNudgeEntity->GetType() == eGameEntityType_Object &&
+                static_cast<cGameObject*>(pNudgeEntity)->IsPadlocked())
               continue;
 
             // Only push when the hand is moving INTO the object
@@ -486,9 +522,9 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             // Radius as well as mass keeps large lightweight mechanisms from
             // being treated like batteries, cans or other loose pickups.
             const bool bSmallLight =
-              pBody->GetMass() <= 3.0f && pBV->GetRadius() <= 0.30f;
+              fBodyMass <= 3.0f && pBV->GetRadius() <= 0.30f;
             const bool bLargeHeavy =
-              pBody->GetMass() >= 12.0f || pBV->GetRadius() >= 0.75f;
+              fBodyMass >= 12.0f || pBV->GetRadius() >= 0.75f;
 
             float fPushFraction;
             float fMaxPushSpeed;
@@ -553,7 +589,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
               fDesiredPushSpeed - fCurrentPushSpeed, 0.0f, fMaxDeltaV);
             if (fDeltaV <= 0.005f) continue;
             pBody->AddImpulseAtPosition(
-              vPushDir * (fDeltaV * pBody->GetMass()), vContact);
+              vPushDir * (fDeltaV * fBodyMass), vContact);
 
             static unsigned long slNextNudgeLogMs = 0;
             unsigned long lNudgeNowMs = GetApplicationTime();
@@ -566,7 +602,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
                 bConstrainedJoint ? 1 : 0, bLockedDoor ? 1 : 0,
                 bSmallLight ? 1 : 0, bLargeHeavy ? 1 : 0,
                 bBreakableObject ? 1 : 0,
-                pBody->GetMass(), pBV->GetRadius(), fDeltaV);
+                fBodyMass, pBV->GetRadius(), fDeltaV);
             }
 
             // Subtle haptic pulse on the touching hand, scaled to the push

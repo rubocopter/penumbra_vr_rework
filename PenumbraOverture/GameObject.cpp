@@ -493,8 +493,30 @@ void cGameObject::OnPlayerPick()
 
 //-----------------------------------------------------------------------
 
+bool cGameObject::IsPadlocked()
+{
+	// The starting boat locker is a GameObject with a separate, active lock
+	// entity. Keep this check deliberately narrow: other objects may use the
+	// same generic Object/Move interaction without sharing this map convention.
+	if(cString::ToLowerCase(GetName()) != "locker1" ||
+		cString::ToLowerCase(GetFileName()).find("boat_locker") == tString::npos)
+		return false;
+
+	iGameEntity *pLock = mpInit->mpMapHandler->GetGameEntity("lock1", false);
+	return pLock != NULL && pLock->IsActive();
+}
+
+//-----------------------------------------------------------------------
+
 void cGameObject::OnPlayerInteract()
 {
+	if(IsPadlocked())
+	{
+		Log(" [VR interaction +%lu ms] padlocked locker rejected.\n",
+			GetApplicationTime());
+		return;
+	}
+
 	iPhysicsBody *pBody = mpInit->mpPlayer->GetPickedBody();
 
 	cGameStickArea *pStickArea = mpInit->mpMapHandler->GetBodyStickArea(pBody);

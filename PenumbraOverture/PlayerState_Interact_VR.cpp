@@ -1025,6 +1025,11 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
         mfHingeLightnessFactor = 3.0f;
       else if (sBodyName.find("hatch_wheelshape") != tString::npos)
         mfHingeLightnessFactor = 3.25f;
+      else if (pEntity != NULL &&
+               cString::ToLowerCase(pEntity->GetName()) == "locker1")
+        // The boat locker is a small, player-operated door. Give it enough
+        // servo assistance to feel light without changing its authored mass.
+        mfHingeLightnessFactor = 2.25f;
       else if (fMass > 10.0f)
         mfHingeLightnessFactor = 2.25f;
       else if (fMass >= 5.0f)

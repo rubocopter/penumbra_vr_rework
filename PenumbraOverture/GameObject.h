@@ -169,6 +169,10 @@ public:
 	void OnPlayerInteract();
 	void OnPlayerPick();
 
+	// The boat cabin locker is locked by a separate map entity (lock1), not by
+	// the SwingDoor lock state used by the regular hinged doors.
+	bool IsPadlocked();
+
 	bool IsSaved(){ 
 		if(mDisappearProps.mbActive) return false;
 		return mbIsSaved;
