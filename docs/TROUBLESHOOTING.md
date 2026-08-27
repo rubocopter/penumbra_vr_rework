@@ -56,6 +56,17 @@ SteamVR remembers the binding it stored on first launch; an older alpha's bindin
 **Unrecognized controller.**
 Search `hpl.log` for `[VR input]`: it records the detected headset driver, both controller types, and whether a bundled profile matched. Include this when reporting new hardware.
 
+## Hand or world-interaction problems
+
+**A hand disappears, folds incorrectly, or sits far from its controller.**
+Search `hpl.log` for `[hand-rig]`. A short tracking dropout is tolerated, but a persistent invalid pose hides only that hand. Include the relevant lines and say which physical controller was affected. The current asset has a short static thumb chain and a fused ring/middle section; those two visual limitations are expected.
+
+**A flashlight, tool, or carried item sits incorrectly in the hand.**
+Search for `[hand-grip]` and include the item name. Bundled HUD objects define a measured grip point, radius, and twist; the diagnostic reports when an anchor falls outside the reconstructed object geometry. This is separate from gameplay collision and can be corrected per item without changing the hand rig.
+
+**A drawer, hatch, door, lever, or loose prop resists the hand.**
+Search for `[VR hinge selected]`, `[VR slider selected]`, and `[VR nudge]`. These lines identify the body and joint actually driven, its axis, and the mass/size assist applied. A bare hand intentionally gives heavy or breakable bodies less velocity than small pickups; held interaction should still drive the selected mechanism directly.
+
 ## Installing without Steam (GOG copy or custom location)
 
 The installer auto-detects Steam libraries. For anything else, point it at the folder that contains `redist`:

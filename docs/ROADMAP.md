@@ -4,14 +4,15 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 
 ## Current focus
 
-- Hand and equipped-object polish — fist wrap, thumb behaviour, and per-item placement
+- Hand-rig polish — thumb behaviour, fused ring/middle mesh, finger splay, and any remaining item-specific calibration
 - Two-hand interaction — simultaneous object ownership and optional two-point constraints for large props
+- Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
 
 ## Next
 
-- Improve grip poses and per-item alignment without destabilizing the current rig
+- Decide whether the current hand asset can support a convincing thumb wrap or should be replaced
 - Validate Index, Touch, Pico, WMR, and Vive profiles on real hardware
 - Refine notebook, ladder, door, and held-object interactions for tracked controllers
 - Design a two-hand state model without breaking the original single-state interaction callbacks
@@ -39,10 +40,12 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Controller profiles for Index, Touch, Pico, WMR, Vive (bundled, unvalidated)
 - Input resilience — 500 ms dropout bridging, legacy movement from strongest axis
 - Graphics presets (Performance/Balanced/Quality) and render scale setting
-- Equipped objects in hand — first experimental pass with melee and throwing preserved
+- Equipped objects in hand — geometry-calibrated grip points, radius-driven finger curl, per-item twist, with melee and throwing preserved
 - Left-handed mirror — fully mirrored action sets, equipment slots, notebook on off hand
 - Bare off-hand targeting and grabbing on PS VR2 Sense
-- Dynamic hand nudge for physics props and hinged doors, excluding inventory items
+- Collision-constrained visible hands — swept approximate hand volume, surface sliding, bounded visual lag, and independent tracking-loss recovery
+- Adaptive hand nudge for physics props, inventory pickups, hinges, and sliders; stronger for small/light objects and restrained for heavy or breakable props
+- Joint-aware VR mechanisms — actual driven joint selection, circular hinge drag, slider projection, easier hatches/lockers, inserted-lever forwarding, and locked-door axis retention
 - Low-latency VR audio listener — OpenAL orientation/position built from fresh head tracking data each update instead of the previous render's camera matrix
 - Spatial-audio chain on bundled OpenAL Soft 1.25.2: binaural HRTF toggle (Auto/Headphones/Off), global mine-gallery reverb, occlusion muffling through per-source low-pass filters, and distance treble absorption
 - Startup crash hardening — legacy sound-updater thread force-disabled on upgraded installs, typed on-demand EFX filters, eye-framebuffer completeness checks with half-size retries

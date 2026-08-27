@@ -81,20 +81,36 @@ Target and held-body state is recorded independently for both hands. The
 configured dominant hand remains the default for tools and pointer origin, but
 either bare hand can select and initiate a world interaction. Grab ownership,
 throw velocity, hand visibility, and pickup/drop haptics follow the controller
-that pressed interact. Invalid poses hide and release only the affected hand.
+that pressed interact. Invalid poses have a short grace period and hide only the
+affected hand, preventing one controller dropout from removing both rigs.
 
-Unoccupied hands use a small overlap proxy to nudge dynamic props and hinged
-doors with bounded contact-point impulses. Inventory items are excluded and
-grabbable props use gentler limits. This does not create rigid collision against
-static scenery. The original global player-state machine also limits the current
-implementation to one active grab; simultaneous and two-point holds remain
-future work.
+The raw controller pose remains the source of intent. Before rendering a bare
+hand, `cPlayer` sweeps an approximate hand box through the static world, resolves
+remaining overlaps, and slides the visible pose along blocking surfaces. A
+bounded controller-to-hand lag prevents an irrecoverable correction from making
+the hand disappear. Interaction queries use a scale-free physical palm transform
+instead of the visual mesh scale, so reaching and contact distances remain in
+metres. This is deliberately a coarse palm/hand volume, not per-finger rigid-body
+physics; thin geometry and individual fingers can still clip.
+
+Unoccupied hands use the raw controller path and a small overlap proxy to nudge
+dynamic props and constrained mechanisms. The response adapts to mass, size,
+breakability, and the active hinge or slider: small inventory items receive more
+help, while barrels, loaded crates, and other heavy or breakable bodies are kept
+gentle. The visible hand may stop at scenery while this bounded assist still lets
+the player retrieve an item from a cramped shelf. The original global
+player-state machine limits the current implementation to one active grab;
+simultaneous and two-point holds remain future work.
 
 Equipped lights, melee weapons, and thrown objects are separate attachments on
-top of the visible hand rig. They share the controller pose, apply a fixed palm
-socket plus per-item transform, and retain their original gameplay logic. This
-presentation layer is experimental; current visual limitations are listed in
-the [roadmap](ROADMAP.md) and [release history](RELEASES.md).
+top of the visible hand rig and retain their original gameplay logic. Each HUD
+definition can provide `VrGripPoint`, `VrGripRadius`, and `VrGripTwist`. The grip
+point is aligned with a cylinder fitted through the closing fingers, radius
+drives the amount of finger curl, and twist rotates the item around that contact
+axis. `scripts/analyze-vr-grips.py` reconstructs HUD geometry and hand skeleton
+poses so bundled tools can be calibrated against measured bounds rather than by
+screen-space guesswork. Rig limitations, especially the short static thumb chain
+and fused ring/middle mesh, still constrain the final pose.
 
 ## Runtime and build constraints
 

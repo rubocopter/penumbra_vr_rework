@@ -9,8 +9,8 @@ A community-made PCVR rework that brings **Penumbra: Overture** to full room-sca
 ## Why try it?
 
 - Full room-scale PCVR — walk, crouch, lean, reach
-- Motion-controlled hands with animated fingers and visible equipped objects
-- Physical interaction — pick up, throw, and manipulate objects naturally
+- Motion-controlled hands with animated fingers, collision-constrained palms, and geometry-calibrated equipped objects
+- Physical interaction — pick up, throw, nudge, and manipulate objects, doors, drawers, hatches, and mechanisms naturally
 - **Hear the dark**: binaural HRTF audio, creatures that sound muffled through walls, distant sources that lose their treble, and a mine-gallery reverb that makes corridors breathe
 - Standing or seated play, left- or right-handed controls, and height calibration
 - Snap, smooth, or physical-only turning plus adjustable movement and crouch modes
@@ -40,7 +40,7 @@ Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime s
 
 ## Status
 
-**Experimental public alpha.** The game is playable end-to-end, but expect bugs, crashes, and incorrect behaviour. Controller coverage and hand rendering remain under active validation; see the [release history](docs/RELEASES.md) for build-specific status.
+**Experimental public alpha.** The game is playable end-to-end, but expect bugs, crashes, and incorrect behaviour. Hand collision uses an approximate palm volume rather than per-finger physics, and controller coverage remains under active validation; see the [release history](docs/RELEASES.md) for build-specific status.
 
 ## Documentation
 

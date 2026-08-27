@@ -2,20 +2,47 @@
 
 ## Unreleased
 
-Accumulated on `master` after v0.1.0-alpha.6.1; becomes the next release's notes.
+No changes yet.
+
+---
+
+## v0.1.0-alpha.6.2 — 27 August 2026
+
+**Physical hands that respect the world, measured equipment grips, and much more forgiving doors, drawers, hatches, pickups, and opening-area mechanisms.**
 
 ### Fixed
 
+- Visible hands now sweep an approximate physical volume through static scenery, resolve overlaps, and slide along surfaces instead of freely crossing walls and furniture; correction lag is bounded so a deeply blocked pose cannot strand or permanently hide a hand
+- Tracking loss is isolated per hand and has a short grace period, preventing one transient invalid pose from removing both rigs
+- Finger fold axes turn into the palm consistently on both rigs; the little finger no longer rotates backwards (the short thumb chain remains static by design)
+- Flashlight, glowstick, hammer, pickaxe, broom, flare, and dynamite placement is calibrated against reconstructed object geometry and the hand's closing-finger volume instead of a fixed visual palm offset
+- VR interaction selects the joint whose child body was actually grabbed, so the opening snow hatch drives its lid joint rather than the wheel joint and is substantially easier to lift
+- Inserted handles forward interaction to the mechanism they drive: the steel bar near the opening hatch can now turn its support after placement instead of requiring the player to grab the support itself
+- Hinges use circular pick-point motion and sliders project onto their permitted axis, making lockers, drawers, doors, wheels, and levers less resistant and less prone to drifting off-axis
+- Locked swing doors retain their hinge axis and stop around their locked angle, including the tutorial door blocked by its padlock
+- Small and light pickups, including inventory items inside cramped lockers, receive stronger hand-nudge assistance; heavy, large, or breakable props receive a restrained response so bare hands do not casually explode barrels or punch loaded crates across the room
+- Held objects follow the collision-resolved physical palm pose while targeting and direct nudge preserve the raw controller intent
 - Locomotion no longer computes the head-rotation inverse twice per frame
 - The sound source filter is only pushed to the driver when it actually changes, instead of re-issuing identical state for every audible sound each update
 - VR eye framebuffer descriptors are zero-initialized, so a failed allocation attempt cannot destroy unrelated GL object names
 
 ### Added
 
+- Per-item `VrGripPoint`, `VrGripRadius`, and `VrGripTwist` metadata: the attachment aligns a measured grip point with the closing fingers, derives curl from handle radius, and twists around the grip pivot
+- `scripts/analyze-vr-grips.py`, which reconstructs HUD-object geometry and hand skeleton poses, reports grip slices and bounds, and validates anchors without requiring repeated in-headset guesswork
+- Scale-free physical palm transforms and contact-distance prioritization for world selection, independent of the tiny visual mesh scale
+- Joint-selection and nudge diagnostics for map-specific interaction tuning
 - Release identifier (`Penumbra VR vX.Y.Z`) logged at the very start of every boot, independent of the SteamVR input path
 - Environment fingerprint in `hpl.log`: Windows build, RAM and free 32-bit address space, real GPU vendor/renderer/driver — plus remaining address space recorded at crash time
 - Controller bindings are now generated from a single declarative spec (`scripts/generate-bindings.ps1`); the build fails if the shipped JSONs drift from it
 - Unit tests for the pure VR math (tracking-space transform, recenter invariant, stick dead zone) run on every build and in CI
+
+### Known limitations
+
+- Hand collision uses one approximate palm/hand volume, not individual physical fingers; some clipping around thin geometry, handles, and animated fingers remains possible
+- The current hand asset has a short static thumb chain and a fused ring/middle mesh, so it cannot produce a complete anatomical wrap around every handle
+- The original global player state still permits only one active grab; simultaneous two-object holding and two-hand constraints are not implemented
+- Bundled equipment is calibrated individually, but unusual or map-specific held meshes may still need their own grip metadata
 
 ---
 
