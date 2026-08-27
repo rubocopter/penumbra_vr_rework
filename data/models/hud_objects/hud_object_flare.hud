@@ -14,9 +14,11 @@
 		EquipSound = ""
 		UnequipSound = ""
 		
-		VrTransOffset = "0.0 0.0 0.0"
+		VrTransOffset = "0.0 0.0 0.1"
 		VrRotOffset = "4.71 0.0 0.0"
 		VrScale = 1.8f
+		VrGripPoint = "0.0010 -0.0002 -0.090"
+		VrGripRadius = 0.018f
 	 />
 </HUD_MODEL>
 

@@ -19,6 +19,8 @@
 		VrTransOffset = "0.0 0.0 0.0"
 		VrRotOffset = "4.71 0.0 0.0"
 		VrScale = 6.0f
+		VrGripPoint = "0.0 0.0 0.0"
+		VrGripRadius = 0.019f
 	 />
 	 
 	 <THROW

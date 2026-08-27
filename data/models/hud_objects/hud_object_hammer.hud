@@ -15,9 +15,12 @@
 		EquipSound = ""
 		UnequipSound = ""
 		 
-		VrTransOffset = "0.0 0.0 0.0"
+		VrTransOffset = "0.0 0.0 0.2"
 		VrRotOffset = "-1.57 0.0 0.0"
 		VrScale = 2.85f
+		VrGripPoint = "0.0 0.0 -0.060"
+		VrGripRadius = 0.015f
+		VrGripTwist = 1.57f
 	 />
 	 
 	 <MELEE

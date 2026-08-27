@@ -17,5 +17,7 @@
 		VrTransOffset = "0.0 0.0 0.0"
 		VrRotOffset = "4.71 0.0 0.0"
 		VrScale = 1.55f
+		VrGripPoint = "0.0 0.0078 -0.078"
+		VrGripRadius = 0.0125f
 	 />
 </HUD_MODEL>

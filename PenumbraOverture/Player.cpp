@@ -55,8 +55,10 @@ cPlayer::cPlayer(cInit *apInit)  : iUpdateable("Player")
 	mpInit = apInit;
 	mpVRHandInteractionShape = NULL;
 	mpVRHandNudgeShape = NULL;
+	mpVRHandCollisionShape = NULL;
 	mVRInteractHand = eVRHandIndex_Right;
 	mpCharBody = NULL;
+	ResetVRHandCollision();
 
 	mpScene = apInit->mpGame->GetScene();
 	mpGraphics = apInit->mpGame->GetGraphics();
@@ -730,6 +732,180 @@ void cPlayer::SetVRHandTarget(eVRHandIndex aHand, iPhysicsBody *apBody,
 	mHandCrossHairStates[aHand] = aCrossHairState;
 }
 
+void cPlayer::ResetVRHandCollision()
+{
+	for(int i = 0; i < eVRHandIndex_Count; ++i)
+	{
+		mVRHandResolvedPoses[i] = cMatrixf::Identity;
+		mVRHandRawPoses[i] = cMatrixf::Identity;
+		mbVRHandResolvedPoseValid[i] = false;
+	}
+}
+
+bool cPlayer::ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
+	cMatrixf& aResolvedPose)
+{
+	aResolvedPose = aRawPose;
+	if(aHand < eVRHandIndex_Left || aHand >= eVRHandIndex_Count ||
+		mpVRHandCollisionShape == NULL || mpScene == NULL ||
+		mpScene->GetWorld3D() == NULL)
+	{
+		return false;
+	}
+
+	iPhysicsWorld *pPhysicsWorld = mpScene->GetWorld3D()->GetPhysicsWorld();
+	if(pPhysicsWorld == NULL) return false;
+
+	const int lHand = (int)aHand;
+	const cVector3f vRawPos = aRawPose.GetTranslation();
+	cVector3f vStartPos;
+
+	// A tracking reacquisition, teleport or snap turn must not sweep the hand
+	// through the whole map. Re-anchor near the shoulder and resolve the short
+	// arm segment again instead.
+	const bool bReanchor = !mbVRHandResolvedPoseValid[lHand] ||
+		(mVRHandRawPoses[lHand].GetTranslation() - vRawPos).Length() > 0.75f;
+	if(bReanchor && mpCamera != NULL)
+	{
+		const float fSide = aHand == eVRHandIndex_Left ? -0.13f : 0.13f;
+		vStartPos = mpCamera->GetPosition() + mpCamera->GetRight() * fSide -
+			mpCamera->GetUp() * 0.18f + mpCamera->GetForward() * 0.04f;
+	}
+	else if(mbVRHandResolvedPoseValid[lHand])
+	{
+		vStartPos = mVRHandResolvedPoses[lHand].GetTranslation();
+	}
+	else
+	{
+		vStartPos = vRawPos;
+	}
+
+	iPhysicsBody *pSkipBody = mVRHeldBodies[lHand];
+
+	// The engine has no implemented convex cast, so use small discrete steps
+	// plus a binary search at the first overlap. The 2.5 cm step is below half
+	// the palm volume's narrowest extent and prevents tunnelling through thin geometry.
+	const float fSweepStep = 0.025f;
+	const int lMaxSlideIterations = 3;
+	cVector3f vCurrent = vStartPos;
+	cVector3f vGoal = vRawPos;
+
+	for(int lSlide = 0; lSlide < lMaxSlideIterations; ++lSlide)
+	{
+		cVector3f vDelta = vGoal - vCurrent;
+		const float fDistance = vDelta.Length();
+		if(fDistance < 0.0001f) break;
+
+		int lSteps = (int)(fDistance / fSweepStep) + 1;
+		if(lSteps < 1) lSteps = 1;
+		if(lSteps > 80) lSteps = 80;
+		float fSafeT = 0.0f;
+		float fHitT = 1.0f;
+		cVector3f vHitCorrection(0, 0, 0);
+		bool bHit = false;
+
+		for(int lStep = 1; lStep <= lSteps; ++lStep)
+		{
+			const float fT = (float)lStep / (float)lSteps;
+			cMatrixf mtxTest = aRawPose;
+			const cVector3f vTestPos = vCurrent + vDelta * fT;
+			mtxTest.SetTranslation(vTestPos);
+			cVector3f vCorrectedPos;
+			if(pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
+				mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
+				NULL, false, false, false, false))
+			{
+				bHit = true;
+				fHitT = fT;
+				vHitCorrection = vCorrectedPos - vTestPos;
+				break;
+			}
+			fSafeT = fT;
+		}
+
+		if(!bHit)
+		{
+			vCurrent = vGoal;
+			break;
+		}
+
+		// Refine the stopping point so the rendered hand sits close to the
+		// surface instead of visibly hovering one whole sample away.
+		for(int lRefine = 0; lRefine < 6; ++lRefine)
+		{
+			const float fMidT = (fSafeT + fHitT) * 0.5f;
+			cMatrixf mtxTest = aRawPose;
+			const cVector3f vTestPos = vCurrent + vDelta * fMidT;
+			mtxTest.SetTranslation(vTestPos);
+			cVector3f vCorrectedPos;
+			if(pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
+				mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
+				NULL, false, false, false, false))
+			{
+				fHitT = fMidT;
+				vHitCorrection = vCorrectedPos - vTestPos;
+			}
+			else
+			{
+				fSafeT = fMidT;
+			}
+		}
+
+		vCurrent += vDelta * fSafeT;
+		if(vHitCorrection.Length() < 0.0001f) break;
+
+		// Remove only the component that points into the surface. This lets a
+		// blocked hand slide along walls, tables and door faces naturally.
+		const cVector3f vNormal = cMath::Vector3Normalize(vHitCorrection);
+		cVector3f vRemaining = vGoal - vCurrent;
+		const float fIntoSurface = cMath::Vector3Dot(vRemaining, vNormal);
+		if(fIntoSurface >= 0.0f) break;
+		vRemaining -= vNormal * fIntoSurface;
+		if(vRemaining.Length() < 0.0001f) break;
+		vGoal = vCurrent + vRemaining;
+	}
+
+	// Rotation alone can place the hand volume into a nearby surface. Resolve a
+	// few shallow overlaps after the translational sweep without changing the
+	// controller's orientation.
+	for(int lResolve = 0; lResolve < 3; ++lResolve)
+	{
+		cMatrixf mtxTest = aRawPose;
+		mtxTest.SetTranslation(vCurrent);
+		cVector3f vCorrectedPos;
+		if(!pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
+			mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
+			NULL, false, false, false, false))
+		{
+			break;
+		}
+		vCurrent = vCorrectedPos;
+	}
+
+	//A malformed/deep penetration result must never throw the rendered hand
+	//out of view. Keep collision lag local to the wrist area; beyond this
+	//distance the visual follows the controller again, preferring shallow
+	//penetration over a hand that appears to have stopped rendering.
+	cVector3f vVisualLag = vCurrent - vRawPos;
+	const float fVisualLag = vVisualLag.Length();
+	const float fMaxVisualLag = 0.35f;
+	if(fVisualLag != fVisualLag)
+	{
+		vCurrent = vRawPos;
+	}
+	else if(fVisualLag > fMaxVisualLag)
+	{
+		vCurrent = vRawPos + vVisualLag * (fMaxVisualLag / fVisualLag);
+	}
+
+	aResolvedPose = aRawPose;
+	aResolvedPose.SetTranslation(vCurrent);
+	mVRHandResolvedPoses[lHand] = aResolvedPose;
+	mVRHandRawPoses[lHand] = aRawPose;
+	mbVRHandResolvedPoseValid[lHand] = true;
+	return true;
+}
+
 //-----------------------------------------------------------------------
 
 float cPlayer::GetPickedDist()
@@ -803,12 +979,21 @@ void cPlayer::DestroyWorldObjects()
 		mpVRHandNudgeShape = NULL;
 	}
 
+	if(mpVRHandCollisionShape != NULL)
+	{
+		if(pPhysicsWorld != NULL)
+			pPhysicsWorld->DestroyShape(mpVRHandCollisionShape);
+		mpVRHandCollisionShape = NULL;
+	}
+
 	if(mpCharBody != NULL)
 	{
 		if(pPhysicsWorld != NULL)
 			pPhysicsWorld->DestroyCharacterBody(mpCharBody);
 		mpCharBody = NULL;
 	}
+
+	ResetVRHandCollision();
 
 	//mpFlashLight->Destroy();
 	//mpGlowStick->Destroy();
@@ -1047,18 +1232,44 @@ void cPlayer::OnWorldLoad()
 	/////////////////////////////////////////////////////////
 	// Both hand queries reuse immutable collision geometry for the lifetime
 	// of this physics world instead of allocating a shape every frame.
-if(mpVRHandInteractionShape == NULL)
+	if(mpVRHandInteractionShape == NULL)
+	{
+		// Keep target detection around the palm and fingers in real metres. The
+		// previous 50x20x30 values compensated for the hand mesh's 0.006 render
+		// scale inside the query matrix, coupling interaction reach to graphics.
+		// The query now uses a scale-free palm transform instead.
+		cMatrixf mtxHandInteractionOffset = cMath::MatrixTranslate(
+			cVector3f(0.011f, 0.002f, -0.011f));
 		mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
-			cVector3f(50.0f, 20.0f, 30.0f), NULL);
+			cVector3f(0.30f, 0.14f, 0.20f), &mtxHandInteractionOffset);
+	}
 
 	// Small sphere used for direct hand-to-object nudge collision.
 	if(mpVRHandNudgeShape == NULL)
 		mpVRHandNudgeShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateSphereShape(
 			cVector3f(0.12f), NULL);
 
+	// Match the collision volume to the visible hand mesh, whose long axis is
+	// local X after the HUD hand rotation. The former controller-aligned
+	// capsule covered the wrist/forward axis but left most of the palm and
+	// fingers outside it, which is why poles and door edges crossed the hand.
+	if(mpVRHandCollisionShape == NULL)
+	{
+		cMatrixf mtxHandVisualOffset = cMath::MatrixMul(
+			cMath::MatrixTranslate(cVector3f(0, 0, 0.05f)),
+			cMath::MatrixRotate(cVector3f(0, 0.525f, -1.1f),
+				eEulerRotationOrder_XYZ));
+		cMatrixf mtxHandCollisionOffset = cMath::MatrixMul(
+			mtxHandVisualOffset,
+			cMath::MatrixTranslate(cVector3f(0.011f, 0.002f, -0.011f)));
+		mpVRHandCollisionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
+			cVector3f(0.205f, 0.065f, 0.145f), &mtxHandCollisionOffset);
+	}
+	ResetVRHandCollision();
+
 	// Create body
 	// mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", mvSize);
-  mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", cVector3f(mvSize.x * 0.5, 0.85f, mvSize.z * 0.5));
+	mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", cVector3f(mvSize.x * 0.5, 0.85f, mvSize.z * 0.5));
 	
 	mpCharBody->SetCamera(mpCamera);
 	mpCharBody->SetMass(mfMass);
@@ -1637,7 +1848,9 @@ void cPlayer::Reset()
 	mpCharBody = NULL;
 	mpVRHandInteractionShape = NULL;
 	mpVRHandNudgeShape = NULL;
+	mpVRHandCollisionShape = NULL;
 	mVRInteractHand = eVRHandIndex_Right;
+	ResetVRHandCollision();
 	mpWeaponCallback = NULL;
 	mbUpdatingCollisionCallbacks = false;
 

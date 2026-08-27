@@ -14,9 +14,11 @@
 		EquipSound = "item_flashlight_on"
 		UnequipSound = "item_flashlight_off"
 		 
-		VrTransOffset = "0.0 0.0 0.0"
-		VrRotOffset = "1.57 0.0 0.0"
+		VrTransOffset = "0.0 0.0 0.1"
+		VrRotOffset = "-1.57 0.0 0.0"
 		VrScale = 1.6f
+		VrGripPoint = "0.0004 0.0005 0.090"
+		VrGripRadius = 0.022f
 	 />
 </HUD_MODEL>
 

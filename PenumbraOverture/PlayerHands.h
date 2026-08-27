@@ -125,9 +125,22 @@ public:
   cVector3f mvVrRotOffset;
   cVector3f mvVrTransOffset;
 
+  //Measured point on the object's handle after VrRotOffset/VrScale, in
+  //metres. Attachments place this point on the cylinder described by the
+  //posed finger joints instead of assuming that the model origin is a grip.
+  cVector3f mvVrGripPoint;
+  float mfVrGripRadius;
+  //Rotation around the measured handle axis, in radians. This changes which
+  //side of a hammer/pick head faces the thumb without moving the grip point.
+  float mfVrGripTwist;
+  bool mbUseVrGripAnchor;
+
   //While true the finger rigs close into the full grab pose regardless of
   //the live grip input, so an attached item is seen firmly held.
   bool mbForceGrabPose;
+  //Radius-derived fraction of the hold pose; thick handles remain more open
+  //so the rigid finger skin does not pass through them.
+  float mfForcedGrabPoseWeight;
   //One-shot diagnostic guard for the forced-grab log line.
   bool mbForceGrabLogged;
 
@@ -241,6 +254,8 @@ public:
 
 	void SetCurrentModel(int alNum, const tString& asName);
 	iHudModel* GetCurrentModel(int alNum){ return mvCurrentHudModels[alNum];}
+	// Collision-resolved, unscaled palm transform for physics interaction.
+	bool GetHandPalmPose(int alNum, cMatrixf& aPoseMtx);
 
 	// Extra mesh rendered on the same controller pose as the slot's hand rig,
 	// so an equipped item (flashlight, glowstick, flare) is seen held by a
@@ -259,6 +274,8 @@ private:
 	tHudModelMap m_mapHudModels;
 	iHudModel* mvCurrentHudModels[2];
 	iHudModel* mvAttachmentHudModels[2];
+	//Grace period for transient OpenVR pose loss; shared by hand and item.
+	int mlInvalidPoseFrames[2];
 	int mlCurrentModelNum;
 };
 

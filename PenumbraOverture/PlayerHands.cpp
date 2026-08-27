@@ -75,7 +75,12 @@ cHudModelPose GetPoseFromElem(const tString &asName, TiXmlElement *apElem)
 	mbHandRigSetup = false;
 	mlHandIndex = 0;
 	mbForceGrabPose = false;
+	mfForcedGrabPoseWeight = 1.0f;
 	mbForceGrabLogged = false;
+	mvVrGripPoint = cVector3f(0, 0, 0);
+	mfVrGripRadius = 0.018f;
+	mfVrGripTwist = 0.0f;
+	mbUseVrGripAnchor = false;
 	mfIndexHoldWeight = 0.0f;
 	mpPoseCallback = NULL;
 	mmtxLastPose = cMatrixf::Identity;
@@ -106,13 +111,65 @@ bool iHudModel::UpdatePoseMatrix(cMatrixf& aPoseMtx, float afTimeStep)
     vr_handMtx = mpInit->mpGame->vr_right_hand.GetMatrix();
   }
 
-  aPoseMtx = vr_handMtx;
+  // Resolve collision in metre-scaled controller space. Applying the HUD
+  // model's tiny visual scale to the physics shape made the previous hand
+  // collision attempt effectively disappear.
+  cMatrixf vr_worldHandMtx = VRHelper::TrackingToWorldSpace(vr_handMtx, mpInit->mpGame);
+  if (mpInit->mpPlayer != NULL)
+  {
+    cMatrixf vr_resolvedHandMtx;
+    if (mpInit->mpPlayer->ResolveVRHandPose((eVRHandIndex)mlHandIndex,
+        vr_worldHandMtx, vr_resolvedHandMtx))
+      vr_worldHandMtx = vr_resolvedHandMtx;
+  }
 
-  aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_transMtx);
+  //Attachment grip frame derived from the actual posed skeleton. In the
+  //hand mesh, all four long fingers describe a cylinder around local Z; the
+  //least-squares centres of their three joints sit at X ~= 5 cm and mirror
+  //in Y. Composing the item's existing rotation inside the hand frame aligns
+  //the whole handle with that cylinder instead of with the controller's Z.
+  if(mbUseVrGripAnchor && mpInit->mpPlayerHands != NULL)
+  {
+    iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(mlHandIndex);
+    if(pHandModel != NULL &&
+      (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand"))
+    {
+      const float fPoseWeight = cMath::Clamp(
+        1.15f - mfVrGripRadius * 12.5f, 0.72f, 1.0f);
+      //Opening the fingers increases the fitted cylinder radius and moves
+      //its centre away from the palm by about 3.25 cm per unit of pose
+      //weight. Follow that measured centre so radius correction does not
+      //reintroduce a lateral offset for thick handles.
+      const float fOpenCentreOffset = (1.0f - fPoseWeight) * 0.0325f;
+      const cVector3f vGripSocket(0.050f,
+        mlHandIndex == 0 ? 0.019f + fOpenCentreOffset :
+          -0.014f - fOpenCentreOffset,
+        0.0f);
+      aPoseMtx = cMath::MatrixMul(vr_worldHandMtx,
+        cMath::MatrixTranslate(pHandModel->mvVrTransOffset));
+      aPoseMtx = cMath::MatrixMul(aPoseMtx,
+        cMath::MatrixRotate(pHandModel->mvVrRotOffset,
+          eEulerRotationOrder_XYZ));
+      aPoseMtx = cMath::MatrixMul(aPoseMtx,
+        cMath::MatrixTranslate(vGripSocket));
+      //Twist around the handle at the grip pivot. Keeping this separate from
+      //VrRotOffset means tool heads can be reoriented without changing their
+      //height or moving the measured contact point out of the hand.
+      aPoseMtx = cMath::MatrixMul(aPoseMtx,
+        cMath::MatrixRotateZ(mfVrGripTwist));
+      aPoseMtx = cMath::MatrixMul(aPoseMtx,
+        cMath::MatrixTranslate(mvVrGripPoint * -1.0f));
+      aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
+      aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
+      return true;
+    }
+  }
+
+  //Legacy/controller-local pose for the hand models themselves and for any
+  //old HUD object that has not supplied a measured grip profile.
+  aPoseMtx = cMath::MatrixMul(vr_worldHandMtx, vr_transMtx);
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_rotMtx);
   aPoseMtx = cMath::MatrixMul(aPoseMtx, vr_scaleMtx);
-
-  aPoseMtx = VRHelper::TrackingToWorldSpace(aPoseMtx, mpInit->mpGame);
 
   return true;
 }
@@ -174,14 +231,21 @@ void iHudModel::LoadEntities()
 		}
 	}
 
-	SetupHandAnimation();
+	// Only the two actual hand models own a finger skeleton. Attachments such
+	// as the flashlight and hammer share this class but do not have hand bones;
+	// trying to pose them produced a misleading FAILED rig setup every equip.
+	const bool bIsHandRig = msName == "Hand" || msName == "LeftHand";
+	if(bIsHandRig)
+	{
+		SetupHandAnimation();
 
-	//Direct finger posing: the callback writes the smoothed rotations onto
-	//the bones after the engine animation update and refreshes the world
-	//matrices, so the pose never depends on animation-state application.
-	if(mpEntity && mpPoseCallback == NULL)
-		mpPoseCallback = hplNew( cHandRigPoseCallback, (this) );
-	mpEntity->SetCallback(mpPoseCallback);
+		//Direct finger posing: the callback writes the smoothed rotations onto
+		//the bones after the engine animation update and refreshes the world
+		//matrices, so the pose never depends on animation-state application.
+		if(mpEntity && mpPoseCallback == NULL)
+			mpPoseCallback = hplNew( cHandRigPoseCallback, (this) );
+		mpEntity->SetCallback(mpPoseCallback);
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -193,47 +257,32 @@ void iHudModel::SetupHandAnimation()
 	const char* sHand = mlHandIndex == 0 ? "left" : "right";
 
 	//Own rotation per joint in degrees (per-joint deltas; they accumulate
-	//down each chain). Grab: middle/ring/little/thumb. Trigger: index.
-	//Re-tuned 21 August 2026 (tune_finger_pose.py, engine-exact skinning):
-	//- Angles rise from the old capped 17/17/10 set (tips barely moved,
-	//  user-reported "poco agarre") to a fist-like wrap: Middle/Ring
-	//  60/70/40 (170 deg total), Little 50/60/35, Index 45/55/32. Simulated
-	//  adjacent-finger clearances stay >= the bind-pose baseline (Ring/
-	//  Middle tubes are fused and only 0.09 apart at rest).
-	//- Fold directions live in the axis block below: plain +/-Z for the
-	//  four fingers (flipped per hand), YZ-tilted per-hand axis for the
-	//  thumb.
+	//down each chain). The mesh has all three joints for every finger, but
+	//each vertex is rigidly assigned to a single bone, so restrained angles
+	//look much more natural than a mathematically complete fist.
 	static const float kfGrabAngles[lHandBoneNum] = {
-		60,70,40,	//Middle
-		60,70,40,	//Ring
-		60,70,40,	//Little: exact Ring/Middle parity - the pinky chain owns
-					//~140 extra web/hypothenar vertices, and any differential
-					//fold against Ring sheared that skin toward the ring lane.
-					//Identical transforms keep the fused skin coherent; its
-					//fold axis below additionally steers the deep curl away
-					//from the Ring lane (tips bunching read as contortion).
+		52,66,38,	//Middle
+		52,66,38,	//Ring
+		52,66,38,	//Little: same curve avoids shearing the fused web skin
 		0,0,0,		//Index
-		0,0,0		//Thumb frozen at bind pose: the chain is too short to reach
-					//anything meaningful, every sweep tried read as invisible
-					//(user-confirmed), so per user decision it stays static.
+		22,28,16	//Thumb: visible opposition without collapsing the web
 	};
 	static const float kfTriggerAngles[lHandBoneNum] = {
 		0,0,0,		//Middle
 		0,0,0,		//Ring
 		0,0,0,		//Little
-		50,60,36,	//Index: slightly deeper than the old 45/55/32 so a held
-					//item (forced grab drives this chain to full weight)
-					//reads as wrapped instead of resting on top.
+		48,62,36,	//Index
 		0,0,0		//Thumb
 	};
-	//Deep hold pose driven only while an item is attached: every finger
-	//wraps like a tight fist around the held object.
+	//Hold pose driven only while an item is attached. It is deliberately only
+	//a little tighter than the live pose: over-curling this old rigid skin is
+	//what made fingers appear doubled or folded through the back of the hand.
 	static const float kfHoldAngles[lHandBoneNum] = {
-		75,85,50,	//Middle
-		75,85,50,	//Ring
-		75,85,50,	//Little
-		60,70,40,	//Index
-		0,0,0		//Thumb frozen (model limitation, documented above)
+		55,70,40,	//Middle
+		55,70,40,	//Ring
+		55,70,40,	//Little
+		52,66,38,	//Index
+		28,34,20	//Thumb
 	};
 
 	int lBoneIdx[lHandBoneNum];
@@ -251,34 +300,24 @@ void iHudModel::SetupHandAnimation()
 	}
 
 	const bool bLeft = (mlHandIndex == 0);
-	//Fold directions re-derived after hardware feedback (21 August 2026,
-	//scripts/verify_fold_directions.py):
-	//- The left rig is a Y-mirror of the right (palmar flesh median at
-	//  -1.95 vs +1.95 relative to each Palm joint), so EVERY fold axis must
-	//  flip its X/Z sign on the left hand or the fingers curl into the back
-	//  of the hand instead of the palm.
-	//- Middle/Ring/Little/Index share one plain +/-Z axis. Their anatomical
-	//  verticals differ by up to 23 deg, but Ring/Middle share a fused mesh
-	//  tube: curling around diverging axes stretches that seam 3.66 units
-	//  (user-reported "double finger"); the shared axis keeps it at 0.71
-	//  and gives exactly zero lateral drift.
-	//- Pinky axis tilted 15 deg out of the shared sagittal plane so its deep
-	//  curl drifts ~1.2 units away from the Ring lane instead of bunching
-	//  against it (user-reported contortion toward the ring finger).
-	cVector3f vFingerAxis = cVector3f(0, 0, -1.0f * (bLeft ? -1.0f : 1.0f));
-	cVector3f vPinkyAxis = cVector3f(0.0f, 0.2588f, -0.9659f * (bLeft ? -1.0f : 1.0f));
-	//- Thumb axis kept for reference; the thumb pose is frozen at zero angles
-	//  above, so the thumb quaternions stay identity and the bone never moves.
-	cVector3f vThumbAxis = cVector3f(0.0f, 0.94f, -0.342f * (bLeft ? -1.0f : 1.0f));
+	//The two meshes are mirrored. Positive curl must point into each palm:
+	//right fingers rotate about -Z and left fingers about +Z. The previous
+	//signs were reversed and visibly folded every finger toward the dorsum.
+	//All four long fingers intentionally share the same axis. In particular,
+	//giving the little finger a tilted axis twists its rigidly weighted web
+	//toward the ring finger instead of producing anatomical splay.
+	cVector3f vFingerAxis = cVector3f(0, 0, bLeft ? 1.0f : -1.0f);
+	cVector3f vPinkyAxis = vFingerAxis;
+	//The thumb has a diagonal three-joint chain, so it needs opposition as
+	//well as flexion. Its Z component mirrors while Y remains common.
+	cVector3f vThumbAxis = cVector3f(0.0f, 0.94f,
+		bLeft ? 0.342f : -0.342f);
 
 	//Precompute the per-bone bind-relative rotations for the three poses
 	//(relaxed grab, trigger, deep hold). ApplyFingerPose writes these
 	//straight onto the bones from the entity callback, bypassing the
 	//animation-state path.
 	static const int klChainStart[kFingerTrackNum] = { 0,3,6,9,12 };
-	static const float* kpChainAngles[kFingerTrackNum] = {
-		kfGrabAngles,kfGrabAngles,kfGrabAngles,kfTriggerAngles,kfGrabAngles
-	};
 
 	for(int f=0; f<kFingerTrackNum; ++f)
 	{
@@ -400,10 +439,11 @@ void iHudModel::UpdateHandAnimation(float afTimeStep)
 	//perceptible lag at VR frame rates.
 	if(mbForceGrabPose)
 	{
-		//An item is attached to this slot: wrap every finger around it with
-		//the full grab pose instead of following the live grip input. The
-		//index chain retracts so only the dedicated hold pose drives it.
-		for(int f=0; f<kFingerTrackNum; ++f) afTarget[f] = 1.0f;
+		//An item is attached to this slot. The target comes from its measured
+		//handle radius: a flashlight keeps the hand more open than a glowstick.
+		const float fForcedWeight = cMath::Clamp(mfForcedGrabPoseWeight,
+			0.72f, 1.0f);
+		for(int f=0; f<kFingerTrackNum; ++f) afTarget[f] = fForcedWeight;
 		afTarget[3] = 0.0f;
 	}
 
@@ -415,7 +455,8 @@ void iHudModel::UpdateHandAnimation(float afTimeStep)
 		mfFingerWeight[f] += (afTarget[f] - mfFingerWeight[f]) * fBlend;
 	}
 
-	float fHoldTarget = mbForceGrabPose ? 1.0f : 0.0f;
+	float fHoldTarget = mbForceGrabPose ?
+		cMath::Clamp(mfForcedGrabPoseWeight, 0.72f, 1.0f) : 0.0f;
 	mfIndexHoldWeight += (fHoldTarget - mfIndexHoldWeight) * fBlend;
 }
 
@@ -465,7 +506,9 @@ void iHudModel::ApplyFingerPose()
 		if(mbForceGrabPose)
 		{
 			w = (f == 3) ? mfIndexHoldWeight : mfFingerWeight[f];
-			pq = (f == 3) ? &mvHoldRot[i] : &mvGrabRot[i];
+			//Use the dedicated hold pose for every chain. The old branch used
+			//it only on the index, despite all five hold weights reaching 1.0.
+			pq = &mvHoldRot[i];
 		}
 		else
 		{
@@ -599,6 +642,7 @@ cPlayerHands::cPlayerHands(cInit *apInit)  : iUpdateable("FadeHandler")
 	{
 		mvCurrentHudModels[i] = NULL;
 		mvAttachmentHudModels[i] = NULL;
+		mlInvalidPoseFrames[i] = 0;
 	}
 }
 
@@ -636,6 +680,31 @@ void cPlayerHands::OnStart()
 
 void cPlayerHands::Update(float afTimeStep)
 {
+	//OpenVR can mark an otherwise tracked controller invalid for one or two
+	//frames. Keep the last rendered transform during that short gap instead
+	//of making the hand and held item flash out immediately.
+	bool vbPoseValid[2];
+	for(int i=0; i< mlCurrentModelNum; ++i)
+	{
+		vbPoseValid[i] = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
+			mpInit->mpGame->vr_right_hand.IsPoseValid();
+		if(vbPoseValid[i])
+		{
+			if(mlInvalidPoseFrames[i] >= 6)
+				Log(" [hand-render] slot %d recovered after %d invalid pose frames\n",
+					i, mlInvalidPoseFrames[i]);
+			mlInvalidPoseFrames[i] = 0;
+		}
+		else if(mlInvalidPoseFrames[i] < 46)
+		{
+			++mlInvalidPoseFrames[i];
+			if(mlInvalidPoseFrames[i] == 6)
+				Log(" [hand-render] slot %d tracking pose remains invalid\n", i);
+			else if(mlInvalidPoseFrames[i] == 46)
+				Log(" [hand-render] slot %d hidden after tracking grace period\n", i);
+		}
+	}
+
 	/////////////////////////////////////
 	// Update the current model
 	for(int i=0; i< mlCurrentModelNum; ++i)
@@ -643,10 +712,12 @@ void cPlayerHands::Update(float afTimeStep)
 		iHudModel *pHudModel = mvCurrentHudModels[i];
     if (pHudModel == NULL) {continue;}
 
-    const bool poseValid = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
-      mpInit->mpGame->vr_right_hand.IsPoseValid();
-    if (!poseValid) {
-      if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(false);
+		if(!vbPoseValid[i]) {
+			//At 90 Hz this is roughly half a second. A genuinely disconnected
+			//controller is hidden, while ordinary tracking hitches retain the
+			//last good pose.
+			if(mlInvalidPoseFrames[i] > 45 && pHudModel->mpEntity != NULL)
+				pHudModel->SetVisible(false);
       continue;
     }
     if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(true);
@@ -697,7 +768,20 @@ void cPlayerHands::Update(float afTimeStep)
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
 
-    pHudModel->mbForceGrabPose = mvAttachmentHudModels[i] != NULL;
+    iHudModel *pAttachment = mvAttachmentHudModels[i];
+    pHudModel->mbForceGrabPose = pAttachment != NULL;
+    if(pAttachment != NULL)
+    {
+      //The inner finger arc is about 3 cm at full curl. Convert the measured
+      //handle radius into a stable 0.72..1 pose fraction: thin rods close
+      //fully, while thick flashlight bodies retain clearance.
+      pHudModel->mfForcedGrabPoseWeight = cMath::Clamp(
+        1.15f - pAttachment->mfVrGripRadius * 12.5f, 0.72f, 1.0f);
+    }
+    else
+    {
+      pHudModel->mfForcedGrabPoseWeight = 1.0f;
+    }
 
     pHudModel->UpdateHandAnimation(afTimeStep);
 
@@ -706,48 +790,26 @@ void cPlayerHands::Update(float afTimeStep)
 	}
 
 	/////////////////////////////////////
-	// Attachment models share the slot's controller pose but never replace
-	// the hand rig, so the item is seen held by a visible hand. They skip
-	// the finger animation and the equip/unequip swap chain.
+	// Attachment models use their own calibrated HUD offsets on the same
+	// collision-resolved controller pose as the hand. They skip finger
+	// animation and the equip/unequip swap chain.
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
 		iHudModel *pHudModel = mvAttachmentHudModels[i];
 		if(pHudModel == NULL) continue;
 
-    const bool poseValid = i == 0 ? mpInit->mpGame->vr_left_hand.IsPoseValid() :
-      mpInit->mpGame->vr_right_hand.IsPoseValid();
-    if (!poseValid) {
-      if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(false);
+		if(!vbPoseValid[i]) {
+			if(mlInvalidPoseFrames[i] > 45 && pHudModel->mpEntity != NULL)
+				pHudModel->SetVisible(false);
       continue;
     }
     if (pHudModel->mpEntity != NULL) pHudModel->SetVisible(true);
 
-    TrackedController& hand = i == 0 ? mpInit->mpGame->vr_left_hand :
-      mpInit->mpGame->vr_right_hand;
-    cMatrixf mtxRaw = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
-
-    //Virtual per-model pose logic (the melee attack sweep, throw charging)
-    //must keep running even though the final rendered matrix below comes
-    //from the palm anchor.
-    cMatrixf mtxLogicPose = cMatrixf::Identity;
-    pHudModel->UpdatePoseMatrix(mtxLogicPose, afTimeStep);
-
-    //Fixed palm socket expressed in the CONTROLLER frame (multiplied right
-    //after the raw pose, before any world-space operation): slightly above
-    //the grip origin and forward, at the line between the palm and the
-    //finger knuckles, shifted toward the thumb side. Composing it inside
-    //the controller frame keeps the item rigid relative to the hand no
-    //matter how the hand or the body move.
-    cVector3f vSocket(
-      ((i == 0) ? 0.05f : -0.05f) + pHudModel->mvVrTransOffset.x,
-      0.015f + pHudModel->mvVrTransOffset.y,
-      0.08f + pHudModel->mvVrTransOffset.z);
-    cMatrixf mtxLocal = cMath::MatrixMul(
-      cMath::MatrixTranslate(vSocket),
-      cMath::MatrixMul(
-        cMath::MatrixRotate(pHudModel->mvVrRotOffset, eEulerRotationOrder_XYZ),
-        cMath::MatrixScale(cVector3f(pHudModel->mfVrScale))));
-    cMatrixf mtxPose = cMath::MatrixMul(mtxRaw, mtxLocal);
+    // Use the pose returned by the model itself. The former hard-coded
+    // thumb/knuckle socket added 5-8 cm to every item and was the reason
+    // flashlights and weapons appeared to float beside the hand.
+    cMatrixf mtxPose = cMatrixf::Identity;
+    if (!pHudModel->UpdatePoseMatrix(mtxPose, afTimeStep)) continue;
 
     if (pHudModel->mpEntity != nullptr)
       pHudModel->mpEntity->SetMatrix(mtxPose);
@@ -759,10 +821,45 @@ void cPlayerHands::Update(float afTimeStep)
 
 //-----------------------------------------------------------------------
 
+bool cPlayerHands::GetHandPalmPose(int alNum, cMatrixf& aPoseMtx)
+{
+	if(alNum < 0 || alNum >= mlCurrentModelNum) return false;
+
+	TrackedController& hand = alNum == 0 ? mpInit->mpGame->vr_left_hand :
+		mpInit->mpGame->vr_right_hand;
+	if(!hand.IsPoseValid()) return false;
+
+	aPoseMtx = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
+	cMatrixf mtxResolved;
+	if(mpInit->mpPlayer->ResolveVRHandPose((eVRHandIndex)alNum,
+		aPoseMtx, mtxResolved))
+	{
+		aPoseMtx = mtxResolved;
+	}
+
+	// Match the visible hand's palm orientation, but deliberately omit its
+	// 0.006 mesh scale. Physics anchors must remain rigid metre transforms.
+	iHudModel *pHandModel = mvCurrentHudModels[alNum];
+	if(pHandModel != NULL &&
+		(pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand"))
+	{
+		aPoseMtx = cMath::MatrixMul(aPoseMtx,
+			cMath::MatrixTranslate(pHandModel->mvVrTransOffset));
+		aPoseMtx = cMath::MatrixMul(aPoseMtx,
+			cMath::MatrixRotate(pHandModel->mvVrRotOffset,
+				eEulerRotationOrder_XYZ));
+	}
+
+	return true;
+}
+
+//-----------------------------------------------------------------------
+
 void cPlayerHands::Reset()
 {
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
+		mlInvalidPoseFrames[i] = 0;
 		iHudModel *pHudModel = mvCurrentHudModels[i];
 		if(pHudModel)
 		{
@@ -884,6 +981,9 @@ bool cPlayerHands::AddModelFromFile(const tString &asFile)
   pHudModel->mfVrScale = cString::ToFloat(pMainElem->Attribute("VrScale"), 1.0f);
   pHudModel->mvVrRotOffset = cString::ToVector3f(pMainElem->Attribute("VrRotOffset"), 0);
   pHudModel->mvVrTransOffset = cString::ToVector3f(pMainElem->Attribute("VrTransOffset"), 0);
+  pHudModel->mvVrGripPoint = cString::ToVector3f(pMainElem->Attribute("VrGripPoint"), 0);
+  pHudModel->mfVrGripRadius = cString::ToFloat(pMainElem->Attribute("VrGripRadius"), 0.018f);
+  pHudModel->mfVrGripTwist = cString::ToFloat(pMainElem->Attribute("VrGripTwist"), 0.0f);
 	
 	pHudModel->LoadData(pRootElem);
 
@@ -995,6 +1095,7 @@ void cPlayerHands::SetAttachmentModel(int alNum,const tString& asName)
 		Log(" [hand-rig] detach '%s' from %s hand.\n", pSlot->msName.c_str(),
 			alNum == 0 ? "left" : "right");
 		pSlot->UnequipEffect();
+		pSlot->mbUseVrGripAnchor = false;
 		pSlot->DestroyEntities();
 		pSlot->Reset();
 		pSlot = NULL;
@@ -1015,10 +1116,16 @@ void cPlayerHands::SetAttachmentModel(int alNum,const tString& asName)
 		alNum == 0 ? "left" : "right");
 
 	pAttachModel->SetHandIndex(alNum);
+	pAttachModel->mbUseVrGripAnchor = true;
 	pAttachModel->LoadEntities();
 	pAttachModel->EquipEffect(true);
 	pAttachModel->mfTime = 0;
 	pAttachModel->mState = eHudModelState_Idle;
+	const float fPoseWeight = cMath::Clamp(
+		1.15f - pAttachModel->mfVrGripRadius * 12.5f, 0.72f, 1.0f);
+	Log(" [hand-grip] '%s': point %s radius %.3f twist %.2f pose %.2f\n",
+		pAttachModel->msName.c_str(), pAttachModel->mvVrGripPoint.ToString().c_str(),
+		pAttachModel->mfVrGripRadius, pAttachModel->mfVrGripTwist, fPoseWeight);
 
 	pSlot = pAttachModel;
 }
@@ -1091,6 +1198,7 @@ void cPlayerHands::OnWorldLoad()
 {
 	for(int i=0; i< mlCurrentModelNum; ++i)
 	{
+		mlInvalidPoseFrames[i] = 0;
 		iHudModel *pHudModel = mvCurrentHudModels[i];
 		if(pHudModel)
 		{

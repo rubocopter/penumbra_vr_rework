@@ -327,6 +327,9 @@ public:
 	iPhysicsBody *GetVRHeldBody(eVRHandIndex aHand) const { return mVRHeldBodies[aHand]; }
 	void SetVRInteractHand(eVRHandIndex aHand) { mVRInteractHand = aHand; }
 	eVRHandIndex GetVRInteractHand() const { return mVRInteractHand; }
+	bool ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
+		cMatrixf& aResolvedPose);
+	void ResetVRHandCollision();
 	
 	iPhysicsBody* GetPickedBody();
 	void SetPickedBody(iPhysicsBody* apBody);
@@ -363,6 +366,7 @@ public:
   cPlayerVRDimmer* GetVRDimmer() { return mpVRDimmer; }
 	iCollideShape *GetVRHandInteractionShape() { return mpVRHandInteractionShape; }
 	iCollideShape *GetVRHandNudgeShape() { return mpVRHandNudgeShape; }
+	iCollideShape *GetVRHandCollisionShape() { return mpVRHandCollisionShape; }
 
 	cPlayerFlare* GetFlare(){ return mpFlare;}
 
@@ -541,6 +545,7 @@ private:
   cPlayerVRDimmer *mpVRDimmer;
 	iCollideShape *mpVRHandInteractionShape;
 	iCollideShape *mpVRHandNudgeShape;
+	iCollideShape *mpVRHandCollisionShape;
 	
 	iPlayerWeaponCallback *mpWeaponCallback;
 
@@ -557,6 +562,9 @@ private:
 	cVRHandTarget mVRHandTargets[eVRHandIndex_Count];
 	iPhysicsBody *mVRHeldBodies[eVRHandIndex_Count];
 	eVRHandIndex mVRInteractHand;
+	cMatrixf mVRHandResolvedPoses[eVRHandIndex_Count];
+	cMatrixf mVRHandRawPoses[eVRHandIndex_Count];
+	bool mbVRHandResolvedPoseValid[eVRHandIndex_Count];
 
 	cInventoryItem *mpCurrentItem;
 	cLinearOscillation mItemFlash;
