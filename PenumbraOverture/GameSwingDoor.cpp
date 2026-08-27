@@ -255,10 +255,17 @@ void cGameSwingDoor::SetLocked(bool abX)
 		
 		if(mbLocked)
 		{
-			if(std::abs(pHingeJoint->GetMinAngle()) > std::abs(pHingeJoint->GetMaxAngle()))
-				pHingeJoint->SetMinAngle(cMath::ToRad(-1));
-			else
-				pHingeJoint->SetMaxAngle(cMath::ToRad(1));
+			//Keep the original closed-side stop and leave less than one degree
+			//of travel toward the padlock. Clamping both immutable defaults also
+			//locks symmetric two-way doors and stays stable after save/load or a
+			//previous temporary limit adjustment.
+			const float fLockPlay = cMath::ToRad(0.75f);
+			const float fLockedMin = mvJointDefaults[i].mfMin < -fLockPlay
+				? -fLockPlay : mvJointDefaults[i].mfMin;
+			const float fLockedMax = mvJointDefaults[i].mfMax > fLockPlay
+				? fLockPlay : mvJointDefaults[i].mfMax;
+			pHingeJoint->SetMinAngle(fLockedMin);
+			pHingeJoint->SetMaxAngle(fLockedMax);
 		}
 		else
 		{
@@ -270,6 +277,12 @@ void cGameSwingDoor::SetLocked(bool abX)
 	for(size_t i=0; i<mvBodies.size(); ++i)
 	{
 		iPhysicsBody *pBody = mvBodies[i];
+		if(mbLocked)
+		{
+			//Do not carry pre-lock momentum into the very small padlock travel.
+			pBody->SetLinearVelocity(cVector3f(0,0,0));
+			pBody->SetAngularVelocity(cVector3f(0,0,0));
+		}
 		pBody->SetEnabled(true);
 	}
 }

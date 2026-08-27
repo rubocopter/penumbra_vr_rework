@@ -379,13 +379,13 @@ foreach ($requiredHandStateSnippet in @(
     'GetVRHandTarget(',
     'vr_dominant_hand == eSteamVRHand_Left',
     'GetVRHandInteractionShape()',
-    'SetVRHeldBody(eVRHandIndex_Right'
+    'SetVRHeldBody(interactHand'
 )) {
     if (($playerHeader + $vrInteractionSource + $vrHeldObjectSource) -notmatch [regex]::Escape($requiredHandStateSnippet)) {
         throw "Independent VR hand state is missing '$requiredHandStateSnippet'."
     }
 }
-if ($vrInteractionSource -notmatch [regex]::Escape('if (!hand->UpdatePoseMatrix(poseMatrix, 0.0f))')) {
+if ($vrInteractionSource -notmatch [regex]::Escape('if (!mpInit->mpPlayerHands->GetHandPalmPose(i, poseMatrix))')) {
     throw 'VR target detection must skip a hand whose tracked pose is invalid.'
 }
 if ($playerSource -notmatch [regex]::Escape('mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape')) {

@@ -165,6 +165,7 @@ private:
 	bool bPausedGravity;
 
 	iPhysicsBody *mpPushBody;
+	iPhysicsJoint *mpMoveJoint;
 
 	int mlMoveCount;
 

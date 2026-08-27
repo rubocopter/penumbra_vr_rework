@@ -27,6 +27,51 @@
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
 
+namespace
+{
+	// A body may be the parent of one mechanism and the child of another.
+	// The joint that actually constrains this body's motion is normally the
+	// one where it is the child.  This matters for the outside hatch: its lid
+	// also parents the wheel joint, so blindly taking joint 0 rotates the lid
+	// around the wheel axis instead of the hatch hinge.
+	iPhysicsJoint *GetVRBodyMoveJoint(iPhysicsBody *apBody)
+	{
+		if(apBody == NULL) return NULL;
+
+		iPhysicsJoint *pFallback = NULL;
+		for(int i = 0; i < apBody->GetJointNum(); ++i)
+		{
+			iPhysicsJoint *pJoint = apBody->GetJoint(i);
+			if(pJoint == NULL) continue;
+			if(pFallback == NULL) pFallback = pJoint;
+			if(pJoint->GetChildBody() == apBody) return pJoint;
+		}
+
+		// Some detachable handles are authored as the parent of a short locking
+		// joint. The mine entrance steel rod is one: joint2 only fastens the rod
+		// to the rotating hole, while joint1 on that child is the mechanism's
+		// real axis. Follow that child by one link so grabbing the handle drives
+		// the same joint as grabbing the support itself.
+		for(int i = 0; i < apBody->GetJointNum(); ++i)
+		{
+			iPhysicsJoint *pLinkJoint = apBody->GetJoint(i);
+			if(pLinkJoint == NULL || pLinkJoint->GetParentBody() != apBody) continue;
+
+			iPhysicsBody *pChildBody = pLinkJoint->GetChildBody();
+			if(pChildBody == NULL) continue;
+			for(int j = 0; j < pChildBody->GetJointNum(); ++j)
+			{
+				iPhysicsJoint *pDriveJoint = pChildBody->GetJoint(j);
+				if(pDriveJoint != NULL && pDriveJoint != pLinkJoint &&
+					pDriveJoint->GetChildBody() == pChildBody)
+					return pDriveJoint;
+			}
+		}
+
+		return pFallback;
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // GRAB STATE
 //////////////////////////////////////////////////////////////////////////
@@ -86,12 +131,7 @@ void cPlayerState_Grab_VR::OnUpdate(float afTimeStep)
   // offsets) so held items sit inside the visible palm instead of floating
   // beside it.
   cMatrixf handMat;
-  iHudModel *pGrabModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
-  if (pGrabModel && pGrabModel->UpdatePoseMatrix(handMat, 0.0f))
-  {
-    // pose matrix already includes tracking-to-world
-  }
-  else
+  if (!mpInit->mpPlayerHands->GetHandPalmPose(mHandIndex, handMat))
   {
     handMat = VRHelper::TrackingToWorldSpace(VR_GRAB_HAND().GetMatrix(), mpInit->mpGame);
   }
@@ -373,12 +413,7 @@ void cPlayerState_Grab_VR::EnterState(iPlayerState* apPrevState)
   // Compute the grab anchor against the SAME rendered hand pose used during
   // hold, so the object keeps exactly its visual relationship to the palm.
   cMatrixf grabAnchorMat;
-  iHudModel *pEnterModel = mpInit->mpPlayerHands->GetCurrentModel(mHandIndex);
-  if (pEnterModel && pEnterModel->UpdatePoseMatrix(grabAnchorMat, 0.0f))
-  {
-    // world-space rig pose ready
-  }
-  else
+  if (!mpInit->mpPlayerHands->GetHandPalmPose(mHandIndex, grabAnchorMat))
   {
     grabAnchorMat = VRHelper::TrackingToWorldSpace(VR_GRAB_HAND().GetMatrix(), mpInit->mpGame);
   }
@@ -533,6 +568,7 @@ void cPlayerState_Move_BodyCallback_VR::OnCollide(iPhysicsBody *apBody, iPhysics
 cPlayerState_Move_VR::cPlayerState_Move_VR(cInit *apInit,cPlayer *apPlayer) : iPlayerState(apInit,apPlayer,ePlayerState_Move)
 {
 	mpPushBody = NULL;
+	mpMoveJoint = NULL;
 	mpCallback = hplNew( cPlayerState_Move_BodyCallback_VR, (apPlayer, apInit->mpGame->GetStepSize()) );
 	mbHasSlideAxis = false;
 	mvSlideAxis = cVector3f(0, 0, 0);
@@ -564,11 +600,16 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   //mpPushBody->SetLinearVelocity(mpPushBody->GetWorldPosition() - pos);
 
-  auto handMat = VRHelper::TrackingToWorldSpace(
-      mpPlayer->GetVRInteractHand() == eVRHandIndex_Left
-          ? mpInit->mpGame->vr_left_hand.GetMatrix()
-          : mpInit->mpGame->vr_right_hand.GetMatrix(),
+  const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+  cMatrixf handMat;
+  if (!mpInit->mpPlayerHands->GetHandPalmPose((int)interactHand, handMat))
+  {
+    handMat = VRHelper::TrackingToWorldSpace(
+      interactHand == eVRHandIndex_Left
+        ? mpInit->mpGame->vr_left_hand.GetMatrix()
+        : mpInit->mpGame->vr_right_hand.GetMatrix(),
       mpInit->mpGame);
+  }
   cMatrixf destMatrix = cMath::MatrixMul(handMat, localPickMatrix);
 
   auto destTranslation = destMatrix.GetTranslation();
@@ -578,14 +619,11 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
 
   if (mpPushBody->GetJointNum() > 0)
   {
-    iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+    iPhysicsJoint *pJoint = mpMoveJoint;
     if (pJoint)
     {
-      cVector3f vPinDir = pJoint->GetPinDir();
+      cVector3f vPinDir = cMath::Vector3Normalize(pJoint->GetPinDir());
       cVector3f vPivot = pJoint->GetPivotPoint();
-      cVector3f vToBody = mpPushBody->GetWorldPosition() - vPivot;
-      float fRadius = vToBody.Length();
-      if (fRadius < 0.01f) fRadius = 0.3f;
 
       ePhysicsJointType jointType = pJoint->GetType();
 
@@ -614,12 +652,25 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
       else
       {
         // Hinge joint (doors): angular velocity must be ALONG the pin axis.
-        // The desired linear velocity at the contact point is vPerpDir * fAllowedSpeed.
-        // For a hinge, v = ω × r, so ω must be along the pin:
-        // ω = ±pin * (fAllowedSpeed / fRadius)
-        // Sign determined by whether vPerpDir matches Cross(pin, vToBody).
+        // Measure the lever arm at the held point and remove its component
+        // along the pin. The old full 3D body-centre distance included most
+        // of a locker's height, making its angular response several times too
+        // small even when the hand was pulling at the outer edge.
+        cVector3f vRadial = mvPickPoint - vPivot;
+        vRadial -= vPinDir * cMath::Vector3Dot(vRadial, vPinDir);
+        float fRadius = vRadial.Length();
+        if (fRadius < 0.03f)
+        {
+          vRadial = mpPushBody->GetWorldPosition() - vPivot;
+          vRadial -= vPinDir * cMath::Vector3Dot(vRadial, vPinDir);
+          fRadius = vRadial.Length();
+        }
+        if (fRadius < 0.03f) fRadius = 0.3f;
+
+        // At the held point v = omega x r. Project the hand request onto
+        // that tangent so Newton only receives motion the hinge can satisfy.
         cVector3f vPerpDir = cMath::Vector3Normalize(
-            cMath::Vector3Cross(vPinDir, vToBody));
+            cMath::Vector3Cross(vPinDir, vRadial));
         cVector3f vDragVel = destDiff * 10.0f;
         float fDotPerp = cMath::Vector3Dot(vDragVel, vPerpDir);
         float fAllowedSpeed = fabsf(fDotPerp);
@@ -643,7 +694,12 @@ void cPlayerState_Move_VR::OnUpdate(float afTimeStep)
               mfHingeLightnessFactor);
         }
 
-        mpPushBody->SetLinearVelocity(cMath::Vector3Cross(vAngVel, vToBody));
+        // Keep the body's requested translation on the circular hinge path;
+        // feeding the pin-parallel offset into this term could visibly pull
+        // a door away from its axis under a strong VR motion.
+        cVector3f vBodyRadial = mpPushBody->GetWorldPosition() - vPivot;
+        vBodyRadial -= vPinDir * cMath::Vector3Dot(vBodyRadial, vPinDir);
+        mpPushBody->SetLinearVelocity(cMath::Vector3Cross(vAngVel, vBodyRadial));
         mpPushBody->SetAngularVelocity(vAngVel);
       }
     }
@@ -833,7 +889,8 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
+  const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+  mpInit->mpPlayerHands->SetSlotVisible((int)interactHand, false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -862,7 +919,7 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	    GetApplicationTime(),
 	    mpPushBody ? mpPushBody->GetName().c_str() : "NULL",
 	    mpPushBody ? mpPushBody->GetJointNum() : 0);
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, mpPushBody);
+	mpPlayer->SetVRHeldBody(interactHand, mpPushBody);
 	mpPushBody->SetAutoDisable(false);
 
 	// Lift the map-defined velocity caps while dragging so the pull force or
@@ -873,11 +930,15 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPushBody->SetMaxAngularSpeed(mpPushBody->GetJointNum() > 0 ? 8.0f : 15.0f);
 
 //The pick point relative to the body
-  auto handMat = VRHelper::TrackingToWorldSpace(
-      mpPlayer->GetVRInteractHand() == eVRHandIndex_Left
-          ? mpInit->mpGame->vr_left_hand.GetMatrix()
-          : mpInit->mpGame->vr_right_hand.GetMatrix(),
+  cMatrixf handMat;
+  if (!mpInit->mpPlayerHands->GetHandPalmPose((int)interactHand, handMat))
+  {
+    handMat = VRHelper::TrackingToWorldSpace(
+      interactHand == eVRHandIndex_Left
+        ? mpInit->mpGame->vr_left_hand.GetMatrix()
+        : mpInit->mpGame->vr_right_hand.GetMatrix(),
       mpInit->mpGame);
+  }
   mvPickPoint = handMat.GetTranslation();
 
 	/////////////////////////////////////////
@@ -931,14 +992,18 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
 
   if (mpPushBody->GetJointNum() > 0)
   {
-    iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+    mpMoveJoint = GetVRBodyMoveJoint(mpPushBody);
+    iPhysicsJoint *pJoint = mpMoveJoint;
+	if(pEntity->GetPauseControllers() && pJoint != NULL)
+		pJoint->SetAllControllersPaused(true);
     cVector3f vPin = pJoint ? pJoint->GetPinDir() : cVector3f(0,0,0);
     cVector3f vPiv = pJoint ? pJoint->GetPivotPoint() : cVector3f(0,0,0);
     cVector3f vBody = mpPushBody->GetWorldPosition();
-    Log(" [VR hinge +%lu ms] body '%s' joints=%d pin=(%.3f %.3f %.3f) pivot=(%.3f %.3f %.3f) body=(%.3f %.3f %.3f) dist=%.3f\n",
+    Log(" [VR hinge +%lu ms] body '%s' joints=%d selected='%s' pin=(%.3f %.3f %.3f) pivot=(%.3f %.3f %.3f) body=(%.3f %.3f %.3f) dist=%.3f\n",
         GetApplicationTime(),
         mpPushBody->GetName().c_str(),
         mpPushBody->GetJointNum(),
+        pJoint ? pJoint->GetName().c_str() : "none",
         vPin.x, vPin.y, vPin.z,
         vPiv.x, vPiv.y, vPiv.z,
         vBody.x, vBody.y, vBody.z,
@@ -955,12 +1020,17 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
       // Just pause the controllers (spring) so the player can move freely within limits
       // Lightness factor: heavier bodies get more assistance
       float fMass = mpPushBody->GetMass();
-      if (fMass > 10.0f)
-        mfHingeLightnessFactor = 2.0f;
-      else if (fMass > 5.0f)
-        mfHingeLightnessFactor = 1.5f;
+      const tString sBodyName = cString::ToLowerCase(mpPushBody->GetName());
+      if (sBodyName.find("hatch_hatchshape") != tString::npos)
+        mfHingeLightnessFactor = 3.0f;
+      else if (sBodyName.find("hatch_wheelshape") != tString::npos)
+        mfHingeLightnessFactor = 3.25f;
+      else if (fMass > 10.0f)
+        mfHingeLightnessFactor = 2.25f;
+      else if (fMass >= 5.0f)
+        mfHingeLightnessFactor = 1.75f;
       else
-        mfHingeLightnessFactor = 1.2f;
+        mfHingeLightnessFactor = 1.35f;
       // Increase max angular speed cap for lightness factor
       mpPushBody->SetMaxAngularSpeed(8.0f * mfHingeLightnessFactor);
     }
@@ -969,6 +1039,10 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
       mbHingeLimitsStored = false;
       mfHingeLightnessFactor = 1.0f;
     }
+  }
+  else
+  {
+    mpMoveJoint = NULL;
   }
 
   mbHasSlideAxis = false;
@@ -1009,14 +1083,16 @@ cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
     }
   }
 
-	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
+	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup,
+		interactHand == eVRHandIndex_Left ? eVRHapticHand_Left : eVRHapticHand_Right);
 }
 
 //-----------------------------------------------------------------------
 
 void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 {
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
+	const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+	mpPlayer->SetVRHeldBody(interactHand, NULL);
 
 	//Remove callback to body if needed
 	/*if(mpPushBody->GetCollideCharacter())
@@ -1024,7 +1100,7 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	mpPushBody->RemoveBodyCallback(mpCallback);
 	}*/
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
+  mpInit->mpPlayerHands->SetSlotVisible((int)interactHand, true);
 
 	// Restore the map-defined velocity caps
 	mpPushBody->SetMaxLinearSpeed(mfDefaultMaxLinSpeed);
@@ -1039,12 +1115,15 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 		{
 			mpPushBody->GetJoint(i)->SetAllControllersPaused(false);
 		}
+		if(mpMoveJoint != NULL)
+			mpMoveJoint->SetAllControllersPaused(false);
 	}
 
-	// Restore hinge joint angle limits
-	if (mbHingeLimitsStored && mpPushBody->GetJointNum() > 0)
+	// Restore the limits on the same joint selected on entry. Multi-jointed
+	// objects such as the outside hatch must not restore the wheel by mistake.
+	if (mbHingeLimitsStored && mpMoveJoint != NULL)
 	{
-	  iPhysicsJoint *pJoint = mpPushBody->GetJoint(0);
+	  iPhysicsJoint *pJoint = mpMoveJoint;
 	  if (pJoint && pJoint->GetType() == ePhysicsJointType_Hinge)
 	  {
 	    iPhysicsJointHinge *pHinge = static_cast<iPhysicsJointHinge*>(pJoint);
@@ -1053,6 +1132,7 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	  }
 	  mbHingeLimitsStored = false;
 	}
+	mpMoveJoint = NULL;
 
 	////////////////////////////
 	//Pause gravity
@@ -1076,7 +1156,8 @@ void cPlayerState_Move_VR::LeaveState(iPlayerState* apNextState)
 	if(mPrevState == ePlayerState_Normal)
 		mpPlayer->ResetCrossHairPos();
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop,
+    interactHand == eVRHandIndex_Left ? eVRHapticHand_Left : eVRHapticHand_Right);
 }
 
 //-----------------------------------------------------------------------
@@ -1117,7 +1198,16 @@ cPlayerState_Push_VR::cPlayerState_Push_VR(cInit *apInit,cPlayer *apPlayer) : iP
 void cPlayerState_Push_VR::OnUpdate(float afTimeStep)
 {	
 
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
+  const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+  cMatrixf handMat;
+  if (!mpInit->mpPlayerHands->GetHandPalmPose((int)interactHand, handMat))
+  {
+    handMat = VRHelper::TrackingToWorldSpace(
+      interactHand == eVRHandIndex_Left
+        ? mpInit->mpGame->vr_left_hand.GetMatrix()
+        : mpInit->mpGame->vr_right_hand.GetMatrix(),
+      mpInit->mpGame);
+  }
 
   auto destDiff = handMat.GetTranslation() - (mpPushBody->GetLocalPosition() + mvRelPickPoint);
   auto moveDirection = cMath::Vector3Normalize(destDiff);
@@ -1293,7 +1383,8 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 		}
 	}
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), false);
+  const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+  mpInit->mpPlayerHands->SetSlotVisible((int)interactHand, false);
 
 	cCamera3D *pCamera = mpPlayer->GetCamera();
 
@@ -1318,7 +1409,7 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 
 	//Get the body to push
 	mpPushBody = mpPlayer->GetPushBody();
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, mpPushBody);
+	mpPlayer->SetVRHeldBody(interactHand, mpPushBody);
 
 	//All pushed bodies shall be affected by player gravity.
 	mbHasPlayerGravityPush = mpPushBody->GetPushedByCharacterGravity();
@@ -1352,23 +1443,33 @@ void cPlayerState_Push_VR::EnterState(iPlayerState* apPrevState)
 	mlForward = 0;
 	mlSideways = 0;
 
-  auto handMat = VRHelper::TrackingToWorldSpace(VRHelper::DominantHand(mpInit->mpGame).GetMatrix(), mpInit->mpGame);
+  cMatrixf handMat;
+  if (!mpInit->mpPlayerHands->GetHandPalmPose((int)interactHand, handMat))
+  {
+    handMat = VRHelper::TrackingToWorldSpace(
+      interactHand == eVRHandIndex_Left
+        ? mpInit->mpGame->vr_left_hand.GetMatrix()
+        : mpInit->mpGame->vr_right_hand.GetMatrix(),
+      mpInit->mpGame);
+  }
 
   //The pick point relative to the body
   mvRelPickPoint = handMat.GetTranslation() - mpPushBody->GetLocalPosition();
 
   // mpPushBody->SetCollidePlayer(false);
 
-  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
+  cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup,
+    interactHand == eVRHandIndex_Left ? eVRHapticHand_Left : eVRHapticHand_Right);
 }
 
 //-----------------------------------------------------------------------
 
 void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 {
-	mpPlayer->SetVRHeldBody(eVRHandIndex_Right, NULL);
+	const eVRHandIndex interactHand = mpPlayer->GetVRInteractHand();
+	mpPlayer->SetVRHeldBody(interactHand, NULL);
 
-  mpInit->mpPlayerHands->SetSlotVisible(VRHelper::DominantHandSlot(mpInit->mpGame), true);
+  mpInit->mpPlayerHands->SetSlotVisible((int)interactHand, true);
 
 	mpPushBody->SetPushedByCharacterGravity(mbHasPlayerGravityPush);
 
@@ -1384,7 +1485,8 @@ void cPlayerState_Push_VR::LeaveState(iPlayerState* apNextState)
 	mpPushBody->SetAutoDisable(true);
 	//mpPushBody->AddForce(cVector3f(0,-1,0) *60.0f *mpPushBody->GetMass());
 
-	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop, VRHelper::DominantHapticHand(mpInit->mpGame));
+	cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectDrop,
+		interactHand == eVRHandIndex_Left ? eVRHapticHand_Left : eVRHapticHand_Right);
 }
 
 

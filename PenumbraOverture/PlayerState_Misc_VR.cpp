@@ -30,6 +30,42 @@
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
 
+namespace
+{
+  iPhysicsJoint *GetVRNudgeJoint(iPhysicsBody *apBody)
+  {
+    if (apBody == NULL) return NULL;
+
+    iPhysicsJoint *pFallback = NULL;
+    for (int i = 0; i < apBody->GetJointNum(); ++i)
+    {
+      iPhysicsJoint *pJoint = apBody->GetJoint(i);
+      if (pJoint == NULL) continue;
+      if (pFallback == NULL) pFallback = pJoint;
+      if (pJoint->GetChildBody() == apBody) return pJoint;
+    }
+
+    // Follow detachable/inserted handles to the joint that drives their
+    // child mechanism (for example ht_steelrodShape -> ht_joint1).
+    for (int i = 0; i < apBody->GetJointNum(); ++i)
+    {
+      iPhysicsJoint *pLinkJoint = apBody->GetJoint(i);
+      if (pLinkJoint == NULL || pLinkJoint->GetParentBody() != apBody) continue;
+
+      iPhysicsBody *pChildBody = pLinkJoint->GetChildBody();
+      if (pChildBody == NULL) continue;
+      for (int j = 0; j < pChildBody->GetJointNum(); ++j)
+      {
+        iPhysicsJoint *pDriveJoint = pChildBody->GetJoint(j);
+        if (pDriveJoint != NULL && pDriveJoint != pLinkJoint &&
+            pDriveJoint->GetChildBody() == pChildBody)
+          return pDriveJoint;
+      }
+    }
+    return pFallback;
+  }
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // NORMAL STATE
@@ -68,6 +104,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
   struct touchedObject {
     iPhysicsBody* physicsBody;
     float planeDistance;
+    float touchDistance;
     eCrossHairState crosshair;
     cCollideData collideData;
   };
@@ -98,8 +135,10 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
       if (pHandModel &&
           (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand")) {
 
-        auto hand = pHandModel;
-        if (!hand->UpdatePoseMatrix(poseMatrix, 0.0f))
+        // Use the scale-free physical palm frame. UpdatePoseMatrix contains
+        // the hand mesh's 0.006 render scale, which forced the old collision
+        // query to use artificial 50x20x30 dimensions.
+        if (!mpInit->mpPlayerHands->GetHandPalmPose(i, poseMatrix))
           continue;
 
         cVector3f handCenter = poseMatrix.GetTranslation();
@@ -188,11 +227,15 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
               else
               {
                 float planeDistance = cMath::PlaneToPointDist(cPlanef(mpPlayer->GetCamera()->GetForward(), mpPlayer->GetCamera()->GetPosition()), pBody->GetBV()->GetWorldCenter());
-                
+                const cVector3f vTouchPoint = VRHelper::CollideCenter(
+                  collideData.mvContactPoints, collideData.mlNumOfPoints);
+                const float fTouchDistance = (vTouchPoint - handCenter).Length();
+
                 //Other entity
                 touchedObject target = {
                   pBody,
                   planeDistance,
+                  fTouchDistance,
                   interactState,
                   collideData
                 };
@@ -205,6 +248,25 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           float fPickedDist = 9998.0f;
           cVector3f vPickedPos;
           iPhysicsBody* pPickedBody = NULL;
+
+          // The overlap volume is intentionally forgiving, but it must not
+          // select through a thin wall. A short ray from the resolved palm to
+          // the candidate preserves drawer/key interactions while rejecting
+          // geometry between the hand and the object.
+          auto HandHasLineOfSight = [&](touchedObject *apTarget) -> bool
+          {
+            if (apTarget == NULL || apTarget->physicsBody == NULL) return false;
+            cVector3f vTarget = VRHelper::CollideCenter(
+              apTarget->collideData.mvContactPoints,
+              apTarget->collideData.mlNumOfPoints);
+            // At true palm contact, the physical hand collision has already
+            // established that this is not a through-wall selection.
+            if ((vTarget - handCenter).Length() <= 0.055f) return true;
+            mpPlayer->GetPickRay()->Clear();
+            pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), handCenter,
+              vTarget, true, false, true);
+            return mpPlayer->GetPickRay()->mpPickedBody == apTarget->physicsBody;
+          };
 
           // Pick the best candidate per class: small items (PickUp/Item) win
           // over furniture so a key inside a drawer is not shadowed by the
@@ -220,13 +282,13 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
               touchedBody.crosshair == eCrossHairState_Item;
 
             if (bIsItemClass) {
-              if (touchedBody.planeDistance < fBestItemDist) {
-                fBestItemDist = touchedBody.planeDistance;
+              if (touchedBody.touchDistance < fBestItemDist) {
+                fBestItemDist = touchedBody.touchDistance;
                 bestItemTarget = &touchedBody;
               }
             }
-            else if (touchedBody.planeDistance < fBestOtherDist) {
-              fBestOtherDist = touchedBody.planeDistance;
+            else if (touchedBody.touchDistance < fBestOtherDist) {
+              fBestOtherDist = touchedBody.touchDistance;
               bestOtherTarget = &touchedBody;
             }
           }
@@ -243,9 +305,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             mpPlayer->GetPickRay()->CalculateResults();
 
             bool bHasLOS = mpPlayer->GetPickedBody() == bestItemTarget->physicsBody;
-            float fPalmDist = (bestItemTarget->physicsBody->GetBV()->GetWorldCenter() - handCenter).Length();
-
-            if (bHasLOS || fPalmDist < 0.2f)
+            if (bHasLOS || HandHasLineOfSight(bestItemTarget))
             {
               mpPlayer->GetPickRay()->Clear();
               mpPlayer->GetPickRay()->mpPickedBody = bestItemTarget->physicsBody;
@@ -257,7 +317,8 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             }
           }
 
-          if (!bSelected && !useTraceResults && bestOtherTarget != NULL) {
+          if (!bSelected && !useTraceResults && bestOtherTarget != NULL &&
+              HandHasLineOfSight(bestOtherTarget)) {
             vPickedPos = VRHelper::CollideCenter(bestOtherTarget->collideData.mvContactPoints,
               bestOtherTarget->collideData.mlNumOfPoints);
             fPickedDist = bestOtherTarget->planeDistance;
@@ -304,9 +365,13 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 
           iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(h);
           if (!pHandModel) continue;
-          cMatrixf handPose;
-          if (!pHandModel->UpdatePoseMatrix(handPose, 0.0f)) continue;
-
+          // Nudge follows the real controller, not the collision-constrained
+          // visual hand. This lets the physical hand keep pushing a movable
+          // body while the rendered hand rests against it.
+          cMatrixf handPose = VRHelper::TrackingToWorldSpace(
+            trackedHand.GetMatrix(), mpInit->mpGame);
+          handPose = cMath::MatrixMul(handPose,
+            cMath::MatrixTranslate(pHandModel->mvVrTransOffset));
           cVector3f vHandCenter = handPose.GetTranslation();
 
           // Skip if hand is occupied (holding an object)
@@ -319,7 +384,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 
           cMatrixf nudgeMtx = cMath::MatrixTranslate(vHandCenter);
 
-          // Check which bodies overlap the nudge shape
+          // Check which bodies overlap the compact nudge sphere.
           cPhysicsBodyIterator bodyIt = pPhysicsWorld->GetBodyIterator();
           while (bodyIt.HasNext())
           {
@@ -327,12 +392,13 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             if (pBody->GetUserData() == NULL) continue;
             if (pBody->GetMass() <= 0.0f) continue; // skip statics
 
-            // Inventory items stay excluded, while ordinary physics objects
-            // and hinged doors participate. The latter mirrors the player's
-            // head/body collision, which can already push an open door.
+            // Small inventory pickups must participate too. Otherwise a hand
+            // stopped by a shelf or locker wall can neither enter farther nor
+            // ease a battery out into reach.
             iGameEntity *pNudgeEntity = (iGameEntity*)pBody->GetUserData();
             bool bNudgeable =
               pNudgeEntity->GetType() == eGameEntityType_Object ||
+              pNudgeEntity->GetType() == eGameEntityType_Item ||
               pNudgeEntity->GetType() == eGameEntityType_SwingDoor;
             if (!bNudgeable) continue;
 
@@ -365,24 +431,119 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             if (cMath::Vector3Dot(vWorldVel, vToObj) <= 0.0f)
               continue;
 
-            // Match a fraction of the hand speed instead of adding the same
-            // delta-v every frame. Repeated overlap frames therefore converge
-            // on a modest push speed rather than stacking into a launch.
-            cVector3f vPushDir = cMath::Vector3Normalize(vWorldVel);
+            // Project the motion onto a joint's permitted direction before
+            // calculating the impulse. Otherwise most of a drawer push is
+            // discarded by its slider and most of a door push fights its
+            // hinge, which made nudging them feel much heavier than grabbing.
+            cVector3f vPushVelocity = vWorldVel;
+            bool bConstrainedJoint = false;
+            if (pBody->GetJointNum() > 0)
+            {
+              iPhysicsJoint *pJoint = GetVRNudgeJoint(pBody);
+              if (pJoint != NULL)
+              {
+                cVector3f vPin = cMath::Vector3Normalize(pJoint->GetPinDir());
+                if (pJoint->GetType() == ePhysicsJointType_Slider)
+                {
+                  vPushVelocity = vPin * cMath::Vector3Dot(vWorldVel, vPin);
+                  bConstrainedJoint = true;
+                }
+                else if (pJoint->GetType() == ePhysicsJointType_Hinge)
+                {
+                  cVector3f vRadial = vContact - pJoint->GetPivotPoint();
+                  vRadial -= vPin * cMath::Vector3Dot(vRadial, vPin);
+                  if (vRadial.Length() > 0.02f)
+                  {
+                    cVector3f vTangent = cMath::Vector3Normalize(
+                      cMath::Vector3Cross(vPin, vRadial));
+                    vPushVelocity = vTangent *
+                      cMath::Vector3Dot(vWorldVel, vTangent);
+                    bConstrainedJoint = true;
+                  }
+                }
+              }
+            }
+
+            float fUsableSpeed = vPushVelocity.Length();
+            if (fUsableSpeed < 0.02f) continue;
+            cVector3f vPushDir = vPushVelocity * (1.0f / fUsableSpeed);
             bool bGentleGrabCandidate = false;
+            bool bBreakableObject = false;
             if (pNudgeEntity->GetType() == eGameEntityType_Object)
             {
               cGameObject *pObject = (cGameObject*)pNudgeEntity;
               bGentleGrabCandidate =
                 pObject->GetInteractMode() == eObjectInteractMode_Grab ||
                 pObject->GetInteractMode() == eObjectInteractMode_Move;
+              bBreakableObject = pObject->IsBreakable();
             }
 
-            const float fPushFraction = bGentleGrabCandidate ? 0.18f : 0.45f;
-            const float fMaxPushSpeed = bGentleGrabCandidate ? 0.35f : 0.9f;
-            const float fMaxDeltaV = bGentleGrabCandidate ? 0.12f : 0.35f;
+            bool bLockedDoor = false;
+            if (pNudgeEntity->GetType() == eGameEntityType_SwingDoor)
+              bLockedDoor = static_cast<cGameSwingDoor*>(pNudgeEntity)->IsLocked();
+
+            // Give compact, light props a little more displacement per touch.
+            // Radius as well as mass keeps large lightweight mechanisms from
+            // being treated like batteries, cans or other loose pickups.
+            const bool bSmallLight =
+              pBody->GetMass() <= 3.0f && pBV->GetRadius() <= 0.30f;
+            const bool bLargeHeavy =
+              pBody->GetMass() >= 12.0f || pBV->GetRadius() >= 0.75f;
+
+            float fPushFraction;
+            float fMaxPushSpeed;
+            float fMaxDeltaV;
+            if (bLockedDoor)
+            {
+              // Preserve a little physical play against the padlock without
+              // hammering the locked hinge limit hard enough to pull it off-axis.
+              fPushFraction = 0.30f;
+              fMaxPushSpeed = 0.30f;
+              fMaxDeltaV = 0.10f;
+            }
+            else if (bConstrainedJoint)
+            {
+              fPushFraction = 0.80f;
+              fMaxPushSpeed = 1.35f;
+              fMaxDeltaV = 0.36f;
+            }
+            else if (bBreakableObject)
+            {
+              // Bare-hand contact should roll or slide a destructible prop,
+              // not cross its impact-break threshold. Weapons keep their own
+              // attack path and can still destroy it normally.
+              fPushFraction = 0.20f;
+              fMaxPushSpeed = 0.32f;
+              fMaxDeltaV = 0.08f;
+            }
+            else if (bSmallLight)
+            {
+              fPushFraction = 0.60f;
+              fMaxPushSpeed = 0.90f;
+              fMaxDeltaV = 0.28f;
+            }
+            else if (bLargeHeavy)
+            {
+              // A hand can start a barrel or loaded crate moving, but repeated
+              // overlap frames must not behave like full-strength punches.
+              fPushFraction = 0.22f;
+              fMaxPushSpeed = 0.38f;
+              fMaxDeltaV = 0.10f;
+            }
+            else if (bGentleGrabCandidate)
+            {
+              fPushFraction = 0.34f;
+              fMaxPushSpeed = 0.65f;
+              fMaxDeltaV = 0.22f;
+            }
+            else
+            {
+              fPushFraction = 0.50f;
+              fMaxPushSpeed = 1.00f;
+              fMaxDeltaV = 0.40f;
+            }
             float fDesiredPushSpeed = cMath::Clamp(
-              fSpeed * fPushFraction, 0.0f, fMaxPushSpeed);
+              fUsableSpeed * fPushFraction, 0.0f, fMaxPushSpeed);
             cVector3f vContactVelocity = pBody->GetLinearVelocity() +
               cMath::Vector3Cross(pBody->GetAngularVelocity(),
                 vContact - pBody->GetWorldPosition());
@@ -399,9 +560,13 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             if (lNudgeNowMs >= slNextNudgeLogMs)
             {
               slNextNudgeLogMs = lNudgeNowMs + 1000;
-              Log(" [VR nudge +%lu ms] %s hand pushed '%s' type=%d dv=%.2f.\n",
+              Log(" [VR nudge +%lu ms] %s hand pushed '%s' type=%d joint=%d locked=%d small=%d heavy=%d breakable=%d mass=%.2f radius=%.2f dv=%.2f.\n",
                 lNudgeNowMs, h == eVRHandIndex_Left ? "left" : "right",
-                pBody->GetName().c_str(), (int)pNudgeEntity->GetType(), fDeltaV);
+                pBody->GetName().c_str(), (int)pNudgeEntity->GetType(),
+                bConstrainedJoint ? 1 : 0, bLockedDoor ? 1 : 0,
+                bSmallLight ? 1 : 0, bLargeHeavy ? 1 : 0,
+                bBreakableObject ? 1 : 0,
+                pBody->GetMass(), pBV->GetRadius(), fDeltaV);
             }
 
             // Subtle haptic pulse on the touching hand, scaled to the push
@@ -500,7 +665,10 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
         mpLowGfx->SetDepthTestActive(true);
         continue;
       }
-      cMatrixf handMat = VRHelper::TrackingToWorldSpace(trackedHand.GetMatrix(), mpInit->mpGame);
+      cMatrixf handMat;
+      iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(i);
+      if (pHandModel == NULL || !pHandModel->UpdatePoseMatrix(handMat, 0.0f))
+        handMat = VRHelper::TrackingToWorldSpace(trackedHand.GetMatrix(), mpInit->mpGame);
       iconMat = cMath::MatrixMul(cMath::MatrixTranslate(handMat.GetTranslation()), iconMat);
 
       mpLowGfx->SetMatrix(eMatrix_ModelView, cMath::MatrixMul(pCamera3D->GetViewMatrix(), iconMat));
