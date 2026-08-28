@@ -202,9 +202,14 @@ bool cOAL_EFXManager::Initialize(int alNumSlotsHint, int alNumSends, bool abUseT
 	{
 		LogMsg("",eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Launching Slot updater thread...\n" );
 
-		mlThreadWaitTime = 1000/alSlotUpdateFreq;
+		mlThreadWaitTime = alSlotUpdateFreq > 0 ? 1000/alSlotUpdateFreq : 0;
         
 		mpUpdaterThread = SDL_CreateThread ( SlotUpdaterThread, NULL );
+		if(mpUpdaterThread == NULL)
+		{
+			LogMsg("",eOAL_LogVerbose_Low, eOAL_LogMsg_Error, "Failed to create Slot updater thread; continuing without the legacy updater thread.\n" );
+			mbUsingThread = false;
+		}
 	}
 	
 	LogMsg("",eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "EFX succesfully initialized.\n" );

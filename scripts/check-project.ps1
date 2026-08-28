@@ -400,6 +400,101 @@ if ($playerSource -match [regex]::Escape('mpScene->GetWorld3D()->GetPhysicsWorld
     throw 'VR hand geometry destruction must tolerate an already-null scene world.'
 }
 
+$vrHandCollisionPolicy = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\VRHandCollisionPolicy.h')
+$vrMathTests = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'tests\VRTrackingTest\main.cpp')
+foreach ($requiredHandCollisionSnippet in @(
+    'kCollisionSizeX = 0.190f',
+    'kCollisionSizeY = 0.052f',
+    'kCollisionSizeZ = 0.125f',
+    'kInteractionContactTolerance = 0.008f',
+	'kMaxTrackedHandDistanceFromHead = 2.50f',
+    'CheckVRHandWorldCollision',
+	'IsUsableVRHandPose',
+	'InterpolateVRHandRotation',
+	'aRawPose == mVRHandRawPoses[lHand]',
+	'if(bFirstPose)',
+	'bInitialOverlap',
+	'FindVRHandRecoveryPose',
+	'ShouldUseRecoveryAnchor',
+    'TestVRHandCannotCrossWall',
+    'TestVRHandCannotCrossClosedDoorAtSpeed',
+	'TestVRHandInitialCeilingOverlapRecoversBySweep',
+	'TestVRHandRecoveryCannotCrossClosedDoor',
+	'TestVRHandHingeRecoveryRequiresPullback'
+)) {
+    if (($vrHandCollisionPolicy + $playerSource + $vrMathTests) -notmatch [regex]::Escape($requiredHandCollisionSnippet)) {
+        throw "The VR hand collision regression guard is missing '$requiredHandCollisionSnippet'."
+    }
+}
+if ($playerSource -match 'fMaxVisualLag|vRawPos\s*\+\s*vVisualLag') {
+    throw 'VR hand collision must never follow the raw controller through a barrier to cap visual lag.'
+}
+if ($playerSource -notmatch [regex]::Escape('pSkipBody = mVRHeldBodies[lHand]') -or
+    $playerSource -match 'pSkipBody\s*=\s*handTarget\.mpBody') {
+    throw 'Interaction assistance may soften contact skin but must not skip its target or a closed door.'
+}
+$handPoseCacheIndex = $playerSource.IndexOf('aRawPose == mVRHandRawPoses[lHand]')
+$handOverlapIndex = $playerSource.IndexOf('kOverlapResolveIterations', $handPoseCacheIndex)
+if ($handPoseCacheIndex -lt 0 -or $handOverlapIndex -le $handPoseCacheIndex) {
+    throw 'Repeated consumers of one tracking sample must reuse the pose before any physics query.'
+}
+$firstPoseIndex = $playerSource.IndexOf('if(bFirstPose)', $handPoseCacheIndex)
+$firstPoseRawIndex = $playerSource.IndexOf('vStartPos = vRawPos', $firstPoseIndex)
+if ($firstPoseIndex -lt 0 -or $firstPoseRawIndex -le $firstPoseIndex) {
+    throw 'A collision-free first tracking sample must initialize at the controller.'
+}
+if ($playerSource -notmatch '(?s)bInitialOverlap\s*=\s*CheckVRHandWorldCollision.*?FindVRHandRecoveryPose' -or
+    $playerSource -notmatch [regex]::Escape('bFirstPose && bInitialOverlap')) {
+    throw 'A first hand pose embedded by loading must recover from a collision-free body-side anchor.'
+}
+
+$oalEffectSlotSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'OALWrapper\sources\OAL_EffectSlot.cpp')
+$oalEffectSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'OALWrapper\sources\OAL_Effect.cpp')
+$oalSourceSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'OALWrapper\sources\OAL_Source.cpp')
+$oalSourceManagerSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'OALWrapper\sources\OAL_SourceManager.cpp')
+$oalDeviceSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'OALWrapper\sources\OAL_Device.cpp')
+$lowLevelSoundSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\sources\impl\LowLevelSoundOpenAL.cpp')
+$gameInitSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\Init.cpp')
+foreach ($requiredAudioShutdownSnippet in @(
+    'mpMutex(SDL_CreateMutex())',
+    'SDL_DestroyMutex(mpMutex)',
+    'mpMutex = NULL',
+    'if(mpStreamListMutex)',
+    'mpStreamListMutex = NULL'
+)) {
+    if (($oalEffectSlotSource + $oalEffectSource + $oalSourceManagerSource) -notmatch [regex]::Escape($requiredAudioShutdownSnippet)) {
+        throw "The OpenAL/SDL shutdown regression guard is missing '$requiredAudioShutdownSnippet'."
+    }
+}
+$streamMutexCreateIndex = $oalSourceManagerSource.IndexOf('mpStreamListMutex = SDL_CreateMutex')
+$streamThreadCreateIndex = $oalSourceManagerSource.IndexOf('mpUpdaterThread = SDL_CreateThread')
+if ($streamMutexCreateIndex -lt 0 -or $streamThreadCreateIndex -le $streamMutexCreateIndex) {
+    throw 'The legacy OpenAL updater must create its mutex before starting the SDL thread.'
+}
+if ($oalEffectSlotSource -match 'if\s*\(mpEFXManager->IsThreadAlive\(\)\)\s*mpMutex\s*=\s*SDL_CreateMutex') {
+    throw 'Effect-slot mutex lifetime must not depend on the updater thread state.'
+}
+if ($oalSourceSource -match 'if\s*\(\s*mpSourceManager->IsThreadAlive\(\)\s*\)\s*SDL_(Lock|Unlock)Mutex') {
+    throw 'A source must unlock an acquired SDL mutex even after its updater stop flag changes.'
+}
+if ($oalSourceManagerSource -match 'if\s*\(\s*mbUseThreading\s*\)\s*SDL_(Lock|Unlock)Mutex') {
+    throw 'The stream list must unlock its SDL mutex independently of the updater stop flag.'
+}
+if ($gameInitSource -notmatch 'mbUseSoundThreading\s*=\s*false') {
+    throw 'The unsupported legacy OpenAL updater thread must remain disabled in the game configuration.'
+}
+if ($oalSourceSource -notmatch [regex]::Escape('GetEFXManager()->DestroyFilter(mpFilter)') -or
+    $oalSourceSource -match '(?m)^\s*delete\s+mpFilter\s*;') {
+    throw 'Source-owned EFX filters must be removed through EFXManager to prevent a shutdown double free.'
+}
+if ($oalDeviceSource -notmatch '(?s)mpEFXManager\(NULL\).*?mbEFXActive\(false\)' -or
+    $oalDeviceSource -notmatch '(?s)if\s*\(!mbEFXActive\).*?delete mpEFXManager;.*?mpEFXManager = NULL;') {
+    throw 'Failed EFX initialization must leave an explicitly inactive, null manager.'
+}
+if ($lowLevelSoundSource -notmatch 'mbNullEffectAttached\s*=\s*false;\s*mpEffect\s*=\s*NULL;') {
+    throw 'The low-level environmental effect handle must start null.'
+}
+
 $moveStateStart = $vrHeldObjectSource.IndexOf('void cPlayerState_Move_VR::EnterState')
 $moveStateEnd = $vrHeldObjectSource.IndexOf('void cPlayerState_Move_VR::OnPostSceneDraw')
 if ($moveStateStart -lt 0 -or $moveStateEnd -le $moveStateStart) {
@@ -539,6 +634,23 @@ foreach ($defaultBinding in $actionManifest.default_bindings) {
             }
         }
     }
+}
+
+# Release metadata is deliberately stored in the game log identifier, README,
+# and release history. Keep those public surfaces synchronized so a packaged
+# executable can always be matched to the documentation users downloaded.
+$initText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\Init.h')
+$readmeText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'readme.md')
+$releaseHistoryText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'docs\RELEASES.md')
+if ($initText -notmatch '#define\s+PENUMBRA_VR_VERSION\s+"([^"]+)"') {
+    throw 'PENUMBRA_VR_VERSION is missing from PenumbraOverture\Init.h.'
+}
+$releaseVersion = $Matches[1]
+if ($readmeText -notmatch [regex]::Escape("current release: **$releaseVersion**")) {
+    throw "README current release does not match $releaseVersion."
+}
+if ($releaseHistoryText -notmatch [regex]::Escape("## $releaseVersion ")) {
+    throw "Release history has no section for $releaseVersion."
 }
 
 Write-Host 'Project validation passed.' -ForegroundColor Green

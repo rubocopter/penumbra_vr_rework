@@ -45,6 +45,7 @@ namespace hpl {
 		mbInitialized = false;
 		mbEnvAudioEnabled = false;
 		mbNullEffectAttached = false;
+		mpEffect = NULL;
 	}
 
 	//-----------------------------------------------------------------------

@@ -12,21 +12,23 @@
 
 
 cOAL_EffectSlot::cOAL_EffectSlot( cOAL_EFXManager* apEFXManager, int alId) : iOAL_LowLevelObject("EffectSlot"),
-																			  mlId(alId),
-																			  mpEffect(NULL),
-																			  mfGain(1.0f),
-																			  mbAutoAdjust (true),
-																			  mpEFXManager(apEFXManager)
+															  mlId(alId),
+															  mpEffect(NULL),
+															  mfGain(1.0f),
+															  mbAutoAdjust (true),
+															  mpEFXManager(apEFXManager),
+															  mpMutex(SDL_CreateMutex())
 {
-	if (mpEFXManager->IsThreadAlive())
-		mpMutex = SDL_CreateMutex();
 	mbStatus = CreateLowLevelID();
 }
 
 cOAL_EffectSlot::~cOAL_EffectSlot()
 {
 	if(mpMutex)
+	{
 		SDL_DestroyMutex(mpMutex);
+		mpMutex = NULL;
+	}
 
 	DestroyLowLevelID();
 }
@@ -119,12 +121,12 @@ void cOAL_EffectSlot::Update()
 
 void cOAL_EffectSlot::Lock()
 {
-	if ( mpEFXManager->IsThreadAlive() )
+	if(mpMutex)
 		SDL_LockMutex(mpMutex);
 }
 
 void cOAL_EffectSlot::Unlock()
 {
-	if ( mpEFXManager->IsThreadAlive() )
+	if(mpMutex)
 		SDL_UnlockMutex(mpMutex);
 }

@@ -43,6 +43,304 @@
 #include "GlobalInit.h"
 
 #include "VRHelper.hpp"
+#include "VRHandCollisionPolicy.h"
+
+namespace
+{
+	bool IsFiniteVRHandValue(float afValue)
+	{
+		return afValue == afValue && fabsf(afValue) < 1000000.0f;
+	}
+
+	bool IsFiniteVRHandVector(const cVector3f& avValue)
+	{
+		return IsFiniteVRHandValue(avValue.x) &&
+			IsFiniteVRHandValue(avValue.y) &&
+			IsFiniteVRHandValue(avValue.z);
+	}
+
+	bool IsUsableVRHandPose(const cMatrixf& aPose, cCamera3D *apCamera)
+	{
+		for(int i = 0; i < 16; ++i)
+		{
+			if(!IsFiniteVRHandValue(aPose.v[i])) return false;
+		}
+
+		// TrackingToWorldSpace returns a rigid homogeneous transform. Reject a
+		// malformed OpenVR sample before it reaches a mesh, attached light or
+		// physics query; one bad matrix must not contaminate later hand poses.
+		if(fabsf(aPose.m[3][0]) > 0.001f ||
+			fabsf(aPose.m[3][1]) > 0.001f ||
+			fabsf(aPose.m[3][2]) > 0.001f ||
+			fabsf(aPose.m[3][3] - 1.0f) > 0.001f)
+		{
+			return false;
+		}
+
+		cVector3f vAxes[3];
+		for(int axis = 0; axis < 3; ++axis)
+		{
+			vAxes[axis] = cVector3f(aPose.m[0][axis], aPose.m[1][axis],
+				aPose.m[2][axis]);
+			const float fAxisLength = vAxes[axis].Length();
+			if(fAxisLength < 0.8f || fAxisLength > 1.2f) return false;
+		}
+		if(fabsf(cMath::Vector3Dot(vAxes[0], vAxes[1])) > 0.15f ||
+			fabsf(cMath::Vector3Dot(vAxes[0], vAxes[2])) > 0.15f ||
+			fabsf(cMath::Vector3Dot(vAxes[1], vAxes[2])) > 0.15f)
+		{
+			return false;
+		}
+		const float fHandedness = cMath::Vector3Dot(
+			cMath::Vector3Cross(vAxes[0], vAxes[1]), vAxes[2]);
+		if(fHandedness < 0.5f || fHandedness > 1.5f) return false;
+
+		if(apCamera != NULL)
+		{
+			cVector3f vFromHead =
+				aPose.GetTranslation() - apCamera->GetPosition();
+			if(!IsFiniteVRHandVector(vFromHead) ||
+				vFromHead.Length() >
+					VRHandCollisionPolicy::kMaxTrackedHandDistanceFromHead)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool NormalizeVRHandQuaternion(cQuaternion& aqRotation)
+	{
+		const float fLengthSq = aqRotation.w * aqRotation.w +
+			aqRotation.v.x * aqRotation.v.x +
+			aqRotation.v.y * aqRotation.v.y +
+			aqRotation.v.z * aqRotation.v.z;
+		if(!IsFiniteVRHandValue(fLengthSq) || fLengthSq < 0.000001f)
+			return false;
+
+		const float fInvLength = 1.0f / sqrtf(fLengthSq);
+		aqRotation.w *= fInvLength;
+		aqRotation.v = aqRotation.v * fInvLength;
+		return true;
+	}
+
+	class cVRHandWorldCollisionCallback : public iPhysicsWorldCollisionCallback
+	{
+	public:
+		cVRHandWorldCollisionCallback(const cVector3f& avMotion,
+			float afTolerance)
+			: mfTolerance(afTolerance), mfMaxDepth(0.0f),
+			  mfBestDepth(0.0f), mfBestScore(-9999.0f),
+			  mvBestNormal(0, 0, 0), mbHasContact(false),
+			  mbHasBlockingNormal(false)
+		{
+			cVector3f vMotion = avMotion;
+			const float fMotionLength = vMotion.Length();
+			if(fMotionLength > 0.00001f)
+				mvMotionDirection = vMotion / fMotionLength;
+			else
+				mvMotionDirection = cVector3f(0, 0, 0);
+		}
+
+		void OnCollision(iPhysicsBody *apBody, cCollideData *apCollideData)
+		{
+			if(apBody == NULL || apCollideData == NULL) return;
+
+			for(int i = 0; i < apCollideData->mlNumOfPoints; ++i)
+			{
+				cCollidePoint& point = apCollideData->mvContactPoints[i];
+				if(point.mfDepth < 0.0f || point.mfDepth != point.mfDepth)
+					continue;
+
+				mbHasContact = true;
+				if(point.mfDepth > mfMaxDepth) mfMaxDepth = point.mfDepth;
+				if(point.mfDepth <= mfTolerance) continue;
+
+				const float fNormalLength = point.mvNormal.Length();
+				if(fNormalLength <= 0.00001f || fNormalLength != fNormalLength)
+					continue;
+				const cVector3f vNormal = point.mvNormal / fNormalLength;
+				const bool bHasMotion = mvMotionDirection.SqrLength() > 0.0f;
+				const float fScore = bHasMotion
+					? -cMath::Vector3Dot(mvMotionDirection, vNormal)
+					: point.mfDepth;
+				if(!mbHasBlockingNormal || fScore > mfBestScore + 0.0001f ||
+					(fabsf(fScore - mfBestScore) <= 0.0001f &&
+					 point.mfDepth > mfBestDepth))
+				{
+					mfBestScore = fScore;
+					mfBestDepth = point.mfDepth;
+					mvBestNormal = vNormal;
+					mbHasBlockingNormal = true;
+				}
+			}
+		}
+
+		float mfTolerance;
+		float mfMaxDepth;
+		float mfBestDepth;
+		float mfBestScore;
+		cVector3f mvMotionDirection;
+		cVector3f mvBestNormal;
+		bool mbHasContact;
+		bool mbHasBlockingNormal;
+	};
+
+	bool CheckVRHandWorldCollision(iPhysicsWorld *apPhysicsWorld,
+		iCollideShape *apShape, const cMatrixf& aPose,
+		iPhysicsBody *apSkipBody, const cVector3f& avMotion,
+		float afTolerance, cVector3f& avNormal, float& afDepth)
+	{
+		avNormal = cVector3f(0, 0, 0);
+		afDepth = 0.0f;
+		cVRHandWorldCollisionCallback callback(avMotion, afTolerance);
+		cVector3f vCorrectedPos;
+		const bool bCollide = apPhysicsWorld->CheckShapeWorldCollision(
+			&vCorrectedPos, apShape, aPose, apSkipBody, false, false,
+			&callback, false, false, false, false);
+		if(!bCollide) return false;
+
+		if(callback.mbHasContact)
+		{
+			if(callback.mfMaxDepth <= afTolerance) return false;
+			if(callback.mbHasBlockingNormal)
+			{
+				avNormal = callback.mvBestNormal;
+				afDepth = callback.mfBestDepth;
+				return true;
+			}
+		}
+
+		// Defensive fallback for a backend that reports an overlap without
+		// contact data. It remains blocking unless its correction fits in skin.
+		cVector3f vCorrection =
+			vCorrectedPos - aPose.GetTranslation();
+		const float fCorrectionLength = vCorrection.Length();
+		if(fCorrectionLength == fCorrectionLength &&
+			fCorrectionLength <= afTolerance)
+			return false;
+		if(fCorrectionLength > 0.00001f &&
+			fCorrectionLength == fCorrectionLength)
+		{
+			avNormal = vCorrection / fCorrectionLength;
+			afDepth = fCorrectionLength;
+		}
+		return true;
+	}
+
+	cVector3f VRHandNominalRecoveryAnchor(cCamera3D *apCamera,
+		eVRHandIndex aHand)
+	{
+		if(apCamera == NULL) return cVector3f(0, 0, 0);
+		const float fSide = aHand == eVRHandIndex_Left
+			? -VRHandCollisionPolicy::kRecoveryAnchorSide
+			: VRHandCollisionPolicy::kRecoveryAnchorSide;
+		return apCamera->GetPosition() + apCamera->GetRight() * fSide -
+			apCamera->GetUp() * VRHandCollisionPolicy::kRecoveryAnchorDown +
+			apCamera->GetForward() *
+				VRHandCollisionPolicy::kRecoveryAnchorForward;
+	}
+
+	bool FindVRHandRecoveryPose(iPhysicsWorld *apPhysicsWorld,
+		iCollideShape *apShape, cCamera3D *apCamera, eVRHandIndex aHand,
+		const cMatrixf& aOrientation, iPhysicsBody *apSkipBody,
+		cMatrixf& aRecoveryPose)
+	{
+		if(apPhysicsWorld == NULL || apShape == NULL || apCamera == NULL)
+			return false;
+
+		const float fSide = aHand == eVRHandIndex_Left ? -1.0f : 1.0f;
+		const cVector3f vHead = apCamera->GetPosition();
+		const cVector3f vRight = apCamera->GetRight();
+		const cVector3f vUp = apCamera->GetUp();
+		const cVector3f vForward = apCamera->GetForward();
+		cVector3f vCandidates[4];
+		vCandidates[0] = VRHandNominalRecoveryAnchor(apCamera, aHand);
+		vCandidates[1] = vHead + vRight * (0.10f * fSide) -
+			vUp * 0.32f + vForward * 0.02f;
+		vCandidates[2] = vHead + vRight * (0.20f * fSide) -
+			vUp * 0.20f - vForward * 0.02f;
+		vCandidates[3] = vHead - vUp * 0.30f;
+
+		for(int i = 0; i < 4; ++i)
+		{
+			cMatrixf mtxCandidate = aOrientation;
+			mtxCandidate.SetTranslation(vCandidates[i]);
+			cVector3f vNormal;
+			float fDepth = 0.0f;
+			if(!CheckVRHandWorldCollision(apPhysicsWorld, apShape,
+				mtxCandidate, apSkipBody, cVector3f(0, 0, 0),
+				VRHandCollisionPolicy::kContactTolerance,
+				vNormal, fDepth))
+			{
+				aRecoveryPose = mtxCandidate;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	cMatrixf InterpolateVRHandRotation(const cMatrixf& aStart,
+		const cMatrixf& aGoal, float afT, const cVector3f& avPosition)
+	{
+		cQuaternion qStart;
+		cQuaternion qGoal;
+		qStart.FromRotationMatrix(aStart);
+		qGoal.FromRotationMatrix(aGoal);
+		if(!NormalizeVRHandQuaternion(qStart) ||
+			!NormalizeVRHandQuaternion(qGoal))
+		{
+			cMatrixf mtxFallback = aStart;
+			mtxFallback.SetTranslation(avPosition);
+			return mtxFallback;
+		}
+
+		float fDot = cMath::QuaternionDot(qStart, qGoal);
+		if(fDot < 0.0f)
+		{
+			qGoal = qGoal * -1.0f;
+			fDot = -fDot;
+		}
+		fDot = cMath::Clamp(fDot, 0.0f, 1.0f);
+
+		cQuaternion qRotation;
+		if(fDot > 0.9995f)
+		{
+			qRotation = qStart * (1.0f - afT) + qGoal * afT;
+		}
+		else
+		{
+			const float fAngle = acosf(fDot);
+			const float fSinAngle = sinf(fAngle);
+			const float fStartWeight = sinf((1.0f - afT) * fAngle) /
+				fSinAngle;
+			const float fGoalWeight = sinf(afT * fAngle) / fSinAngle;
+			qRotation = qStart * fStartWeight + qGoal * fGoalWeight;
+		}
+		if(!NormalizeVRHandQuaternion(qRotation)) qRotation = qStart;
+		cMatrixf mtxPose = cMath::MatrixQuaternion(qRotation);
+		mtxPose.SetTranslation(avPosition);
+		return mtxPose;
+	}
+
+	float VRHandRotationDistance(const cMatrixf& aStart,
+		const cMatrixf& aGoal)
+	{
+		cQuaternion qStart;
+		cQuaternion qGoal;
+		qStart.FromRotationMatrix(aStart);
+		qGoal.FromRotationMatrix(aGoal);
+		if(!NormalizeVRHandQuaternion(qStart) ||
+			!NormalizeVRHandQuaternion(qGoal))
+		{
+			return 0.0f;
+		}
+		float fDot = fabsf(cMath::QuaternionDot(qStart, qGoal));
+		fDot = cMath::Clamp(fDot, 0.0f, 1.0f);
+		return 2.0f * acosf(fDot);
+	}
+}
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
@@ -791,6 +1089,7 @@ void cPlayer::ResetVRHandCollision()
 		mVRHandResolvedPoses[i] = cMatrixf::Identity;
 		mVRHandRawPoses[i] = cMatrixf::Identity;
 		mbVRHandResolvedPoseValid[i] = false;
+		mlVRHandConstrainedFrames[i] = 0;
 	}
 }
 
@@ -809,15 +1108,99 @@ bool cPlayer::ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
 	if(pPhysicsWorld == NULL) return false;
 
 	const int lHand = (int)aHand;
+	if(!IsUsableVRHandPose(aRawPose, mpCamera))
+	{
+		// Never send a malformed tracking transform to the hand mesh or an
+		// attached light. Hold the last safe pose through the bad sample.
+		if(mbVRHandResolvedPoseValid[lHand])
+		{
+			aResolvedPose = mVRHandResolvedPoses[lHand];
+		}
+		else
+		{
+			aResolvedPose = cMatrixf::Identity;
+			if(mpCamera != NULL)
+			{
+				const float fSide =
+					aHand == eVRHandIndex_Left ? -0.13f : 0.13f;
+				aResolvedPose.SetTranslation(mpCamera->GetPosition() +
+					mpCamera->GetRight() * fSide -
+					mpCamera->GetUp() * 0.18f +
+					mpCamera->GetForward() * 0.04f);
+			}
+		}
+		return true;
+	}
+
+	// The same OpenVR sample is consumed by the visible hand, equipped model,
+	// interaction query and crosshair. Collision resolution mutates history, so
+	// running it independently for every consumer produced different transforms
+	// inside one frame and multiplied the world collision cost. Make a sample
+	// idempotent: every consumer gets the exact same safe result.
+	if(mbVRHandResolvedPoseValid[lHand] &&
+		aRawPose == mVRHandRawPoses[lHand])
+	{
+		aResolvedPose = mVRHandResolvedPoses[lHand];
+		return true;
+	}
+
 	const cVector3f vRawPos = aRawPose.GetTranslation();
 	cVector3f vStartPos;
+	iPhysicsBody *pSkipBody = mVRHeldBodies[lHand];
 
-	// A tracking reacquisition, teleport or snap turn must not sweep the hand
-	// through the whole map. Re-anchor near the shoulder and resolve the short
-	// arm segment again instead.
-	const bool bReanchor = !mbVRHandResolvedPoseValid[lHand] ||
-		(mVRHandRawPoses[lHand].GetTranslation() - vRawPos).Length() > 0.75f;
-	if(bReanchor && mpCamera != NULL)
+	// The first valid sample after a map load has no physical trajectory: using
+	// the shoulder as its artificial starting point made hands and attached
+	// lights stop on arbitrary geometry between shoulder and controller.
+	const bool bFirstPose = !mbVRHandResolvedPoseValid[lHand];
+	const bool bReanchor = !bFirstPose &&
+		(mVRHandRawPoses[lHand].GetTranslation() - vRawPos).Length() >
+			VRHandCollisionPolicy::kTrackingReanchorDistance;
+
+	bool bInitialOverlap = false;
+	if(bFirstPose)
+	{
+		cVector3f vInitialNormal;
+		float fInitialDepth = 0.0f;
+		bInitialOverlap = CheckVRHandWorldCollision(pPhysicsWorld,
+			mpVRHandCollisionShape, aRawPose, pSkipBody,
+			cVector3f(0, 0, 0),
+			VRHandCollisionPolicy::kContactTolerance,
+			vInitialNormal, fInitialDepth);
+	}
+
+	bool bPullbackRecovery = false;
+	if(!bFirstPose && mpCamera != NULL)
+	{
+		const cVector3f vAnchor =
+			VRHandNominalRecoveryAnchor(mpCamera, aHand);
+		const float fCurrentAnchorDistance = (vRawPos - vAnchor).Length();
+		const float fPreviousAnchorDistance =
+			(mVRHandRawPoses[lHand].GetTranslation() - vAnchor).Length();
+		bPullbackRecovery = VRHandCollisionPolicy::ShouldUseRecoveryAnchor(
+			mlVRHandConstrainedFrames[lHand], fCurrentAnchorDistance,
+			fPreviousAnchorDistance);
+	}
+
+	cMatrixf mtxRecoveryPose;
+	const bool bWantsRecoveryAnchor =
+		(bFirstPose && bInitialOverlap) || bReanchor || bPullbackRecovery;
+	const bool bUsingRecoveryAnchor = bWantsRecoveryAnchor &&
+		FindVRHandRecoveryPose(pPhysicsWorld, mpVRHandCollisionShape,
+			mpCamera, aHand, aRawPose, pSkipBody, mtxRecoveryPose);
+
+	if(bUsingRecoveryAnchor)
+	{
+		vStartPos = mtxRecoveryPose.GetTranslation();
+		Log(" [VR hand collision] %s hand using body-side recovery anchor (%s).\n",
+			aHand == eVRHandIndex_Left ? "left" : "right",
+			bInitialOverlap ? "initial overlap" :
+			(bReanchor ? "tracking reanchor" : "pullback from constraint"));
+	}
+	else if(bFirstPose)
+	{
+		vStartPos = vRawPos;
+	}
+	else if(bReanchor && mpCamera != NULL)
 	{
 		const float fSide = aHand == eVRHandIndex_Left ? -0.13f : 0.13f;
 		vStartPos = mpCamera->GetPosition() + mpCamera->GetRight() * fSide -
@@ -832,44 +1215,89 @@ bool cPlayer::ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
 		vStartPos = vRawPos;
 	}
 
-	iPhysicsBody *pSkipBody = mVRHeldBodies[lHand];
+	cMatrixf mtxSweepPose = (bReanchor || bFirstPose || bUsingRecoveryAnchor)
+		? aRawPose : mVRHandResolvedPoses[lHand];
+	mtxSweepPose.SetTranslation(vStartPos);
+
+	// Interaction assistance is a bounded contact skin, not a collision bypass.
+	// It is enabled only for a nearby physical target in the direction in which
+	// the controller is pressing. Magnetic inventory targets never soften world
+	// collision and the target body is not skipped.
+	bool bInteractionAssist = false;
+	const cVRHandTarget& handTarget = mVRHandTargets[lHand];
+	if(handTarget.mpBody != NULL && !handTarget.mbMagnetic)
+	{
+		cVector3f vToTarget = handTarget.mvPosition - vStartPos;
+		cVector3f vControllerMotion = vRawPos - vStartPos;
+		if(vToTarget.Length() <=
+				VRHandCollisionPolicy::kInteractionTargetDistance &&
+			vControllerMotion.SqrLength() > 0.000001f &&
+			cMath::Vector3Dot(vControllerMotion, vToTarget) > 0.0f)
+		{
+			bInteractionAssist = true;
+		}
+	}
+	const float fContactTolerance =
+		VRHandCollisionPolicy::ContactTolerance(bInteractionAssist);
+
+	// The last pose is normally collision-free. If a dynamic drawer or door
+	// moved into a stationary hand, resolve only the penetration beyond skin.
+	// Iterating one contact normal at a time is stable at corners; the engine's
+	// component-wise aggregate correction can point diagonally and cause snaps.
+	for(int lResolve = 0;
+		lResolve < VRHandCollisionPolicy::kOverlapResolveIterations;
+		++lResolve)
+	{
+		mtxSweepPose.SetTranslation(vStartPos);
+		cVector3f vNormal;
+		float fDepth = 0.0f;
+		if(!CheckVRHandWorldCollision(pPhysicsWorld,
+			mpVRHandCollisionShape, mtxSweepPose, pSkipBody,
+			cVector3f(0, 0, 0), fContactTolerance, vNormal, fDepth))
+		{
+			break;
+		}
+		if(vNormal.SqrLength() < 0.000001f || fDepth != fDepth) break;
+		vStartPos += vNormal *
+			(fDepth - fContactTolerance +
+			 VRHandCollisionPolicy::kDepenetrationSlop);
+	}
 
 	// The engine has no implemented convex cast, so use small discrete steps
-	// plus a binary search at the first overlap. The 2.5 cm step is below half
-	// the palm volume's narrowest extent and prevents tunnelling through thin geometry.
-	const float fSweepStep = 0.025f;
-	const int lMaxSlideIterations = 3;
+	// plus a binary search at the first blocking overlap. Shallow contact skin
+	// is accepted, but the step remains smaller than the palm's blocking span;
+	// a wall or closed door therefore cannot be skipped by a fast controller.
 	cVector3f vCurrent = vStartPos;
 	cVector3f vGoal = vRawPos;
 
-	for(int lSlide = 0; lSlide < lMaxSlideIterations; ++lSlide)
+	for(int lSlide = 0;
+		lSlide < VRHandCollisionPolicy::kSlideIterations; ++lSlide)
 	{
 		cVector3f vDelta = vGoal - vCurrent;
 		const float fDistance = vDelta.Length();
 		if(fDistance < 0.0001f) break;
 
-		int lSteps = (int)(fDistance / fSweepStep) + 1;
-		if(lSteps < 1) lSteps = 1;
-		if(lSteps > 80) lSteps = 80;
+		const int lSteps = VRHandCollisionPolicy::SweepStepCount(fDistance);
 		float fSafeT = 0.0f;
 		float fHitT = 1.0f;
-		cVector3f vHitCorrection(0, 0, 0);
+		cVector3f vHitNormal(0, 0, 0);
 		bool bHit = false;
 
 		for(int lStep = 1; lStep <= lSteps; ++lStep)
 		{
 			const float fT = (float)lStep / (float)lSteps;
-			cMatrixf mtxTest = aRawPose;
+			cMatrixf mtxTest = mtxSweepPose;
 			const cVector3f vTestPos = vCurrent + vDelta * fT;
 			mtxTest.SetTranslation(vTestPos);
-			cVector3f vCorrectedPos;
-			if(pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
-				mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
-				NULL, false, false, false, false))
+			cVector3f vNormal;
+			float fDepth = 0.0f;
+			if(CheckVRHandWorldCollision(pPhysicsWorld,
+				mpVRHandCollisionShape, mtxTest, pSkipBody, vDelta,
+				fContactTolerance, vNormal, fDepth))
 			{
 				bHit = true;
 				fHitT = fT;
-				vHitCorrection = vCorrectedPos - vTestPos;
+				vHitNormal = vNormal;
 				break;
 			}
 			fSafeT = fT;
@@ -883,19 +1311,22 @@ bool cPlayer::ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
 
 		// Refine the stopping point so the rendered hand sits close to the
 		// surface instead of visibly hovering one whole sample away.
-		for(int lRefine = 0; lRefine < 6; ++lRefine)
+		for(int lRefine = 0;
+			lRefine < VRHandCollisionPolicy::kSweepRefineIterations;
+			++lRefine)
 		{
 			const float fMidT = (fSafeT + fHitT) * 0.5f;
-			cMatrixf mtxTest = aRawPose;
+			cMatrixf mtxTest = mtxSweepPose;
 			const cVector3f vTestPos = vCurrent + vDelta * fMidT;
 			mtxTest.SetTranslation(vTestPos);
-			cVector3f vCorrectedPos;
-			if(pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
-				mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
-				NULL, false, false, false, false))
+			cVector3f vNormal;
+			float fDepth = 0.0f;
+			if(CheckVRHandWorldCollision(pPhysicsWorld,
+				mpVRHandCollisionShape, mtxTest, pSkipBody, vDelta,
+				fContactTolerance, vNormal, fDepth))
 			{
 				fHitT = fMidT;
-				vHitCorrection = vCorrectedPos - vTestPos;
+				vHitNormal = vNormal;
 			}
 			else
 			{
@@ -904,54 +1335,105 @@ bool cPlayer::ResolveVRHandPose(eVRHandIndex aHand, const cMatrixf& aRawPose,
 		}
 
 		vCurrent += vDelta * fSafeT;
-		if(vHitCorrection.Length() < 0.0001f) break;
+		if(vHitNormal.SqrLength() < 0.000001f) break;
 
 		// Remove only the component that points into the surface. This lets a
-		// blocked hand slide along walls, tables and door faces naturally.
-		const cVector3f vNormal = cMath::Vector3Normalize(vHitCorrection);
+		// blocked hand slide along walls, tables and door faces naturally. A
+		// single most-opposing contact normal avoids diagonal corner attraction.
 		cVector3f vRemaining = vGoal - vCurrent;
-		const float fIntoSurface = cMath::Vector3Dot(vRemaining, vNormal);
+		const float fIntoSurface =
+			cMath::Vector3Dot(vRemaining, vHitNormal);
 		if(fIntoSurface >= 0.0f) break;
-		vRemaining -= vNormal * fIntoSurface;
+		vRemaining -= vHitNormal * fIntoSurface;
 		if(vRemaining.Length() < 0.0001f) break;
 		vGoal = vCurrent + vRemaining;
 	}
 
-	// Rotation alone can place the hand volume into a nearby surface. Resolve a
-	// few shallow overlaps after the translational sweep without changing the
-	// controller's orientation.
-	for(int lResolve = 0; lResolve < 3; ++lResolve)
+	// Sweep orientation after translation. Applying the controller's new
+	// rotation to every translation sample made a small wrist turn look like a
+	// deep overlap and the old post-pass then expelled the whole hand. Rotation
+	// now stops at its last safe fraction without changing the hand position.
+	cMatrixf mtxRotationStart = mtxSweepPose;
+	mtxRotationStart.SetTranslation(vCurrent);
+	cMatrixf mtxRotationGoal = aRawPose;
+	mtxRotationGoal.SetTranslation(vCurrent);
+	const float fRotationDistance =
+		VRHandRotationDistance(mtxRotationStart, mtxRotationGoal);
+	int lRotationSteps =
+		(int)(fRotationDistance /
+		 VRHandCollisionPolicy::kRotationStepRadians) + 1;
+	if(lRotationSteps < 1) lRotationSteps = 1;
+	float fSafeRotationT = 0.0f;
+	float fHitRotationT = 1.0f;
+	bool bRotationHit = false;
+	for(int lStep = 1; lStep <= lRotationSteps; ++lStep)
 	{
-		cMatrixf mtxTest = aRawPose;
-		mtxTest.SetTranslation(vCurrent);
-		cVector3f vCorrectedPos;
-		if(!pPhysicsWorld->CheckShapeWorldCollision(&vCorrectedPos,
-			mpVRHandCollisionShape, mtxTest, pSkipBody, false, false,
-			NULL, false, false, false, false))
+		const float fT = (float)lStep / (float)lRotationSteps;
+		const cMatrixf mtxTest = InterpolateVRHandRotation(
+			mtxRotationStart, mtxRotationGoal, fT, vCurrent);
+		cVector3f vNormal;
+		float fDepth = 0.0f;
+		if(CheckVRHandWorldCollision(pPhysicsWorld,
+			mpVRHandCollisionShape, mtxTest, pSkipBody,
+			cVector3f(0, 0, 0), fContactTolerance, vNormal, fDepth))
 		{
+			bRotationHit = true;
+			fHitRotationT = fT;
 			break;
 		}
-		vCurrent = vCorrectedPos;
+		fSafeRotationT = fT;
 	}
 
-	//A malformed/deep penetration result must never throw the rendered hand
-	//out of view. Keep collision lag local to the wrist area; beyond this
-	//distance the visual follows the controller again, preferring shallow
-	//penetration over a hand that appears to have stopped rendering.
-	cVector3f vVisualLag = vCurrent - vRawPos;
-	const float fVisualLag = vVisualLag.Length();
-	const float fMaxVisualLag = 0.35f;
-	if(fVisualLag != fVisualLag)
+	if(bRotationHit)
 	{
-		vCurrent = vRawPos;
+		for(int lRefine = 0;
+			lRefine < VRHandCollisionPolicy::kRotationRefineIterations;
+			++lRefine)
+		{
+			const float fMidT =
+				(fSafeRotationT + fHitRotationT) * 0.5f;
+			const cMatrixf mtxTest = InterpolateVRHandRotation(
+				mtxRotationStart, mtxRotationGoal, fMidT, vCurrent);
+			cVector3f vNormal;
+			float fDepth = 0.0f;
+			if(CheckVRHandWorldCollision(pPhysicsWorld,
+				mpVRHandCollisionShape, mtxTest, pSkipBody,
+				cVector3f(0, 0, 0), fContactTolerance,
+				vNormal, fDepth))
+				fHitRotationT = fMidT;
+			else
+				fSafeRotationT = fMidT;
+		}
 	}
-	else if(fVisualLag > fMaxVisualLag)
+	else
 	{
-		vCurrent = vRawPos + vVisualLag * (fMaxVisualLag / fVisualLag);
+		fSafeRotationT = 1.0f;
 	}
 
-	aResolvedPose = aRawPose;
-	aResolvedPose.SetTranslation(vCurrent);
+	// Never recover malformed collision output by following the raw controller:
+	// that was the path which eventually crossed a held wall or closed door.
+	if(vCurrent.x != vCurrent.x || vCurrent.y != vCurrent.y ||
+		vCurrent.z != vCurrent.z)
+	{
+		vCurrent = mbVRHandResolvedPoseValid[lHand]
+			? mVRHandResolvedPoses[lHand].GetTranslation() : vStartPos;
+	}
+
+	aResolvedPose = InterpolateVRHandRotation(mtxRotationStart,
+		mtxRotationGoal, fSafeRotationT, vCurrent);
+	const float fConstraintDistance = (vRawPos - vCurrent).Length();
+	if(bUsingRecoveryAnchor)
+		mlVRHandConstrainedFrames[lHand] = 0;
+	if(fConstraintDistance >
+		VRHandCollisionPolicy::kConstrainedHandDistance)
+	{
+		if(mlVRHandConstrainedFrames[lHand] < 1000000)
+			++mlVRHandConstrainedFrames[lHand];
+	}
+	else
+	{
+		mlVRHandConstrainedFrames[lHand] = 0;
+	}
 	mVRHandResolvedPoses[lHand] = aResolvedPose;
 	mVRHandRawPoses[lHand] = aRawPose;
 	mbVRHandResolvedPoseValid[lHand] = true;
@@ -1315,7 +1797,10 @@ void cPlayer::OnWorldLoad()
 			mtxHandVisualOffset,
 			cMath::MatrixTranslate(cVector3f(0.011f, 0.002f, -0.011f)));
 		mpVRHandCollisionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
-			cVector3f(0.190f, 0.052f, 0.125f), &mtxHandCollisionOffset);
+			cVector3f(VRHandCollisionPolicy::kCollisionSizeX,
+				VRHandCollisionPolicy::kCollisionSizeY,
+				VRHandCollisionPolicy::kCollisionSizeZ),
+			&mtxHandCollisionOffset);
 	}
 	ResetVRHandCollision();
 

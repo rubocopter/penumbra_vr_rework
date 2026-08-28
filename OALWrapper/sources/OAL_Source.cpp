@@ -96,7 +96,13 @@ cOAL_Source::~cOAL_Source()
 	if(mpFilter)
 	{
 		LogMsg("",eOAL_LogVerbose_High, eOAL_LogMsg_Info, "Destroying Filter...\n" );
-		delete mpFilter;
+		// CreateFilter registers this source-owned attenuation filter in the
+		// EFX manager. Deleting it directly leaves a dangling entry there and
+		// the manager deletes the same allocation again during device shutdown.
+		// SourceManager is deliberately destroyed before EFXManager, so remove
+		// the filter through its owner while that owner is still alive.
+		if(gpDevice && gpDevice->GetEFXManager())
+			gpDevice->GetEFXManager()->DestroyFilter(mpFilter);
 		mpFilter = NULL;
 	}
 	
@@ -150,13 +156,13 @@ bool cOAL_Source::IsValidObject()
 
 void cOAL_Source::Lock()
 {
-	if(mpSourceManager->IsThreadAlive())
+	if(mpSourceMutex)
 		SDL_LockMutex(mpSourceMutex);
 }
 
 void cOAL_Source::Unlock()
 {
-	if ( mpSourceManager->IsThreadAlive() )
+	if(mpSourceMutex)
 		SDL_UnlockMutex(mpSourceMutex);
 }
 

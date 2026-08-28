@@ -10,14 +10,20 @@
 
 
 cOAL_Effect::cOAL_Effect() : iOAL_LowLevelObject("Effect"),
-							 mbNeedsUpdate(true), 
-							 mpMutex(NULL)
+								 mbNeedsUpdate(true),
+								 mpMutex(SDL_CreateMutex())
 {
 	mbStatus = CreateLowLevelID();
 }
 
 cOAL_Effect::~cOAL_Effect()
 {
+	if(mpMutex)
+	{
+		SDL_DestroyMutex(mpMutex);
+		mpMutex = NULL;
+	}
+
 	DestroyLowLevelID();
 }
 
@@ -59,10 +65,12 @@ bool cOAL_Effect::IsValidObject()
 
 void cOAL_Effect::Lock()
 {
-	SDL_LockMutex(mpMutex);
+	if(mpMutex)
+		SDL_LockMutex(mpMutex);
 }
 
 void cOAL_Effect::Unlock()
 {
-	SDL_UnlockMutex(mpMutex);
+	if(mpMutex)
+		SDL_UnlockMutex(mpMutex);
 }

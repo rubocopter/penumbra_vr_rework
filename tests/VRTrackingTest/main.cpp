@@ -4,6 +4,7 @@
 #include "game/VRTracking.h"
 #include "input/VRAnalog.hpp"
 #include "math/Math.h"
+#include "../../PenumbraOverture/VRHandCollisionPolicy.h"
 
 #include <cmath>
 #include <cstdio>
@@ -196,6 +197,278 @@ void TestDeadZone()
     ExpectNear(x, 0.0f, 1e-8f, "denormal guard");
 }
 
+float HandSlabPenetration(float handCenter, float handHalfExtent,
+                          float slabMin, float slabMax)
+{
+    const float handMin = handCenter - handHalfExtent;
+    const float handMax = handCenter + handHalfExtent;
+    if (handMax <= slabMin || handMin >= slabMax) return 0.0f;
+    return cMath::Min(handMax - slabMin, slabMax - handMin);
+}
+
+float ResolveHandAgainstSlab(float start, float goal,
+                             float slabMin, float slabMax,
+                             bool interactionAssist)
+{
+    const float halfExtent =
+        VRHandCollisionPolicy::kCollisionSizeY * 0.5f;
+    const float delta = goal - start;
+    const int steps = VRHandCollisionPolicy::SweepStepCount(std::fabs(delta));
+    float safeT = 0.0f;
+    float hitT = 1.0f;
+    bool hit = false;
+
+    for (int step = 1; step <= steps; ++step) {
+        const float t = (float)step / (float)steps;
+        const float depth = HandSlabPenetration(
+            start + delta * t, halfExtent, slabMin, slabMax);
+        if (VRHandCollisionPolicy::IsBlockingPenetration(
+                depth, interactionAssist)) {
+            hit = true;
+            hitT = t;
+            break;
+        }
+        safeT = t;
+    }
+
+    if (!hit) return goal;
+    for (int refine = 0;
+         refine < VRHandCollisionPolicy::kSweepRefineIterations; ++refine) {
+        const float midT = (safeT + hitT) * 0.5f;
+        const float depth = HandSlabPenetration(
+            start + delta * midT, halfExtent, slabMin, slabMax);
+        if (VRHandCollisionPolicy::IsBlockingPenetration(
+                depth, interactionAssist))
+            hitT = midT;
+        else
+            safeT = midT;
+    }
+    return start + delta * safeT;
+}
+
+float RotatedHandHalfExtent(float angleRadians)
+{
+    const float thinHalfExtent =
+        VRHandCollisionPolicy::kCollisionSizeY * 0.5f;
+    const float longHalfExtent =
+        VRHandCollisionPolicy::kCollisionSizeX * 0.5f;
+    return std::fabs(std::cos(angleRadians)) * thinHalfExtent +
+           std::fabs(std::sin(angleRadians)) * longHalfExtent;
+}
+
+float ResolveHandRotationAgainstPlane(float startAngle, float goalAngle,
+                                      float handCenter,
+                                      bool interactionAssist)
+{
+    const float delta = goalAngle - startAngle;
+    const int steps = (int)(std::fabs(delta) /
+        VRHandCollisionPolicy::kRotationStepRadians) + 1;
+    float safeT = 0.0f;
+    float hitT = 1.0f;
+    bool hit = false;
+
+    for (int step = 1; step <= steps; ++step) {
+        const float t = (float)step / (float)steps;
+        const float penetration = cMath::Max(0.0f,
+            handCenter + RotatedHandHalfExtent(startAngle + delta * t));
+        if (VRHandCollisionPolicy::IsBlockingPenetration(
+                penetration, interactionAssist)) {
+            hit = true;
+            hitT = t;
+            break;
+        }
+        safeT = t;
+    }
+
+    if (!hit) return goalAngle;
+    for (int refine = 0;
+         refine < VRHandCollisionPolicy::kRotationRefineIterations; ++refine) {
+        const float midT = (safeT + hitT) * 0.5f;
+        const float penetration = cMath::Max(0.0f,
+            handCenter + RotatedHandHalfExtent(startAngle + delta * midT));
+        if (VRHandCollisionPolicy::IsBlockingPenetration(
+                penetration, interactionAssist))
+            hitT = midT;
+        else
+            safeT = midT;
+    }
+    return startAngle + delta * safeT;
+}
+
+void TestVRHandCollisionPolicyKeepsFullPalm()
+{
+    ExpectNear(VRHandCollisionPolicy::kCollisionSizeX, 0.190f, 1e-6f,
+               "VR hand physical width is not reduced");
+    ExpectNear(VRHandCollisionPolicy::kCollisionSizeY, 0.052f, 1e-6f,
+               "VR hand physical depth is not reduced");
+    ExpectNear(VRHandCollisionPolicy::kCollisionSizeZ, 0.125f, 1e-6f,
+               "VR hand physical height is not reduced");
+    ExpectTrue(VRHandCollisionPolicy::kInteractionContactTolerance <
+                   VRHandCollisionPolicy::kCollisionSizeY * 0.20f,
+               "interaction skin stays below twenty percent of palm depth");
+    ExpectTrue(VRHandCollisionPolicy::kSweepStep <
+                   VRHandCollisionPolicy::kCollisionSizeY -
+                       2.0f * VRHandCollisionPolicy::kInteractionContactTolerance,
+               "sweep step cannot skip the thinnest blocking palm span");
+    ExpectTrue(VRHandCollisionPolicy::kMaxTrackedHandDistanceFromHead >= 2.0f,
+               "tracking sanity radius permits a fully extended arm");
+    ExpectTrue(VRHandCollisionPolicy::SweepStepCount(
+                   VRHandCollisionPolicy::kMaxTrackedHandDistanceFromHead) <= 126,
+               "a plausible tracking sample has bounded sweep work");
+    ExpectTrue(VRHandCollisionPolicy::kConstrainedHandDistance >
+                   VRHandCollisionPolicy::kCollisionSizeY,
+               "stuck recovery does not replace ordinary palm contact");
+}
+
+void TestVRHandCannotCrossWall()
+{
+    const float wallNear = 0.0f;
+    const float wallFar = 0.25f;
+    float resolved = -0.20f;
+
+    // Sustained controller pressure used to trigger the 35 cm visual-lag
+    // fallback and eventually drag the rendered hand through the wall.
+    for (int frame = 0; frame < 240; ++frame) {
+        resolved = ResolveHandAgainstSlab(
+            resolved, 1.25f, wallNear, wallFar, true);
+        ExpectTrue(resolved < wallNear,
+                   "sustained hand pressure remains on near side of wall");
+    }
+}
+
+void TestVRHandCannotCrossClosedDoorAtSpeed()
+{
+    const float doorNear = 0.0f;
+    const float doorFar = 0.040f;
+    const float resolved = ResolveHandAgainstSlab(
+        -0.30f, 1.50f, doorNear, doorFar, true);
+    ExpectTrue(resolved < doorNear,
+               "fast controller sweep remains on near side of closed door");
+    ExpectTrue(resolved +
+                   VRHandCollisionPolicy::kCollisionSizeY * 0.5f <=
+                   doorNear +
+                       VRHandCollisionPolicy::kInteractionContactTolerance +
+                       0.0005f,
+               "closed door penetration is bounded by interaction skin");
+}
+
+void TestVRHandInteractionSkinImprovesSurfaceContact()
+{
+    // At this goal the full-size palm overlaps the drawer front by 6 mm:
+    // ordinary collision rejects it, while interaction-aware contact accepts
+    // it because the target is already valid and the 8 mm skin stays bounded.
+    const float start = -0.20f;
+    const float sixMillimetreContact = -0.020f;
+    const float normal = ResolveHandAgainstSlab(
+        start, sixMillimetreContact, 0.0f, 0.25f, false);
+    const float assisted = ResolveHandAgainstSlab(
+        start, sixMillimetreContact, 0.0f, 0.25f, true);
+
+    ExpectTrue(normal < sixMillimetreContact - 0.002f,
+               "ordinary contact retains the normal collision skin");
+    ExpectNear(assisted, sixMillimetreContact, 1e-5f,
+               "valid interaction target permits bounded soft contact");
+}
+
+void TestVRHandSweepIsFrameRateIndependent()
+{
+    const float start = -0.20f;
+    const float goal = 1.25f;
+    const float oneFrame = ResolveHandAgainstSlab(
+        start, goal, 0.0f, 0.25f, true);
+
+    float manyFrames = start;
+    for (int frame = 1; frame <= 90; ++frame) {
+        const float frameGoal = start + (goal - start) *
+            ((float)frame / 90.0f);
+        manyFrames = ResolveHandAgainstSlab(
+            manyFrames, frameGoal, 0.0f, 0.25f, true);
+    }
+    ExpectNear(manyFrames, oneFrame, 0.001f,
+               "hand sweep result is stable across frame subdivision");
+}
+
+void TestVRHandCollisionIsDirectionSymmetric()
+{
+    const float fromNegative = ResolveHandAgainstSlab(
+        -0.20f, 1.25f, 0.0f, 0.25f, true);
+    const float fromPositive = ResolveHandAgainstSlab(
+        0.20f, -1.25f, -0.25f, 0.0f, true);
+    ExpectTrue(fromNegative < 0.0f && fromPositive > 0.0f,
+               "both approach directions remain on their near side");
+    ExpectNear(fromNegative, -fromPositive, 0.001f,
+               "left/right collision policy is symmetric");
+}
+
+void TestVRHandRotationCannotExpandThroughSurface()
+{
+    const float handCenter = -0.030f;
+    const float resolvedAngle = ResolveHandRotationAgainstPlane(
+        0.0f, cMath::ToRad(90.0f), handCenter, true);
+    const float penetration = cMath::Max(0.0f,
+        handCenter + RotatedHandHalfExtent(resolvedAngle));
+
+    ExpectTrue(resolvedAngle < cMath::ToRad(90.0f),
+               "contact rotation stops before the long palm axis crosses surface");
+    ExpectTrue(penetration <=
+                   VRHandCollisionPolicy::kInteractionContactTolerance + 0.0005f,
+               "rotation penetration remains inside interaction skin");
+}
+
+void TestVRHandInitialCeilingOverlapRecoversBySweep()
+{
+    // The tracked centre begins inside an 8 cm ceiling slab after loading.
+    // Starting from a body-side anchor below it must stop on the room side;
+    // directly depenetrating the raw sample could choose the far side.
+    const float bodySideAnchor = -0.30f;
+    const float rawInsideCeiling = 0.025f;
+    const float resolved = ResolveHandAgainstSlab(
+        bodySideAnchor, rawInsideCeiling, 0.0f, 0.080f, false);
+
+    ExpectTrue(resolved < 0.0f,
+               "initial ceiling overlap recovers on the player side");
+    ExpectTrue(resolved +
+                   VRHandCollisionPolicy::kCollisionSizeY * 0.5f <=
+                   VRHandCollisionPolicy::kContactTolerance + 0.0005f,
+               "initial ceiling recovery keeps full-palm penetration bounded");
+}
+
+void TestVRHandRecoveryCannotCrossClosedDoor()
+{
+    const float bodySideAnchor = -0.30f;
+    const float rawBeyondDoor = 0.20f;
+    const float resolved = ResolveHandAgainstSlab(
+        bodySideAnchor, rawBeyondDoor, 0.0f, 0.040f, true);
+
+    ExpectTrue(resolved < 0.0f,
+               "body-side recovery cannot teleport through a closed door");
+    ExpectTrue(resolved +
+                   VRHandCollisionPolicy::kCollisionSizeY * 0.5f <=
+                   VRHandCollisionPolicy::kInteractionContactTolerance +
+                       0.0005f,
+               "recovery sweep preserves the closed-door contact bound");
+}
+
+void TestVRHandHingeRecoveryRequiresPullback()
+{
+    const int ready = VRHandCollisionPolicy::kConstrainedRecoveryFrames;
+    ExpectTrue(!VRHandCollisionPolicy::ShouldUseRecoveryAnchor(
+                   ready - 1, 0.60f, 0.70f),
+               "hinge recovery waits for sustained constraint");
+    ExpectTrue(!VRHandCollisionPolicy::ShouldUseRecoveryAnchor(
+                   ready, 0.75f, 0.70f),
+               "pushing farther into a hinge does not trigger a snap");
+    ExpectTrue(VRHandCollisionPolicy::ShouldUseRecoveryAnchor(
+                   ready, 0.60f, 0.70f),
+               "pulling a constrained hand toward the body triggers recovery");
+
+    const float withdrawnRaw = -0.10f;
+    const float recovered = ResolveHandAgainstSlab(
+        -0.30f, withdrawnRaw, 0.0f, 0.040f, false);
+    ExpectNear(recovered, withdrawnRaw, 1e-5f,
+               "hinge pullback returns to the controller on the player side");
+}
+
 } // namespace
 
 int main()
@@ -208,6 +481,16 @@ int main()
     TestTransformRoundTrip();
     TestWorldYawWraps();
     TestDeadZone();
+    TestVRHandCollisionPolicyKeepsFullPalm();
+    TestVRHandCannotCrossWall();
+    TestVRHandCannotCrossClosedDoorAtSpeed();
+    TestVRHandInteractionSkinImprovesSurfaceContact();
+    TestVRHandSweepIsFrameRateIndependent();
+    TestVRHandCollisionIsDirectionSymmetric();
+    TestVRHandRotationCannotExpandThroughSurface();
+    TestVRHandInitialCeilingOverlapRecoversBySweep();
+    TestVRHandRecoveryCannotCrossClosedDoor();
+    TestVRHandHingeRecoveryRequiresPullback();
 
     std::printf("%d checks, %d failures\n", gChecks, gFailures);
     return gFailures == 0 ? 0 : 1;

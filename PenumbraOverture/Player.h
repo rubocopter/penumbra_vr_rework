@@ -572,6 +572,7 @@ private:
 	cMatrixf mVRHandResolvedPoses[eVRHandIndex_Count];
 	cMatrixf mVRHandRawPoses[eVRHandIndex_Count];
 	bool mbVRHandResolvedPoseValid[eVRHandIndex_Count];
+	int mlVRHandConstrainedFrames[eVRHandIndex_Count];
 
 	cInventoryItem *mpCurrentItem;
 	cLinearOscillation mItemFlash;

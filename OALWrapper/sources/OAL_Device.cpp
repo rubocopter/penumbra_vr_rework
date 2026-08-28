@@ -54,6 +54,7 @@ cOAL_Device::cOAL_Device ( ) : mpDevice(NULL),
 							   mpContext(NULL),
 							   mpSourceManager(NULL), 
 							   mpEFXManager(NULL),
+							   mbEFXActive(false),
 							   mlEFXSends(0)
 {
 }
@@ -195,6 +196,7 @@ bool cOAL_Device::Init( cOAL_Init_Params& acParams )
 		{
 			mpEFXManager->Destroy();
 			delete mpEFXManager;
+			mpEFXManager = NULL;
 		}
 	}
 

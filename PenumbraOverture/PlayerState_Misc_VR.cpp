@@ -31,6 +31,7 @@
 
 #include "VRHelper.hpp"
 #include "VRHaptics.h"
+#include "VRHandCollisionPolicy.h"
 
 namespace
 {
@@ -394,7 +395,6 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 
     for (int i = 0; i < eVRHandIndex_Count; ++i) {
       const eVRHandIndex handIndex = (eVRHandIndex)i;
-      mpPlayer->ClearVRHandTarget(handIndex);
       bool bMagneticTarget = false;
 
 // The off hand may also target and grab, but only while it carries no
@@ -403,6 +403,7 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
       if (handIndex != dominantIndex &&
           mpInit->mpPlayerHands->GetAttachmentModel(i) != NULL)
       {
+        mpPlayer->ClearVRHandTarget(handIndex);
         mpLastMagneticTargets[i] = NULL;
         continue;
       }
@@ -410,17 +411,25 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
 // The left and right hand rigs are distinct HUD models named "LeftHand"
       // and "Hand"; both are valid pointing hands for target detection.
       iHudModel *pHandModel = mpInit->mpPlayerHands->GetCurrentModel(i);
-      if (pHandModel &&
-          (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand")) {
+      const bool bUsableHand = pHandModel &&
+        (pHandModel->msName == "Hand" || pHandModel->msName == "LeftHand");
+      if (bUsableHand) {
 
         // Use the scale-free physical palm frame. UpdatePoseMatrix contains
         // the hand mesh's 0.006 render scale, which forced the old collision
         // query to use artificial 50x20x30 dimensions.
         if (!mpInit->mpPlayerHands->GetHandPalmPose(i, poseMatrix))
         {
+          mpPlayer->ClearVRHandTarget(handIndex);
           mpLastMagneticTargets[i] = NULL;
           continue;
         }
+
+        // Resolve against the previous frame's target before clearing it. The
+        // resolved controller sample is shared by rendering and attachments,
+        // so interaction-aware skin no longer relies on a second, inconsistent
+        // physics pass later in the same frame.
+        mpPlayer->ClearVRHandTarget(handIndex);
 
         // Target acquisition follows the player's real hand slightly beyond
         // the collision-stopped render hand. This is especially important for
@@ -436,9 +445,9 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
         {
           cVector3f vReach = rawPalmPose.GetTranslation() - handCenter;
           const float fReach = vReach.Length();
-          const float kMaxCollisionReach = 0.18f;
-          if(fReach > kMaxCollisionReach)
-            vReach = vReach * (kMaxCollisionReach / fReach);
+          if(fReach > VRHandCollisionPolicy::kMaxCollisionInteractionReach)
+            vReach = vReach *
+              (VRHandCollisionPolicy::kMaxCollisionInteractionReach / fReach);
           fInteractionReach = vReach.Length();
           interactionPose = rawPalmPose;
           interactionPose.SetTranslation(handCenter + vReach);
@@ -665,6 +674,10 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             handState, bMagneticTarget);
         }
 
+      }
+      else
+      {
+        mpPlayer->ClearVRHandTarget(handIndex);
       }
 
       iPhysicsBody *pCurrentMagneticTarget = bMagneticTarget

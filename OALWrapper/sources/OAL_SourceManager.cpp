@@ -82,14 +82,31 @@ bool cOAL_SourceManager::Initialize ( bool abManageVoices, int alNumSourcesHint,
 	LogMsg("", eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Done creating Sources\n" );
 
 	// Launch updater thread
-    if(mbUseThreading)
+	if(mbUseThreading)
 	{
 		LogMsg("", eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Launching updater thread...\n" );
 		// This converts the desired frequency in aInput to amount of milliseconds to wait.
 		// Note that this is an int value, so any freq above 1000 will turn mlThreadWaitTime to 0;
-		mlThreadWaitTime = 1000/alUpdateFreq;
-		mpUpdaterThread = SDL_CreateThread ( UpdaterThread, NULL );
+		mlThreadWaitTime = alUpdateFreq > 0 ? 1000/alUpdateFreq : 0;
 		mpStreamListMutex = SDL_CreateMutex ();
+		if(mpStreamListMutex)
+			mpUpdaterThread = SDL_CreateThread ( UpdaterThread, NULL );
+
+		if(mpStreamListMutex == NULL || mpUpdaterThread == NULL)
+		{
+			LogMsg("", eOAL_LogVerbose_Low, eOAL_LogMsg_Error, "Failed to initialize updater thread synchronization; continuing without the legacy updater thread.\n" );
+			mbUseThreading = false;
+			if(mpUpdaterThread)
+			{
+				SDL_WaitThread(mpUpdaterThread, 0);
+				mpUpdaterThread = NULL;
+			}
+			if(mpStreamListMutex)
+			{
+				SDL_DestroyMutex(mpStreamListMutex);
+				mpStreamListMutex = NULL;
+			}
+		}
 
 		LogMsg("", eOAL_LogVerbose_Medium, eOAL_LogMsg_Info, "Done\n" );
 	}
@@ -103,13 +120,22 @@ bool cOAL_SourceManager::Initialize ( bool abManageVoices, int alNumSourcesHint,
 void cOAL_SourceManager::Destroy()
 {
 	// If we are using the Updater thread, kill it
-	if(mbUseThreading)							
+	if(mpUpdaterThread)
 	{
 		LogMsg("", eOAL_LogVerbose_Medium, eOAL_LogMsg_Info,"Stopping updater thread...\n" );
 		mbUseThreading = false;
 		SDL_WaitThread ( mpUpdaterThread, 0 );
 		mpUpdaterThread = NULL;
+	}
+	else
+	{
+		mbUseThreading = false;
+	}
+
+	if(mpStreamListMutex)
+	{
 		SDL_DestroyMutex(mpStreamListMutex);
+		mpStreamListMutex = NULL;
 	}
 
 	//Delete sources
@@ -160,7 +186,7 @@ cOAL_Source* cOAL_SourceManager::GetSource(int alSourceHandle, bool abUsingAbsol
 
 void cOAL_SourceManager::LockStreamList()
 {
-	if(mbUseThreading)
+	if(mpStreamListMutex)
 		SDL_LockMutex( mpStreamListMutex );
 }
 
@@ -168,7 +194,7 @@ void cOAL_SourceManager::LockStreamList()
 
 void cOAL_SourceManager::UnlockStreamList()
 {
-	if(mbUseThreading)
+	if(mpStreamListMutex)
 		SDL_UnlockMutex( mpStreamListMutex );
 }
 
