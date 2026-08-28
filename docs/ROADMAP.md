@@ -43,6 +43,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Left-handed mirror — fully mirrored action sets, equipment slots, notebook on off hand
 - Bare off-hand targeting and grabbing on PS VR2 Sense
 - Collision-constrained visible hands — swept approximate hand volume, surface sliding, bounded visual lag, and independent tracking-loss recovery
+- Interaction-aware hand contact — full-size palm collision, separate translation/rotation sweeps, refined surface sliding, bounded target contact skin, and body-side recovery for load/hinge/ceiling overlaps without crossing barriers
 - Adaptive hand nudge for physics props, inventory pickups, hinges, and sliders; stronger for small/light objects and restrained for heavy or breakable props
 - Joint-aware VR mechanisms — actual driven joint selection, circular hinge drag, slider projection, easier hatches/lockers, inserted-lever forwarding, and locked-door axis retention
 - Low-ceiling crouch constraint — full-height collider retry with automatic restoration of the physical/button/hybrid requested stance
@@ -54,5 +55,5 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Environment fingerprinting in `hpl.log` — Windows build, RAM and free process address space, real GPU/driver, audio devices
 - Stale-binding diagnostics for dead sticks with the documented one-time SteamVR reset
 - Generated controller bindings — single declarative spec in `scripts/generate-bindings.ps1` with build-time drift enforcement
-- Unit tests for the pure VR math (tracking space, stick dead zones) executed by every build
+- Unit tests for tracking space, stick dead zones, VR hand-collision policy, high-speed wall/closed-door blocking, contact rotation, and constrained recovery executed by every build
 - CI pipeline building and packaging Release Win32 on every push, PR, and tag

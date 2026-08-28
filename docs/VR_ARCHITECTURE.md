@@ -96,13 +96,33 @@ that pressed interact. Invalid poses have a short grace period and hide only the
 affected hand, preventing one controller dropout from removing both rigs.
 
 The raw controller pose remains the source of intent. Before rendering a bare
-hand, `cPlayer` sweeps an approximate hand box through the static world, resolves
-remaining overlaps, and slides the visible pose along blocking surfaces. A
-bounded controller-to-hand lag prevents an irrecoverable correction from making
-the hand disappear. Interaction queries use a scale-free physical palm transform
-instead of the visual mesh scale, so reaching and contact distances remain in
-metres. This is deliberately a coarse palm/hand volume, not per-finger rigid-body
-physics; thin geometry and individual fingers can still clip.
+hand, `cPlayer` validates the complete rigid transform and resolves one cached
+pose for every consumer of that OpenVR sample. The physical palm is a
+`190 × 52 × 125 mm` box. Translation is sampled every 20 mm, refined at the
+first blocking contact, and allowed to slide only by removing motion into the
+selected surface normal. Rotation is swept separately so a wrist turn cannot
+expand the long palm axis through a surface. Interaction queries use a
+scale-free physical palm transform instead of the visual mesh scale, so reaching
+and contact distances remain in metres. This is deliberately a coarse
+palm/hand volume, not per-finger rigid-body physics; thin geometry and individual
+fingers can still clip.
+
+Normal world contact accepts a 2 mm numerical skin. When the hand is pressing
+toward a nearby non-magnetic physical target, the skin may increase to 8 mm to
+reduce the stand-off at drawer fronts and handles. The target body is still
+tested and the full palm dimensions remain unchanged. A 20 mm sweep step is
+smaller than the palm's thinnest blocking span even with that larger skin, so a
+fast controller cannot skip a thin wall or closed door between samples.
+
+The first valid pose after a load is accepted directly when collision-free;
+there is no artificial shoulder-to-controller trajectory. If it begins inside a
+ceiling or moving mechanism, or if a hand stays more than 10 cm behind its
+controller in a concave contact and the player starts pulling back, `cPlayer`
+searches several collision-free anchors beside and below the head. Recovery then
+uses the same full-palm sweep from the selected anchor to the controller. Pushing
+farther into the obstruction never activates recovery, and an anchor on the
+player side cannot cross an intervening wall or closed door. Large tracking
+discontinuities use the same guarded path.
 
 Unoccupied hands use the raw controller path and a small overlap proxy to nudge
 dynamic props and constrained mechanisms. The response adapts to mass, size,

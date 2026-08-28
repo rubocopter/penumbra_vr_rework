@@ -6,6 +6,43 @@ No changes yet.
 
 ---
 
+## v0.1.0-beta.1 — 28 August 2026
+
+**First public beta: full-size physical hands that slide and recover without opening a path through walls, plus a clean and deterministic audio shutdown.**
+
+### Added
+
+- A centralized VR hand-collision policy for the physical palm dimensions (`190 × 52 × 125 mm`), 20 mm spatial sweep step, contact skins, translation/rotation refinement, overlap resolution, tracking sanity limits, and constrained-hand recovery thresholds. Normal contact uses only a 2 mm numerical skin; a nearby physical interaction target may use up to 8 mm, still far below the palm's 52 mm blocking span
+- Context-aware soft contact for nearby physical targets. It improves approach to drawer fronts, handles, doors, and props without shrinking the physical collider, skipping the target body, weakening magnetic-item occlusion, or changing collision elsewhere
+- A body-side recovery path for a hand that starts overlapped after loading, re-enters after a large tracking discontinuity, or remains constrained in a concave hinge/ceiling contact while the controller is pulled back. Every candidate anchor must be collision-free and the complete palm is swept from that anchor to the controller; recovery cannot teleport through a wall or closed door
+- Regression coverage for full palm dimensions, sustained wall pressure, a high-speed controller crossing a 40 mm closed door, interaction contact skin, frame-rate independence, motion-direction symmetry, rotation against a surface, initial ceiling overlap, closed-door recovery, and hinge recovery that activates only on pullback
+
+### Fixed
+
+- Hands no longer use the controller's final rotation for every translation sample. Translation and rotation are swept independently, so a small wrist turn at contact cannot create a deep artificial overlap or abruptly expel the hand
+- Collision resolution now selects the contact normal most opposed to motion, refines the first blocking sample, and removes only the into-surface component. Hands stop close to barriers and slide along faces instead of being attracted to corners or frames by an aggregate diagonal correction
+- Invalid or implausible tracking matrices are rejected before they reach the hand mesh, equipped item, attached light, or physics world. A bad sample holds the previous safe pose independently for each hand instead of sending geometry or lighting to arbitrary world coordinates
+- All consumers of one OpenVR hand sample share the same resolved pose. Rendering, equipment, interaction, and crosshair updates no longer repeat collision resolution or observe different transforms within one frame
+- Interaction may inspect only a tightly bounded amount of raw controller intent beyond a blocked palm, and only with solid-body line of sight. This keeps small handles reachable while walls and closed doors remain authoritative for both hands and either dominant-hand setting
+- The exit-time `0xC0000374` heap corruption is fixed. Per-source EFX filters are now removed through the EFX manager that registered them, eliminating a double free when the source manager shuts down before the EFX manager
+- EFX effects, slots, sources, and manager threads now initialize mutex/thread state deterministically, tolerate creation failure, stop workers before destroying synchronization, and null destroyed pointers. This also removes the earlier uninitialized-mutex access violation when legacy audio threading is disabled
+
+### Validation
+
+- Release Win32 full rebuild, Large Address Aware verification, project validation, and `289 checks, 0 failures`
+- PS VR2 Sense hardware session covering walls, closed doors, lockers, drawers, physical props, both hands, crouch/recenter, recovery activations, and normal shutdown at an average 88.16 FPS
+- The validated session ended with `HPL Exit was successful`, zero reported memory leaks, no invalid/NaN tracking samples, and no Windows crash event after deployment
+- The release remains Win32 for compatibility with the original engine dependencies and bundles app-local OpenVR, OpenAL Soft, and Visual C++ runtime DLLs. Windows 10/11 users do not need a separate VC++ redistributable or system OpenAL installation
+
+### Known limitations
+
+- The collision proxy represents the palm/hand, not individual fingers. Animated fingers and very thin geometry can still clip visually
+- Complex concave contacts can temporarily constrain a hand; pulling the controller back toward the body triggers bounded recovery. Continuing to push into the obstacle intentionally does not snap or bypass it
+- PS VR2 Sense is still the only controller family validated on hardware. Index, Touch, Pico, WMR, and Vive profiles are included through the shared SteamVR action layer but need broader device testing during beta
+- The original global player state still supports one active grab at a time; simultaneous two-object holding and two-hand constraints remain future work
+
+---
+
 ## v0.1.0-alpha.6.3 — 28 August 2026
 
 **More reliable visible-item acquisition, middle-finger magnetic guidance, low-ceiling recovery, and a cheaper VR interaction hot path.**

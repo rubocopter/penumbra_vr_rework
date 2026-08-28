@@ -61,6 +61,9 @@ Search `hpl.log` for `[VR input]`: it records the detected headset driver, both 
 **A hand disappears, folds incorrectly, or sits far from its controller.**
 Search `hpl.log` for `[hand-rig]`. A short tracking dropout is tolerated, but a persistent invalid pose hides only that hand. Include the relevant lines and say which physical controller was affected. The current asset has a short static thumb chain and a fused ring/middle section; those two visual limitations are expected.
 
+**A hand is constrained near a hinge, ceiling, or tight corner.**
+Pull the physical controller back toward your body instead of pushing farther into the obstacle. After sustained separation, the visible hand chooses a collision-free body-side anchor and sweeps the full palm back toward the controller. Search `hpl.log` for `[VR hand collision]`; `initial overlap`, `tracking reanchor`, and `pullback from constraint` identify why recovery ran. Recovery never disables wall or closed-door collision, so a hand on the far side of a barrier remains blocked on the player's side.
+
 **A flashlight, tool, or carried item sits incorrectly in the hand.**
 Search for `[hand-grip]` and include the item name. Bundled HUD objects define a measured grip point, radius, and twist; the diagnostic reports when an anchor falls outside the reconstructed object geometry. This is separate from gameplay collision and can be corrected per item without changing the hand rig.
 
