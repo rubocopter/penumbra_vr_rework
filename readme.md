@@ -2,7 +2,7 @@
 
 A community-made PCVR rework that brings **Penumbra: Overture** to full room-scale VR with motion-controlled hands, physical interactions, and a complete spatial-audio chain built for horror.
 
-> Experimental public alpha. You must own **Penumbra: Overture** on Steam; the original game is not included.
+> Experimental public alpha — current release: **v0.1.0-alpha.6.3** (28 August 2026). You must own **Penumbra: Overture** on Steam; the original game is not included.
 
 **[Download the latest release](https://github.com/rubocopter/penumbra_vr_rework/releases/latest)** · [Controls and VR settings](docs/INPUT.md)
 
@@ -11,6 +11,8 @@ A community-made PCVR rework that brings **Penumbra: Overture** to full room-sca
 - Full room-scale PCVR — walk, crouch, lean, reach
 - Motion-controlled hands with animated fingers, collision-constrained palms, and geometry-calibrated equipped objects
 - Physical interaction — pick up, throw, nudge, and manipulate objects, doors, drawers, hatches, and mechanisms naturally
+- Assisted magnetic acquisition for visible inventory items that are difficult to reach, with occlusion checks and per-hand feedback
+- Low-ceiling crouch recovery that preserves the requested physical, button, or hybrid stance until standing is possible again
 - **Hear the dark**: binaural HRTF audio, creatures that sound muffled through walls, distant sources that lose their treble, and a mine-gallery reverb that makes corridors breathe
 - Standing or seated play, left- or right-handed controls, and height calibration
 - Snap, smooth, or physical-only turning plus adjustable movement and crouch modes
@@ -40,7 +42,7 @@ Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime s
 
 ## Status
 
-**Experimental public alpha.** The game is playable end-to-end, but expect bugs, crashes, and incorrect behaviour. Hand collision uses an approximate palm volume rather than per-finger physics, and controller coverage remains under active validation; see the [release history](docs/RELEASES.md) for build-specific status.
+**v0.1.0-alpha.6.3 — experimental public alpha.** The game is playable end-to-end, but expect bugs, crashes, and incorrect behaviour. PS VR2 Sense is the only controller family validated on hardware; profiles for Index, Touch, Pico, WMR, and Vive are bundled but still require device-specific testing. Hand collision uses an approximate palm volume rather than per-finger physics, the current hand mesh has limited thumb and ring/middle movement, and the original game state still permits only one active grab. See the [release history](docs/RELEASES.md) for build-specific status.
 
 ## Documentation
 
@@ -57,10 +59,12 @@ This is a community-maintained continuation of [veryjos/penumbra_vr](https://git
 
 ## Development
 
-- `scripts/build.ps1` — validates the project, builds Release Win32, runs the unit tests, and (with `-Package` / `-Deploy`) produces or installs a release layout
+- `scripts/build.ps1` — validates the project, builds Win32, runs the unit tests, and (with `-Package` / `-Deploy`) produces or installs a release layout
 - `scripts/generate-bindings.ps1` — regenerates the SteamVR controller bindings; the build fails if the shipped JSONs drift from this spec
 - `tests/VRTrackingTest` — unit tests for the pure VR math, executed by every build
 - `.github/workflows/build.yml` — CI compiles and packages Win32 on every push, PR, and tag
+
+When working from a source checkout, deploy with `scripts/build.ps1 -Deploy`. The packaged release places `Install-PenumbraVR.bat` in its root; the repository copy lives under `scripts/`.
 
 ## License
 
