@@ -254,8 +254,14 @@ public:
 
 	void SetCurrentModel(int alNum, const tString& asName);
 	iHudModel* GetCurrentModel(int alNum){ return mvCurrentHudModels[alNum];}
-	// Collision-resolved, unscaled palm transform for physics interaction.
-	bool GetHandPalmPose(int alNum, cMatrixf& aPoseMtx);
+	// Unscaled palm transform for physics interaction. Callers doing forgiving
+	// target acquisition may request the raw physical pose while rendered grabs
+	// and held objects continue to use the collision-resolved pose by default.
+	bool GetHandPalmPose(int alNum, cMatrixf& aPoseMtx,
+		bool abResolveCollision = true);
+	// World-space anchor on the posed middle finger used by world interaction
+	// cues. This is independent of the inventory/menu pointer.
+	bool GetHandMiddleFingerPosition(int alNum, cVector3f& avPosition);
 
 	// Extra mesh rendered on the same controller pose as the slot's hand rig,
 	// so an equipped item (flashlight, glowstick, flare) is seen held by a

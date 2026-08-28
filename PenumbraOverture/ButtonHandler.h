@@ -78,6 +78,7 @@ private:
 	bool mbVRCrouchButtonLatched;
 	bool mbVRPhysicalCrouch;
 	bool mbVRCrouchApplied;
+	bool mbVRCeilingCrouch;
 	bool mbVRStandingHeightKnown;
 	float mfVRStandingHeight;
 	bool mbVRSeatedBaselineKnown;

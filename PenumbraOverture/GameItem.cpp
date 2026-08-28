@@ -19,7 +19,6 @@
 #include "StdAfx.h"
 #include "GameItem.h"
 #include "VRHaptics.h"
-#include "VRHelper.hpp"
 
 #include "Init.h"
 #include "Inventory.h"
@@ -240,7 +239,10 @@ void cGameItem::OnPlayerInteract()
 		mpInit->mpInventory->AddItem(this);
 
 		mpInit->mpGame->GetSound()->GetSoundHandler()->PlayGui(msPickUpSound,false,1);
-		cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, VRHelper::DominantHapticHand(mpInit->mpGame));
+		const eVRHapticHand pickupHand =
+			mpInit->mpPlayer->GetVRInteractHand() == eVRHandIndex_Left
+				? eVRHapticHand_Left : eVRHapticHand_Right;
+		cVRHaptics::Play(mpInit, eVRHapticEvent_ObjectPickup, pickupHand);
 
 		mbDestroyMe = true;
 	//}

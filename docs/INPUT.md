@@ -223,6 +223,8 @@ Either bare hand can highlight and grab a nearby object. The hand that presses i
 
 Every bundled profile ships a default binding for the off-hand trigger — L2/R2 on PS VR2 Sense and the index trigger on all other controller families — so off-hand grabbing works without manual mapping.
 
+If normal palm contact finds no target, point a bare hand at a visible inventory pickup and press that hand's trigger. Batteries, healing items, and other consumables receive the strongest assistance up to 2.35 metres; keys and ordinary small items use a medium range, while weapons and important equipment require closer intent. Pickups use their normal direct inventory acquisition. The assist requires clear solid-body line of sight from both the controller and the headset, never reaches through closed doors, walls, or shelves, and does not affect doors/drawers/physics props. A thin blue line connects a valid pickup to the posed middle-finger knuckle and a very light pulse marks initial lock; the line disappears when aim/visibility is lost or the item is collected. This world cue is separate from, and disabled during, the inventory and menu pointer.
+
 Moving an unoccupied hand into an ordinary dynamic prop or hinged door applies a bounded impulse at the contact point. Inventory pickups are excluded, and grabbable or movable props receive gentler limits so they remain easy to collect. This is a dynamic-object interaction proxy rather than a rigid hand collider: the rendered hand can still pass through static walls and scenery.
 
 The original game exposes one active player-interaction state. Consequently, both hands can initiate interaction, but holding two different physics objects simultaneously or constraining one object with both hands is not yet supported.
@@ -255,7 +257,7 @@ Changes are saved immediately. Render scale and HRTF require a restart. Settings
 
 The Player Height row includes a **Calibrate** button, and the calibration section includes a one-press **Recenter** row. Snap turn requires the stick to return to the centre before another turn. Turning is disabled in menus and scripted look sequences.
 
-Hybrid crouch is the default. Physical crouch follows headset movement; button crouch lowers the viewpoint and changes the real gameplay collider and stealth state. Seated mode raises the world to the configured player height without changing world scale. Standing is retried safely if a low ceiling blocks the full-height collider.
+Hybrid crouch is the default. Physical crouch follows headset movement; button crouch lowers the viewpoint and changes the real gameplay collider and stealth state. Seated mode raises the world to the configured player height without changing world scale. A low ceiling temporarily keeps the effective collider and view crouched without changing the physical/button/hybrid request; standing returns automatically once the full-height collider fits and no crouch input remains.
 
 Menus and cinematics stay anchored in the room while the player moves their head. Recenter places the surface in front of the current view again. UI distance and UI scale can be adjusted independently.
 

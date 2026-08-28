@@ -468,15 +468,6 @@ void iHudModel::ApplyFingerPose()
 {
 	if(!mbHandRigSetup || mpEntity == NULL) return;
 
-	static int slCallCounter = 0;
-	++slCallCounter;
-	if(mbForceGrabPose && slCallCounter % 200 == 0)
-	{
-		Log(" [hand-rig] '%s': pose tick #%d force=1 weights %.2f/%.2f/%.2f/%.2f/%.2f hold=%.2f\n",
-			msName.c_str(), slCallCounter, mfFingerWeight[0], mfFingerWeight[1],
-			mfFingerWeight[2], mfFingerWeight[3], mfFingerWeight[4], mfIndexHoldWeight);
-	}
-
 	if(mbForceGrabPose && !mbForceGrabLogged)
 	{
 		Log(" [hand-rig] '%s': force=1 weights %.2f/%.2f/%.2f/%.2f/%.2f hold=%.2f\n",
@@ -821,7 +812,8 @@ void cPlayerHands::Update(float afTimeStep)
 
 //-----------------------------------------------------------------------
 
-bool cPlayerHands::GetHandPalmPose(int alNum, cMatrixf& aPoseMtx)
+bool cPlayerHands::GetHandPalmPose(int alNum, cMatrixf& aPoseMtx,
+	bool abResolveCollision)
 {
 	if(alNum < 0 || alNum >= mlCurrentModelNum) return false;
 
@@ -831,8 +823,9 @@ bool cPlayerHands::GetHandPalmPose(int alNum, cMatrixf& aPoseMtx)
 
 	aPoseMtx = VRHelper::TrackingToWorldSpace(hand.GetMatrix(), mpInit->mpGame);
 	cMatrixf mtxResolved;
-	if(mpInit->mpPlayer->ResolveVRHandPose((eVRHandIndex)alNum,
-		aPoseMtx, mtxResolved))
+	if(abResolveCollision &&
+		mpInit->mpPlayer->ResolveVRHandPose((eVRHandIndex)alNum,
+			aPoseMtx, mtxResolved))
 	{
 		aPoseMtx = mtxResolved;
 	}
@@ -850,6 +843,32 @@ bool cPlayerHands::GetHandPalmPose(int alNum, cMatrixf& aPoseMtx)
 				eEulerRotationOrder_XYZ));
 	}
 
+	return true;
+}
+
+//-----------------------------------------------------------------------
+
+bool cPlayerHands::GetHandMiddleFingerPosition(int alNum,
+	cVector3f& avPosition)
+{
+	if(alNum < 0 || alNum >= mlCurrentModelNum) return false;
+
+	iHudModel *pHandModel = mvCurrentHudModels[alNum];
+	if(pHandModel == NULL || pHandModel->mpEntity == NULL ||
+		(pHandModel->msName != "Hand" && pHandModel->msName != "LeftHand"))
+		return false;
+
+	// Middle2 is the central knuckle of the posed middle-finger chain. Reading
+	// its bone state keeps the cue attached to the rendered finger as it curls,
+	// instead of using the controller/palm origin that sits toward the thumb.
+	if(!pHandModel->mbHandRigSetup) return false;
+	const int lMiddleBone = pHandModel->mlBoneIdx[1];
+	if(lMiddleBone < 0) return false;
+
+	cBoneState *pBone = pHandModel->mpEntity->GetBoneState(lMiddleBone);
+	if(pBone == NULL) return false;
+
+	avPosition = pBone->GetWorldPosition();
 	return true;
 }
 

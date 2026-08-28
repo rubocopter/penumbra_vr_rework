@@ -397,6 +397,15 @@ void cPlayer::ChangeMoveState(ePlayerMoveState aState, bool abSetHeadHeightDirec
 {
 	if(mMoveState == aState) return;
 
+	// Keep the requested locomotion state separate from what the current
+	// geometry permits.  In particular, never leave crouch until the complete
+	// standing capsule fits at the same feet position.
+	if(mMoveState == ePlayerMoveState_Crouch &&
+		aState != ePlayerMoveState_Crouch && CanStand()==false)
+	{
+		return;
+	}
+
 	//Log("Change movestate from %d to: %d\n",(int)mMoveState,(int)aState);
 	
 	ePlayerMoveState PrevState = mMoveState;
@@ -408,6 +417,44 @@ void cPlayer::ChangeMoveState(ePlayerMoveState aState, bool abSetHeadHeightDirec
 	{
 		SetHeightAdd(mvMoveStates[aState]->mfHeightAdd);
 	}
+}
+
+//-----------------------------------------------------------------------
+
+bool cPlayer::CanStand()
+{
+	// Movement state can be restored before a world has created the character
+	// body.  There is no environmental constraint to test in that case.
+	if(mpCharBody==NULL || mpScene==NULL || mpScene->GetWorld3D()==NULL)
+		return true;
+
+	iPhysicsWorld *pWorld = mpScene->GetWorld3D()->GetPhysicsWorld();
+	if(pWorld==NULL) return true;
+
+	iPhysicsBody *pStandingBody = mpCharBody->GetExtraBody(0);
+	if(pStandingBody==NULL || pStandingBody->GetShape()==NULL) return true;
+
+	iCollideShape *pStandingShape = pStandingBody->GetShape();
+	const cVector3f vStandingPos = mpCharBody->GetFeetPosition() +
+		cVector3f(0, pStandingShape->GetSize().y * 0.5f + 0.005f, 0);
+	cVector3f vCorrectedPos = vStandingPos;
+	const bool bCollide = pWorld->CheckShapeWorldCollision(&vCorrectedPos,
+		pStandingShape, cMath::MatrixTranslate(vStandingPos),
+		mpCharBody->GetBody(), false, true, NULL,
+		mpCharBody->GetCollideCharacter(), false,
+		mpCharBody->GetCollidePlayer(), true);
+
+	if(bCollide==false) return true;
+
+	// A cylinder resting on the floor can report a tiny upward correction even
+	// though there is unlimited headroom. Only a downward ceiling correction or
+	// a meaningful horizontal displacement prevents standing. Crouch and stand
+	// have the same footprint, so a new lateral correction is also invalid.
+	const cVector3f vCorrection = vCorrectedPos - vStandingPos;
+	const bool bCeilingPush = vCorrection.y < -0.001f;
+	const bool bLateralPush = vCorrection.x * vCorrection.x +
+		vCorrection.z * vCorrection.z > 0.000025f;
+	return !bCeilingPush && !bLateralPush;
 }
 
 //-----------------------------------------------------------------------
@@ -722,14 +769,19 @@ void cPlayer::ClearVRHandTargetBody(iPhysicsBody *apBody)
 }
 
 void cPlayer::SetVRHandTarget(eVRHandIndex aHand, iPhysicsBody *apBody,
-	const cVector3f& avPosition, float afDistance, eCrossHairState aCrossHairState)
+	const cVector3f& avPosition, float afDistance,
+	eCrossHairState aCrossHairState, bool abMagnetic)
 {
 	cVRHandTarget& target = mVRHandTargets[aHand];
 	target.mpBody = apBody;
 	target.mvPosition = avPosition;
 	target.mfDistance = afDistance;
 	target.mCrossHairState = aCrossHairState;
-	mHandCrossHairStates[aHand] = aCrossHairState;
+	target.mbMagnetic = abMagnetic;
+	// Magnetic acquisition should feel like intent assistance, not a laser/UI
+	// mode. A subtle one-shot haptic cue is emitted by the normal VR state.
+	mHandCrossHairStates[aHand] = abMagnetic
+		? eCrossHairState_None : aCrossHairState;
 }
 
 void cPlayer::ResetVRHandCollision()
@@ -1241,7 +1293,7 @@ void cPlayer::OnWorldLoad()
 		cMatrixf mtxHandInteractionOffset = cMath::MatrixTranslate(
 			cVector3f(0.011f, 0.002f, -0.011f));
 		mpVRHandInteractionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
-			cVector3f(0.30f, 0.14f, 0.20f), &mtxHandInteractionOffset);
+			cVector3f(0.34f, 0.17f, 0.24f), &mtxHandInteractionOffset);
 	}
 
 	// Small sphere used for direct hand-to-object nudge collision.
@@ -1250,9 +1302,9 @@ void cPlayer::OnWorldLoad()
 			cVector3f(0.12f), NULL);
 
 	// Match the collision volume to the visible hand mesh, whose long axis is
-	// local X after the HUD hand rotation. The former controller-aligned
-	// capsule covered the wrist/forward axis but left most of the palm and
-	// fingers outside it, which is why poles and door edges crossed the hand.
+	// local X after the HUD hand rotation. Keep a close fit on the thin axes:
+	// an oversized palm stopped visibly short of small drawer fronts and caught
+	// their surrounding frame before the interaction volume reached the handle.
 	if(mpVRHandCollisionShape == NULL)
 	{
 		cMatrixf mtxHandVisualOffset = cMath::MatrixMul(
@@ -1263,13 +1315,15 @@ void cPlayer::OnWorldLoad()
 			mtxHandVisualOffset,
 			cMath::MatrixTranslate(cVector3f(0.011f, 0.002f, -0.011f)));
 		mpVRHandCollisionShape = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateBoxShape(
-			cVector3f(0.205f, 0.065f, 0.145f), &mtxHandCollisionOffset);
+			cVector3f(0.190f, 0.052f, 0.125f), &mtxHandCollisionOffset);
 	}
 	ResetVRHandCollision();
 
-	// Create body
-	// mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", mvSize);
-	mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player", cVector3f(mvSize.x * 0.5, 0.85f, mvSize.z * 0.5));
+	// Keep the narrower VR footprint, but retain the configured standing
+	// height.  Standing and crouching must use different full-height capsules
+	// so low ceilings can actually prevent recovery to standing.
+	mpCharBody = mpScene->GetWorld3D()->GetPhysicsWorld()->CreateCharacterBody("Player",
+		cVector3f(mvSize.x * 0.5f, mvSize.y, mvSize.z * 0.5f));
 	
 	mpCharBody->SetCamera(mpCamera);
 	mpCharBody->SetMass(mfMass);
@@ -1296,7 +1350,7 @@ void cPlayer::OnWorldLoad()
 	mpCharBody->SetAirFriction(mpInit->mpGameConfig->GetFloat("Player","AirFriction",0));
 	
 	//Add the crouch size
-	mpCharBody->AddExtraSize(cVector3f(mvSize.x * 0.5f, 0.85f, mvSize.z * 0.5f));
+	mpCharBody->AddExtraSize(cVector3f(mvSize.x * 0.5f, mfCrouchHeight, mvSize.z * 0.5f));
 
 	//Set so it is not saved:
 	mpCharBody->SetIsSaved(false);

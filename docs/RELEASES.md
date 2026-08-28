@@ -6,6 +6,26 @@ No changes yet.
 
 ---
 
+## v0.1.0-alpha.6.3 — 28 August 2026
+
+**More reliable visible-item acquisition, middle-finger magnetic guidance, low-ceiling recovery, and a cheaper VR interaction hot path.**
+
+### Added
+
+- Assisted hand-aim pickup for visible inventory items: normal palm contact remains authoritative, while a distance/angle/type score and strict controller-plus-head line of sight select small items that are visible but difficult to reach between locker shelves; consumables receive the strongest range (up to 2.35 metres), important equipment requires closer intent, entering the acquisition cone gives a subtle one-shot haptic cue and a thin blue object-to-middle-finger line, and Interact uses the normal pickup sound, callback, and inventory path. Closed doors and other solid bodies block acquisition even if the physical controller has crossed them. The cue has its own world-render path and is suppressed during inventory/menu UI without changing their pointer laser
+
+### Fixed
+
+- Low ceilings now constrain the effective VR stance without changing the player's physical/button/hybrid crouch request; crouch input has one owner instead of passing through both the VR latch and legacy toggle, standing ignores harmless floor-only contact while testing the full-height character collider every frame, the virtual crouch offset remains active after a failed stand, and normal standing returns automatically as soon as there is headroom and no crouch input remains
+- Small drawers are easier to acquire: the interaction volume follows bounded raw-controller intent beyond a collision-stopped visible palm while retaining strict solid-body line of sight, and an acquired mechanism keeps its real surface contact point for slider/hinge projection instead of using an imaginary point in the gap at the palm. The near-contact shortcut is disabled whenever that extension is meaningful, preventing items behind thin closed doors from being treated as palm contact
+- Inventory pickup haptics now follow the hand that actually selected the item, including off-hand and assisted pickups
+
+### Optimized
+
+- Per-frame hand interaction no longer allocates a temporary vector merely to retain the nearest item and nearest mechanism. Magnetic acquisition queries a tight aim-segment volume and ray-tests only its five highest-ranked candidates instead of every eligible body. The posed-hand update also stops writing a recurring diagnostic log while an item is held
+
+---
+
 ## v0.1.0-alpha.6.2 — 27 August 2026
 
 **Physical hands that respect the world, measured equipment grips, and much more forgiving doors, drawers, hatches, pickups, and opening-area mechanisms.**

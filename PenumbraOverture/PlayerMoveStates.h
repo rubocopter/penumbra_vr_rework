@@ -479,43 +479,13 @@ public:
 	void LeaveState(iPlayerMoveState* apNextState)
 	{
 		iCharacterBody *pBody = mpPlayer->GetCharacterBody();
-        		
-		cVector3f vFeetPos = pBody->GetPosition() - cVector3f(0,pBody->GetShape()->GetSize().y/2,0);
+
+		// ChangeMoveState has already verified the complete standing capsule.
+		// Preserve the feet position while swapping size; doing the collision
+		// test before changing state avoids the old recursive crouch transition.
+		const cVector3f vFeetPos = pBody->GetFeetPosition();
 		pBody->SetActiveSize(0);
-		pBody->SetPosition(vFeetPos + cVector3f(0,pBody->GetShape()->GetSize().y/2,0));
-		
-		/////////////////////////////////////////////////
-		//Check if the player will fit with the newer size
-		cInit *pInit = mpPlayer->GetInit();
-		iPhysicsWorld *pWorld = pInit->mpGame->GetScene()->GetWorld3D()->GetPhysicsWorld();
-
-        pBody->SetPosition(pBody->GetPosition() + cVector3f(0,0.005f,0));
-		
-		//Check with both bodies. This removes some bugs.
-		for(int i=0; i<2; ++i)
-		{
-			iCollideShape *pShape = pBody->GetExtraBody(i)->GetShape();
-						
-			cVector3f vNewPos = pBody->GetPosition();
-			bool bCollide = pWorld->CheckShapeWorldCollision(&vNewPos,pShape,
-												cMath::MatrixTranslate(pBody->GetPosition()),
-												pBody->GetBody(),false,true);
-			
-			/*Log("Collide when leaving crouch: %d. NewPos: %s OldPos: %s\n",bCollide,
-														vNewPos.ToString().c_str(),
-														pBody->GetPosition().ToString().c_str());*/
-
-			//If the body is pushed down, then something is colliding from above.
-			//if so, set crouch mode again.
-			if(vNewPos != pBody->GetPosition())
-			{
-				pBody->SetPosition(pBody->GetPosition() - cVector3f(0,0.005f,0));
-				mpPlayer->ChangeMoveState(ePlayerMoveState_Crouch);
-				return;
-			}
-		}
-		
-		pBody->SetPosition(pBody->GetPosition() - cVector3f(0,0.005f,0));
+		pBody->SetFeetPosition(vFeetPos);
 	}
 
 	void OnUpdate(float afTimeStep)

@@ -24,6 +24,7 @@
 #include "EffectHandler.h"
 #include "GameLadder.h"
 #include "GameArea.h"
+#include "GameItem.h"
 #include "GameObject.h"
 #include "GameSwingDoor.h"
 #include "scene/PortalContainer.h"
@@ -35,6 +36,8 @@ namespace
 {
   const float kVRNudgeMinHandSpeed = 0.03f;
   const float kVRNudgeBroadPhasePadding = 0.15f;
+  const float kVRMagneticItemRange = 2.35f;
+  const int kVRMagneticRankedCandidateCount = 5;
 
   iPhysicsJoint *GetVRNudgeJoint(iPhysicsBody *apBody)
   {
@@ -68,6 +71,272 @@ namespace
     }
     return pFallback;
   }
+
+  // Half-Life: Alyx-style hand aim is deliberately limited to inventory
+  // pickups. Doors, drawers, loose props, and arbitrary scripted objects keep
+  // their normal physical acquisition and constraints.
+  bool GetVRMagneticCandidate(iPhysicsBody *apBody, iGameEntity *apEntity,
+    float& afRange, float& afPriorityBias)
+  {
+    if(apBody == NULL || apEntity == NULL || !apEntity->IsActive() ||
+      !apBody->IsActive() || !apBody->GetCollide() || apBody->IsCharacter() ||
+      apBody->IsPlayer())
+      return false;
+
+    if(apEntity->GetType() != eGameEntityType_Item) return false;
+
+    // Consumables and stacks receive the strongest assistance. Important
+    // equipment remains eligible, but only when the hand intent is closer and
+    // more deliberate. "Normal" includes keys and map-authored small tools.
+    const eGameItemType itemType = static_cast<cGameItem*>(apEntity)->GetItemType();
+    switch(itemType)
+    {
+    case eGameItemType_Battery:
+    case eGameItemType_Food:
+    case eGameItemType_GlowStick:
+    case eGameItemType_Flare:
+    case eGameItemType_Painkillers:
+      afRange = kVRMagneticItemRange;
+      afPriorityBias = -0.20f;
+      break;
+    case eGameItemType_Normal:
+    case eGameItemType_Note:
+    case eGameItemType_Map:
+      afRange = 1.90f;
+      afPriorityBias = -0.10f;
+      break;
+    case eGameItemType_Notebook:
+    case eGameItemType_Flashlight:
+    case eGameItemType_WeaponMelee:
+    case eGameItemType_Throw:
+      afRange = 1.45f;
+      afPriorityBias = 0.0f;
+      break;
+    default:
+      return false;
+    }
+    return true;
+  }
+
+  // The normal pick callback is intentionally interaction-oriented: areas and
+  // non-entity bodies receive special treatment. Magnetic visibility instead
+  // needs the first solid physics body, regardless of whether it is usable.
+  class cVRSolidSightCallback : public iPhysicsRayCallback
+  {
+  public:
+    cVRSolidSightCallback(iPhysicsBody *apCandidate)
+      : mpCandidate(apCandidate), mpNearestBody(NULL),
+        mfNearestDistance(9999.0f), mvNearestPoint(0, 0, 0) {}
+
+    bool BeforeIntersect(iPhysicsBody *apBody)
+    {
+      if(apBody == NULL || !apBody->IsActive() || apBody->IsCharacter() ||
+        apBody->IsPlayer())
+        return false;
+
+      // Non-colliding area/helper bodies are not visible barriers. The target
+      // itself is retained defensively even if map data changes its flag.
+      return apBody == mpCandidate || apBody->GetCollide();
+    }
+
+    bool OnIntersect(iPhysicsBody *apBody, cPhysicsRayParams *apParams)
+    {
+      if(!BeforeIntersect(apBody) || apParams == NULL ||
+        apParams->mfDist < 0.0f ||
+        apParams->mfDist >= mfNearestDistance)
+        return true;
+
+      mfNearestDistance = apParams->mfDist;
+      mvNearestPoint = apParams->mvPoint;
+      mpNearestBody = apBody;
+      return true;
+    }
+
+    iPhysicsBody *mpCandidate;
+    iPhysicsBody *mpNearestBody;
+    float mfNearestDistance;
+    cVector3f mvNearestPoint;
+  };
+
+  bool CastVRSolidSight(iPhysicsWorld *apPhysicsWorld,
+    const cVector3f& avOrigin, iPhysicsBody *apCandidate,
+    const cVector3f& avPoint, cVector3f& avHitPoint)
+  {
+    if(apPhysicsWorld == NULL || apCandidate == NULL) return false;
+
+    cVector3f vRay = avPoint - avOrigin;
+    const float fRayLength = vRay.Length();
+    if(fRayLength <= 0.001f) return false;
+
+    // Continue a few centimetres into the target so a sample exactly on its
+    // AABB surface still produces a physics hit.
+    const cVector3f vEnd = avPoint + vRay * (0.03f / fRayLength);
+    cVRSolidSightCallback callback(apCandidate);
+    apPhysicsWorld->CastRay(&callback, avOrigin, vEnd,
+      true, false, true, true);
+    if(callback.mpNearestBody != apCandidate) return false;
+
+    avHitPoint = callback.mvNearestPoint;
+    return true;
+  }
+
+  struct cVRMagneticCandidate
+  {
+    iPhysicsBody *mpBody;
+    cVector3f mvVisibleSample;
+    cVector3f mvCenter;
+    float mfScore;
+  };
+
+  void InsertVRMagneticCandidate(cVRMagneticCandidate *apCandidates,
+    int& alCount, const cVRMagneticCandidate& aCandidate)
+  {
+    int lInsert = alCount;
+    if(lInsert > kVRMagneticRankedCandidateCount)
+      lInsert = kVRMagneticRankedCandidateCount;
+
+    while(lInsert > 0 &&
+      apCandidates[lInsert - 1].mfScore > aCandidate.mfScore)
+      --lInsert;
+
+    if(lInsert >= kVRMagneticRankedCandidateCount) return;
+
+    int lLast = alCount < kVRMagneticRankedCandidateCount
+      ? alCount : kVRMagneticRankedCandidateCount - 1;
+    for(int i = lLast; i > lInsert; --i)
+      apCandidates[i] = apCandidates[i - 1];
+    apCandidates[lInsert] = aCandidate;
+    if(alCount < kVRMagneticRankedCandidateCount) ++alCount;
+  }
+
+  bool FindVRMagneticTarget(cInit *apInit, cPlayer *apPlayer,
+    eVRHandIndex aHand, iPhysicsBody*& apBody, cVector3f& avHitPoint,
+    float& afDistance)
+  {
+    TrackedController& trackedHand = aHand == eVRHandIndex_Left
+      ? apInit->mpGame->vr_left_hand : apInit->mpGame->vr_right_hand;
+    if(!trackedHand.IsPoseValid()) return false;
+
+    cMatrixf aimPose = VRHelper::TrackingToWorldSpace(
+      VRHelper::ControllerAimMatrix(trackedHand), apInit->mpGame);
+    const cVector3f vOrigin = aimPose.GetTranslation();
+    const cVector3f vDirection = cMath::Vector3Normalize(
+      cMath::MatrixMul(aimPose.GetRotation(), cVector3f(0.0f, 0.0f, -1.0f)));
+
+    // Query a tight axis-aligned box around the aim segment instead of a large
+    // cube around the hand. On long corridors this substantially reduces the
+    // number of portal entities considered by both hands every frame.
+    const cVector3f vSearchEnd = vOrigin + vDirection * kVRMagneticItemRange;
+    const cVector3f vSearchDelta = vSearchEnd - vOrigin;
+    const float fSearchPadding = 0.50f;
+    cBoundingVolume searchBV;
+    searchBV.SetSize(cVector3f(fabsf(vSearchDelta.x) + fSearchPadding * 2.0f,
+      fabsf(vSearchDelta.y) + fSearchPadding * 2.0f,
+      fabsf(vSearchDelta.z) + fSearchPadding * 2.0f));
+    searchBV.SetPosition((vOrigin + vSearchEnd) * 0.5f);
+
+    cWorld3D *pWorld = apInit->mpGame->GetScene()->GetWorld3D();
+    iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
+    cPortalContainerEntityIterator it =
+      pWorld->GetPortalContainer()->GetEntityIterator(&searchBV);
+
+    cVRMagneticCandidate rankedCandidates[kVRMagneticRankedCandidateCount];
+    int lRankedCandidateCount = 0;
+
+    while(it.HasNext())
+    {
+      iPhysicsBody *pBody = static_cast<iPhysicsBody*>(it.Next());
+      if(pBody == NULL || pBody->GetUserData() == NULL) continue;
+
+      iGameEntity *pEntity = static_cast<iGameEntity*>(pBody->GetUserData());
+      float fCandidateRange = 0.0f;
+      float fPriorityBias = 0.0f;
+      if(!GetVRMagneticCandidate(pBody, pEntity,
+          fCandidateRange, fPriorityBias))
+        continue;
+
+      if(pBody == apPlayer->GetVRHeldBody(eVRHandIndex_Left) ||
+        pBody == apPlayer->GetVRHeldBody(eVRHandIndex_Right))
+        continue;
+
+      cBoundingVolume *pBodyBV = pBody->GetBV();
+      if(pBodyBV == NULL) continue;
+      const cVector3f vTargetCenter = pBodyBV->GetWorldCenter();
+      const cVector3f vToTarget = vTargetCenter - vOrigin;
+      const float fForward = cMath::Vector3Dot(vToTarget, vDirection);
+      if(fForward <= 0.08f || fForward > fCandidateRange) continue;
+
+      cVector3f vPerpendicular = vToTarget - vDirection * fForward;
+      const float fPerpendicularSq = vPerpendicular.SqrLength();
+      float fBodyAllowance = pBodyBV->GetRadius();
+      if(fBodyAllowance > 0.12f) fBodyAllowance = 0.12f;
+      const float fConeRadius = 0.07f + fForward * 0.12f + fBodyAllowance;
+      if(fPerpendicularSq > fConeRadius * fConeRadius) continue;
+
+      // Aim at the closest portion of the body's AABB to the hand ray. This
+      // keeps partly visible items selectable when their centre lies behind a
+      // shelf lip, while the ray still rejects genuinely occluded objects.
+      const cVector3f vAimPoint = vOrigin + vDirection * fForward;
+      const cVector3f vMin = pBodyBV->GetMin();
+      const cVector3f vMax = pBodyBV->GetMax();
+      cVector3f vVisibleSample(
+        cMath::Clamp(vAimPoint.x, vMin.x, vMax.x),
+        cMath::Clamp(vAimPoint.y, vMin.y, vMax.y),
+        cMath::Clamp(vAimPoint.z, vMin.z, vMax.z));
+      vVisibleSample = vVisibleSample * 0.9f + vTargetCenter * 0.1f;
+
+      float fScore = fPerpendicularSq / (fConeRadius * fConeRadius) +
+        fForward * 0.02f + fPriorityBias;
+
+      cVRMagneticCandidate candidate = {
+        pBody, vVisibleSample, vTargetCenter, fScore
+      };
+      InsertVRMagneticCandidate(rankedCandidates,
+        lRankedCandidateCount, candidate);
+    }
+
+    // Run expensive raycasts only for the five best geometric candidates.
+    // A target must be unobstructed both from the controller and from the HMD:
+    // this prevents a real hand pushed through a closed locker door from using
+    // a ray whose origin has already crossed the door.
+    const cVector3f vHeadOrigin =
+      apInit->mpGame->GetScene()->GetVRWorldSpaceHeadMatrix().GetTranslation();
+    iPhysicsBody *pBestBody = NULL;
+    cVector3f vBestHit(0, 0, 0);
+    for(int i = 0; i < lRankedCandidateCount; ++i)
+    {
+      cVRMagneticCandidate& candidate = rankedCandidates[i];
+      cVector3f vHandHit;
+      cVector3f vHeadHit;
+      const bool bSampleVisible =
+        CastVRSolidSight(pPhysicsWorld, vOrigin, candidate.mpBody,
+          candidate.mvVisibleSample, vHandHit) &&
+        CastVRSolidSight(pPhysicsWorld, vHeadOrigin, candidate.mpBody,
+          candidate.mvVisibleSample, vHeadHit);
+      const bool bCenterVisible = !bSampleVisible &&
+        CastVRSolidSight(pPhysicsWorld, vOrigin, candidate.mpBody,
+          candidate.mvCenter, vHandHit) &&
+        CastVRSolidSight(pPhysicsWorld, vHeadOrigin, candidate.mpBody,
+          candidate.mvCenter, vHeadHit);
+      if(!bSampleVisible && !bCenterVisible) continue;
+
+      pBestBody = candidate.mpBody;
+      vBestHit = vHandHit;
+      break;
+    }
+
+    // Publish only the winning result into the legacy interaction mirror.
+    apPlayer->GetPickRay()->Clear();
+    if(pBestBody == NULL) return false;
+    const float fBestDistance = (vBestHit - vOrigin).Length();
+    apPlayer->GetPickRay()->mpPickedBody = pBestBody;
+    apPlayer->GetPickRay()->mvPickedPos = vBestHit;
+    apPlayer->GetPickRay()->mfPickedDist = fBestDistance;
+    apBody = pBestBody;
+    avHitPoint = vBestHit;
+    afDistance = fBestDistance;
+    return true;
+  }
 }
 
 
@@ -77,6 +346,8 @@ namespace
 
 cPlayerState_Normal_VR::cPlayerState_Normal_VR(cInit *apInit, cPlayer *apPlayer) : iPlayerState(apInit, apPlayer, ePlayerState_Normal)
 {
+  for(int i = 0; i < eVRHandIndex_Count; ++i)
+    mpLastMagneticTargets[i] = NULL;
 }
 
 //-----------------------------------------------------------------------
@@ -116,22 +387,25 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
   if (collider != NULL) {
     cMatrixf poseMatrix;
 
-    // Only the dominant hand can grab, so only it detects targets and shows
-    // the grab icon at grab distance; the off hand stays bare and never
-    // highlights anything.
+    // Keep the dominant index for the legacy picked-body mirror below. Both
+    // bare hands still maintain their own target and can initiate interaction.
     const eVRHandIndex dominantIndex = mpInit->mpGame->vr_dominant_hand == eSteamVRHand_Left
       ? eVRHandIndex_Left : eVRHandIndex_Right;
 
     for (int i = 0; i < eVRHandIndex_Count; ++i) {
       const eVRHandIndex handIndex = (eVRHandIndex)i;
       mpPlayer->ClearVRHandTarget(handIndex);
+      bool bMagneticTarget = false;
 
 // The off hand may also target and grab, but only while it carries no
       // equipment (flashlight, glowstick, flare); an equipped hand keeps its
       // original behaviour and never highlights world objects.
       if (handIndex != dominantIndex &&
           mpInit->mpPlayerHands->GetAttachmentModel(i) != NULL)
+      {
+        mpLastMagneticTargets[i] = NULL;
         continue;
+      }
 
 // The left and right hand rigs are distinct HUD models named "LeftHand"
       // and "Hand"; both are valid pointing hands for target detection.
@@ -143,12 +417,36 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
         // the hand mesh's 0.006 render scale, which forced the old collision
         // query to use artificial 50x20x30 dimensions.
         if (!mpInit->mpPlayerHands->GetHandPalmPose(i, poseMatrix))
+        {
+          mpLastMagneticTargets[i] = NULL;
           continue;
+        }
 
-        cVector3f handCenter = poseMatrix.GetTranslation();
+        // Target acquisition follows the player's real hand slightly beyond
+        // the collision-stopped render hand. This is especially important for
+        // short drawer handles surrounded by a frame: the visible palm can rest
+        // on the front while the controller has already reached the handle.
+        // Limit the extension and retain the LOS check below, so this cannot be
+        // used as an unrestricted reach through walls.
+        const cVector3f handCenter = poseMatrix.GetTranslation();
+        cMatrixf interactionPose = poseMatrix;
+        float fInteractionReach = 0.0f;
+        cMatrixf rawPalmPose;
+        if(mpInit->mpPlayerHands->GetHandPalmPose(i, rawPalmPose, false))
+        {
+          cVector3f vReach = rawPalmPose.GetTranslation() - handCenter;
+          const float fReach = vReach.Length();
+          const float kMaxCollisionReach = 0.18f;
+          if(fReach > kMaxCollisionReach)
+            vReach = vReach * (kMaxCollisionReach / fReach);
+          fInteractionReach = vReach.Length();
+          interactionPose = rawPalmPose;
+          interactionPose.SetTranslation(handCenter + vReach);
+        }
 
-        auto mtxTouch = poseMatrix.GetRotation();
-        mtxTouch = cMath::MatrixMul(cMath::MatrixTranslate(handCenter), mtxTouch);
+        auto mtxTouch = interactionPose.GetRotation();
+        mtxTouch = cMath::MatrixMul(
+          cMath::MatrixTranslate(interactionPose.GetTranslation()), mtxTouch);
 
         // Area body should take priority over everything else
         bool useTraceResults = false;
@@ -171,10 +469,6 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             useTraceResults = true;
         }
 
-
-        // Begin iteration, finding objects that could possibly be the user's target
-        std::vector<touchedObject> targets;
-
         if (!useTraceResults) {
           cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
           iPhysicsWorld *pPhysicsWorld = pWorld->GetPhysicsWorld();
@@ -186,11 +480,16 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           handBV.SetTransform(cMath::MatrixMul(mtxTouch,
             handBV.GetTransform()));
 
-          ////////////////////////////////
-          //Iterate bodies
-          float fClosestHitDist = 9999.0f;
-          cVector3f vClosestHitPos;
-          iPhysicsMaterial* pClosestHitMat = NULL;
+          // Keep only the nearest candidate in each priority class while
+          // iterating. The previous temporary vector allocated every frame for
+          // each hand and was immediately reduced to these same two entries.
+          touchedObject bestItem;
+          touchedObject *bestItemTarget = NULL;
+          float fBestItemDistSq = 9999.0f;
+          touchedObject bestOther;
+          touchedObject *bestOtherTarget = NULL;
+          float fBestOtherDistSq = 9999.0f;
+
           cPortalContainerEntityIterator it =
             pWorld->GetPortalContainer()->GetEntityIterator(&handBV);
           cCollideData collideData;
@@ -255,7 +554,22 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
                   vTouchPoint
                 };
 
-                targets.push_back(target);
+                const bool bIsItemClass =
+                  target.crosshair == eCrossHairState_PickUp ||
+                  target.crosshair == eCrossHairState_Item;
+                if(bIsItemClass && target.touchDistanceSq < fBestItemDistSq)
+                {
+                  fBestItemDistSq = target.touchDistanceSq;
+                  bestItem = target;
+                  bestItemTarget = &bestItem;
+                }
+                else if(!bIsItemClass &&
+                  target.touchDistanceSq < fBestOtherDistSq)
+                {
+                  fBestOtherDistSq = target.touchDistanceSq;
+                  bestOther = target;
+                  bestOtherTarget = &bestOther;
+                }
               }
             }
           }
@@ -272,39 +586,17 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           {
             if (apTarget == NULL || apTarget->physicsBody == NULL) return false;
             const cVector3f& vTarget = apTarget->touchPoint;
-            // At true palm contact, the physical hand collision has already
-            // established that this is not a through-wall selection.
-            if ((vTarget - handCenter).Length() <= 0.055f) return true;
-            mpPlayer->GetPickRay()->Clear();
-            pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), handCenter,
-              vTarget, true, false, true);
-            return mpPlayer->GetPickRay()->mpPickedBody == apTarget->physicsBody;
+            // Only bypass the ray for genuine collision-resolved palm contact.
+            // Once acquisition has followed the raw controller, even a nearby
+            // point may actually be on the far side of a thin closed door.
+            if (fInteractionReach <= 0.015f &&
+              (vTarget - handCenter).Length() <= 0.055f)
+              return true;
+
+            cVector3f vHitPoint;
+            return CastVRSolidSight(pPhysicsWorld, handCenter,
+              apTarget->physicsBody, vTarget, vHitPoint);
           };
-
-          // Pick the best candidate per class: small items (PickUp/Item) win
-          // over furniture so a key inside a drawer is not shadowed by the
-          // drawer body overlapping the same hand area.
-          touchedObject* bestItemTarget = NULL;
-          float fBestItemDistSq = 9999.0f;
-          touchedObject* bestOtherTarget = NULL;
-          float fBestOtherDistSq = 9999.0f;
-
-          for (auto& touchedBody : targets) {
-            const bool bIsItemClass =
-              touchedBody.crosshair == eCrossHairState_PickUp ||
-              touchedBody.crosshair == eCrossHairState_Item;
-
-            if (bIsItemClass) {
-              if (touchedBody.touchDistanceSq < fBestItemDistSq) {
-                fBestItemDistSq = touchedBody.touchDistanceSq;
-                bestItemTarget = &touchedBody;
-              }
-            }
-            else if (touchedBody.touchDistanceSq < fBestOtherDistSq) {
-              fBestOtherDistSq = touchedBody.touchDistanceSq;
-              bestOtherTarget = &touchedBody;
-            }
-          }
 
           bool bSelected = false;
 
@@ -312,12 +604,12 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
             // Items normally need line-of-sight, but when the hand is
             // physically touching the item (e.g. a key lying inside an open
             // drawer whose geometry occludes the camera ray) touch wins.
-            mpPlayer->GetPickRay()->Clear();
-            pPhysicsWorld->CastRay(mpPlayer->GetPickRay(), mpPlayer->GetCamera()->GetPosition(),
-              bestItemTarget->physicsBody->GetWorldPosition(), true, false, true);
-            mpPlayer->GetPickRay()->CalculateResults();
-
-            bool bHasLOS = mpPlayer->GetPickedBody() == bestItemTarget->physicsBody;
+            cVector3f vHeadHit;
+            const cVector3f vHeadOrigin = mpInit->mpGame->GetScene()
+              ->GetVRWorldSpaceHeadMatrix().GetTranslation();
+            bool bHasLOS = CastVRSolidSight(pPhysicsWorld, vHeadOrigin,
+              bestItemTarget->physicsBody, bestItemTarget->touchPoint,
+              vHeadHit);
             if (bHasLOS || HandHasLineOfSight(bestItemTarget))
             {
               mpPlayer->GetPickRay()->Clear();
@@ -345,6 +637,22 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           }
         }
 
+        // Physical overlap remains authoritative. If it found nothing, use a
+        // visible hand-aim cone only for inventory pickups.
+        if (!useTraceResults && mpPlayer->GetPickedBody() == NULL)
+        {
+          iPhysicsBody *pMagneticBody = NULL;
+          cVector3f vMagneticHit;
+          float fMagneticDistance = 0.0f;
+          if(FindVRMagneticTarget(mpInit, mpPlayer, handIndex,
+              pMagneticBody, vMagneticHit, fMagneticDistance))
+          {
+            // FindVRMagneticTarget has published the winning body and hit
+            // point into the legacy pick callback used immediately below.
+            bMagneticTarget = true;
+          }
+        }
+
         if (mpPlayer->GetPickedBody())
         {
           iPhysicsBody *pPickedBody = mpPlayer->GetPickedBody();
@@ -354,9 +662,23 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
           mpPlayer->SetVRHandTarget(handIndex, pPickedBody,
             mpPlayer->GetPickRay()->mvPickedPos,
             mpPlayer->GetPickRay()->mfPickedDist,
-            handState);
+            handState, bMagneticTarget);
         }
 
+      }
+
+      iPhysicsBody *pCurrentMagneticTarget = bMagneticTarget
+        ? mpPlayer->GetVRHandTarget(handIndex).mpBody : NULL;
+      if(pCurrentMagneticTarget != mpLastMagneticTargets[i])
+      {
+        if(pCurrentMagneticTarget != NULL)
+        {
+          const eVRHapticHand hapticHand = handIndex == eVRHandIndex_Left
+            ? eVRHapticHand_Left : eVRHapticHand_Right;
+          cVRHaptics::Play(mpInit, eVRHapticEvent_Interaction,
+            hapticHand, 0.16f);
+        }
+        mpLastMagneticTargets[i] = pCurrentMagneticTarget;
       }
     }
 
@@ -616,8 +938,8 @@ void cPlayerState_Normal_VR::OnUpdate(float afTimeStep)
     }
 
 // Existing Penumbra entity code still reads the legacy picked-body slot.
-    // Mirror only the dominant hand's target into it so the interact button
-    // can never interact with an object merely touched by the other hand.
+    // Mirror the dominant target for those passive paths; explicit interaction
+    // restores the target belonging to the hand whose trigger was pressed.
     const cVRHandTarget& dominantTarget = mpPlayer->GetVRHandTarget(dominantIndex);
     mpPlayer->GetPickRay()->Clear();
     if (dominantTarget.mpBody != NULL)
@@ -670,6 +992,41 @@ void cPlayerState_Normal_VR::OnPostSceneDraw() {
 
   cWorld3D *pWorld = mpInit->mpGame->GetScene()->GetWorld3D();
   //pWorld->GetPhysicsWorld()->RenderDebugGeometry(mpLowGfx, cColor(1.0f, 0.0f, 1.0f, 1.0f));
+
+  // World-only magnetic acquisition cue. This deliberately does not use or
+  // modify cVRPointer / pointerDrawActive, which remain owned by inventory and
+  // menu UI. Suppress it whenever a UI surface is active so the two systems
+  // cannot overlap visually.
+  const bool bWorldCueAllowed =
+    mpInit->mpButtonHandler->GetState() == eButtonHandlerState_Game &&
+    !mpInit->mpInventory->IsActive() &&
+    !mpInit->mpNotebook->IsActive() &&
+    !mpInit->mpNumericalPanel->IsActive() &&
+    !mpInit->mpDeathMenu->IsActive();
+  if(bWorldCueAllowed)
+  {
+    mpLowGfx->SetDepthTestActive(false);
+    for(int i = 0; i < eVRHandIndex_Count; ++i)
+    {
+      const cVRHandTarget& target = mpPlayer->GetVRHandTarget((eVRHandIndex)i);
+      if(!target.mbMagnetic || target.mpBody == NULL ||
+        !target.mpBody->IsActive())
+        continue;
+
+      cVector3f vHandAnchor;
+      if(!mpInit->mpPlayerHands->GetHandMiddleFingerPosition(i, vHandAnchor))
+      {
+        cMatrixf handPose;
+        if(!mpInit->mpPlayerHands->GetHandPalmPose(i, handPose))
+          continue;
+        vHandAnchor = handPose.GetTranslation();
+      }
+
+      mpLowGfx->DrawLine(target.mvPosition, vHandAnchor,
+        cColor(0.10f, 0.65f, 1.0f, 0.92f));
+    }
+    mpLowGfx->SetDepthTestActive(true);
+  }
 
   {
 
@@ -760,10 +1117,11 @@ void cPlayerState_Normal_VR::OnStartInteract()
   const cVRHandTarget& target = mpPlayer->GetVRHandTarget(chosen);
   if (target.mpBody)
   {
-	Log(" [VR DBG +%lu ms] OnStartInteract target='%s' type=%d crosshair=%d dist=%.2f\n",
+	Log(" [VR DBG +%lu ms] OnStartInteract target='%s' type=%d crosshair=%d dist=%.2f magnetic=%d\n",
 	  GetApplicationTime(), target.mpBody->GetName().c_str(),
 	  (int)((iGameEntity*)target.mpBody->GetUserData())->GetType(),
-	  (int)target.mCrossHairState, target.mfDistance);
+	  (int)target.mCrossHairState, target.mfDistance,
+	  target.mbMagnetic ? 1 : 0);
 
     // Keep legacy entity callbacks coherent while the interaction states are
     // migrated incrementally to explicit hand ownership.
@@ -881,12 +1239,16 @@ void cPlayerState_Normal_VR::OnStartInteractMode()
 void cPlayerState_Normal_VR::EnterState(iPlayerState* apPrevState)
 {
   mpPlayer->ResetCrossHairPos();
+  for(int i = 0; i < eVRHandIndex_Count; ++i)
+    mpLastMagneticTargets[i] = NULL;
 }
 
 //-----------------------------------------------------------------------
 
 void cPlayerState_Normal_VR::LeaveState(iPlayerState* apNextState)
 {
+  for(int i = 0; i < eVRHandIndex_Count; ++i)
+    mpLastMagneticTargets[i] = NULL;
   //Can cause crashes!!
   //mpPlayer->GetPickRay()->mpPickedBody = NULL;
 }

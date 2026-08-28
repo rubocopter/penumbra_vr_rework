@@ -30,6 +30,9 @@ using namespace hpl;
 
 class cPlayerState_Normal_VR : public iPlayerState
 {
+private:
+  iPhysicsBody *mpLastMagneticTargets[2];
+
 public:
   cPlayerState_Normal_VR(cInit *apInit, cPlayer *apPlayer);
 

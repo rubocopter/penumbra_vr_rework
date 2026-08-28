@@ -16,7 +16,6 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Validate Index, Touch, Pico, WMR, and Vive profiles on real hardware
 - Refine notebook, ladder, door, and held-object interactions for tracked controllers
 - Design a two-hand state model without breaking the original single-state interaction callbacks
-- Low-ceiling recovery for physical crouch
 - Prototype an OpenXR backend behind the existing runtime boundary and compare it with the SteamVR path
 
 ## Future
@@ -46,6 +45,8 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Collision-constrained visible hands — swept approximate hand volume, surface sliding, bounded visual lag, and independent tracking-loss recovery
 - Adaptive hand nudge for physics props, inventory pickups, hinges, and sliders; stronger for small/light objects and restrained for heavy or breakable props
 - Joint-aware VR mechanisms — actual driven joint selection, circular hinge drag, slider projection, easier hatches/lockers, inserted-lever forwarding, and locked-door axis retention
+- Low-ceiling crouch constraint — full-height collider retry with automatic restoration of the physical/button/hybrid requested stance
+- Assisted hand-aim acquisition for visible inventory pickups, with distance/angle ranking, controller-plus-head occlusion, per-hand haptic feedback, and an isolated blue object-to-middle-finger world cue
 - Low-latency VR audio listener — OpenAL orientation/position built from fresh head tracking data each update instead of the previous render's camera matrix
 - Spatial-audio chain on bundled OpenAL Soft 1.25.2: binaural HRTF toggle (Auto/Headphones/Off), global mine-gallery reverb, occlusion muffling through per-source low-pass filters, and distance treble absorption
 - Startup crash hardening — legacy sound-updater thread force-disabled on upgraded installs, typed on-demand EFX filters, eye-framebuffer completeness checks with half-size retries

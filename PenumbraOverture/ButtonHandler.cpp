@@ -136,6 +136,7 @@ mState = eButtonHandlerState_Game;
 	mbVRCrouchButtonLatched = false;
 	mbVRPhysicalCrouch = false;
 	mbVRCrouchApplied = false;
+	mbVRCeilingCrouch = false;
 	mbVRStandingHeightKnown = false;
 	mfVRStandingHeight = 0.0f;
 	mbVRSeatedBaselineKnown = false;
@@ -828,18 +829,10 @@ if (vrInput.jump.justPressed) {
 						mpPlayer->StopRun();	
 					}
 
-					if(mpInput->BecameTriggerd("Crouch"))
-					{
-						mpPlayer->StartCrouch();
-					}
-					if(GetToggleCrouch())
-					{
-						if(mpInput->WasTriggerd("Crouch"))	mpPlayer->StopCrouch();
-					}
-					else
-					{
-						if(mpInput->IsTriggerd("Crouch")==false) mpPlayer->StopCrouch();
-					}
+					// UpdateVRCrouch handles controller and keyboard crouch once near
+					// the start of Update(). Sending the edge through these legacy
+					// callbacks too could toggle the collider a second time and leave
+					// the player permanently crouched after releasing the VR latch.
 
 					if(mpInput->BecameTriggerd("InteractMode"))
 					{
@@ -1027,7 +1020,12 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 	const bool buttonEnabled = crouchMode != eVRCrouchMode_Physical;
 	const bool physicalEnabled = crouchMode != eVRCrouchMode_Button;
 
-	if(buttonEnabled && aInputState.crouch.justPressed)
+	// SteamVR actions and the legacy keyboard action can describe the same
+	// physical control on some bindings. Collapse both sources into one edge;
+	// this function is the sole owner of the effective VR crouch state.
+	const bool crouchButtonPressed = aInputState.crouch.justPressed ||
+		mpInput->BecameTriggerd("Crouch");
+	if(buttonEnabled && crouchButtonPressed)
 	{
 		mbVRCrouchButtonLatched = !mbVRCrouchButtonLatched;
 		Log(" [VR comfort +%lu ms] crouch button latch %s.\n",
@@ -1053,6 +1051,7 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 					GetApplicationTime(), mfVRStandingHeight);
 			}
 			else if(!mbVRPhysicalCrouch && !mbVRCrouchButtonLatched &&
+				!mbVRCeilingCrouch &&
 				headHeight > mfVRStandingHeight)
 			{
 				// Let an initial low sample settle upwards, but never drift down
@@ -1095,13 +1094,18 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 		mbVRPhysicalCrouch = false;
 	}
 
-	bool crouchWanted = false;
-	if(crouchMode == eVRCrouchMode_Physical) crouchWanted = mbVRPhysicalCrouch;
-	else if(crouchMode == eVRCrouchMode_Button) crouchWanted = mbVRCrouchButtonLatched;
-	else crouchWanted = mbVRPhysicalCrouch || mbVRCrouchButtonLatched;
+	// Requested stance is owned only by player input. The ceiling flag below
+	// constrains the effective stance without overwriting either request.
+	bool crouchRequested = false;
+	if(crouchMode == eVRCrouchMode_Physical) crouchRequested = mbVRPhysicalCrouch;
+	else if(crouchMode == eVRCrouchMode_Button) crouchRequested = mbVRCrouchButtonLatched;
+	else crouchRequested = mbVRPhysicalCrouch || mbVRCrouchButtonLatched;
 
-	if(crouchWanted)
+	if(crouchRequested)
 	{
+		// A real/button request owns the crouch again. If headroom is still
+		// blocked it will be detected when that request is released.
+		mbVRCeilingCrouch = false;
 		if(mpPlayer->GetMoveState() != ePlayerMoveState_Jump &&
 			mpPlayer->GetMoveState() != ePlayerMoveState_Crouch)
 		{
@@ -1113,16 +1117,36 @@ void cButtonHandler::UpdateVRCrouch(const cVRInputState& aInputState)
 		if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
 			mbVRCrouchApplied = true;
 	}
-	else if(mbVRCrouchApplied)
+	else if(mbVRCrouchApplied ||
+		mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
 	{
 		if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
 		{
 			mpPlayer->ChangeMoveState(ePlayerMoveState_Walk);
 			if(mpPlayer->GetMoveState() == ePlayerMoveState_Crouch)
-				return; // A low ceiling prevented standing; retry next frame.
+			{
+				// The full-height collider did not fit. Treat this exactly like a
+				// temporary button crouch even in Physical mode: keep both the
+				// small collider and the virtual height drop, then retry standing
+				// next frame without changing either user-controlled crouch latch.
+				if(!mbVRCeilingCrouch)
+				{
+					mbVRCeilingCrouch = true;
+					Log(" [VR comfort +%lu ms] low ceiling forced crouch; standing will be retried.\n",
+						GetApplicationTime());
+				}
+				mbVRCrouchApplied = true;
+			}
 		}
-		mbVRCrouchApplied = false;
-		Log(" [VR comfort +%lu ms] VR crouch released.\n", GetApplicationTime());
+
+		if(mpPlayer->GetMoveState() != ePlayerMoveState_Crouch)
+		{
+			const bool wasCeilingCrouch = mbVRCeilingCrouch;
+			mbVRCeilingCrouch = false;
+			mbVRCrouchApplied = false;
+			Log(" [VR comfort +%lu ms] VR crouch released%s.\n",
+				GetApplicationTime(), wasCeilingCrouch ? "; headroom recovered" : "");
+		}
 	}
 
 // Physical crouching already moves the user's real viewpoint. A crouch
@@ -1143,6 +1167,7 @@ void cButtonHandler::Reset()
 	mbVRCrouchButtonLatched = false;
 	mbVRPhysicalCrouch = false;
 	mbVRCrouchApplied = false;
+	mbVRCeilingCrouch = false;
 	mbVRStandingHeightKnown = false;
 	mfVRStandingHeight = 0.0f;
 	mbVRSeatedBaselineKnown = false;

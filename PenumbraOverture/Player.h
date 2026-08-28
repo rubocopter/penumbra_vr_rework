@@ -83,7 +83,7 @@ struct cVRHandTarget
 {
 	cVRHandTarget()
 		: mpBody(NULL), mvPosition(0, 0, 0), mfDistance(0),
-		  mCrossHairState(eCrossHairState_None) {}
+		  mCrossHairState(eCrossHairState_None), mbMagnetic(false) {}
 
 	void Clear()
 	{
@@ -91,12 +91,17 @@ struct cVRHandTarget
 		mvPosition = cVector3f(0, 0, 0);
 		mfDistance = 0;
 		mCrossHairState = eCrossHairState_None;
+		mbMagnetic = false;
 	}
 
 	iPhysicsBody *mpBody;
 	cVector3f mvPosition;
 	float mfDistance;
 	eCrossHairState mCrossHairState;
+	// True when an inventory pickup was acquired by the hand-aim assist rather
+	// than physical palm overlap. This is targeting metadata only: it never
+	// changes the physics of doors, drawers, or loose world props.
+	bool mbMagnetic;
 };
 
 //---------------------------------------------
@@ -223,6 +228,7 @@ public:
 
 	void ChangeState(ePlayerState aState);  
 	void ChangeMoveState(ePlayerMoveState aState, bool abSetHeadHeightDirectly=false);
+	bool CanStand();
 
 	void AddCollideScript(eGameCollideScriptType aType,const tString &asFunc, const tString &asEntity);
 	void RemoveCollideScript(eGameCollideScriptType aType,const tString &asFunc);
@@ -321,7 +327,8 @@ public:
 	void ClearVRHandTarget(eVRHandIndex aHand);
 	void ClearVRHandTargetBody(iPhysicsBody *apBody);
 	void SetVRHandTarget(eVRHandIndex aHand, iPhysicsBody *apBody,
-		const cVector3f& avPosition, float afDistance, eCrossHairState aCrossHairState);
+		const cVector3f& avPosition, float afDistance,
+		eCrossHairState aCrossHairState, bool abMagnetic = false);
 	const cVRHandTarget& GetVRHandTarget(eVRHandIndex aHand) const { return mVRHandTargets[aHand]; }
 	void SetVRHeldBody(eVRHandIndex aHand, iPhysicsBody *apBody) { mVRHeldBodies[aHand] = apBody; }
 	iPhysicsBody *GetVRHeldBody(eVRHandIndex aHand) const { return mVRHeldBodies[aHand]; }

@@ -929,7 +929,10 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	mpPushBody->SetMaxLinearSpeed(mpPushBody->GetJointNum() > 0 ? 5.0f : 10.0f);
 	mpPushBody->SetMaxAngularSpeed(mpPushBody->GetJointNum() > 0 ? 8.0f : 15.0f);
 
-//The pick point relative to the body
+  // Use the actual selected surface point. The old VR path substituted the
+  // palm position, which can lie several centimetres outside a small drawer
+  // front once hand collision stops the visible mesh. That imaginary lever
+  // arm made short sliders and handles feel snagged.
   cMatrixf handMat;
   if (!mpInit->mpPlayerHands->GetHandPalmPose((int)interactHand, handMat))
   {
@@ -939,7 +942,11 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
         : mpInit->mpGame->vr_right_hand.GetMatrix(),
       mpInit->mpGame);
   }
-  mvPickPoint = handMat.GetTranslation();
+  const cVRHandTarget& handTarget = mpPlayer->GetVRHandTarget(interactHand);
+  const bool bTargetMatchesBody =
+    handTarget.mpBody != NULL && handTarget.mpBody == mpPushBody;
+  mvPickPoint = bTargetMatchesBody
+    ? handTarget.mvPosition : handMat.GetTranslation();
 
 	/////////////////////////////////////////
 	//Check if all controllers should be paused.
@@ -962,10 +969,14 @@ void cPlayerState_Move_VR::EnterState(iPlayerState* apPrevState)
 	{
 		bPausedGravity = false;
 	}
-cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
+  cMatrixf mtxInvModel = cMath::MatrixInverse(mpPushBody->GetLocalMatrix());
 	mvRelPickPoint = cMath::MatrixMul(mtxInvModel, mvPickPoint);
 
-	localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat), cMath::MatrixTranslate(mvPickPoint));
+	// Preserve the initial hand-to-contact offset, avoiding an opening impulse
+	// on selection. Magnetic targets are inventory entities and never enter
+	// this physical Move state.
+	localPickMatrix = cMath::MatrixMul(cMath::MatrixInverse(handMat),
+		cMath::MatrixTranslate(mvPickPoint));
 
 	//Set cross hair image.
 	//mpPlayer->SetCrossHairState(eCrossHairState_Grab);

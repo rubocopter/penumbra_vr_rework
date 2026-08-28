@@ -29,6 +29,17 @@ standing baseline is calibrated in `cButtonHandler` on the gameplay side
 (plausibility band 0.90–2.20 m, hysteresis); `cVRTrackingSpace` only receives
 the resulting posture offset through `SetPostureOffset`.
 
+Requested crouch (physical, button, or hybrid) is kept separate from the
+effective stance. When the full-height character collider cannot leave crouch,
+the environment temporarily constrains the effective stance and applies the
+same safe virtual height drop as button crouch. The original request is not
+changed. Full-height standing is retried against world collision each frame and
+returns automatically once there is clearance and no crouch request remains.
+The VR crouch controller consumes both SteamVR and keyboard edges and is the sole
+owner of the collider transition; legacy state callbacks do not toggle the same
+edge again. Floor-only upward contact is ignored during the standing probe, while
+downward ceiling or lateral correction still blocks recovery.
+
 The configured player height (VR Settings → Player Height, default 1.70 m,
 range 1.40–2.10 m) is kept separate from the posture offset: it is a semantic
 value chosen by the user or measured by the Calibrate button from the HMD
@@ -101,6 +112,30 @@ gentle. The visible hand may stop at scenery while this bounded assist still let
 the player retrieve an item from a cramped shelf. The original global
 player-state machine limits the current implementation to one active grab;
 simultaneous and two-point holds remain future work.
+
+When that bounded raw-controller extension is used, the contact target must be
+the first solid body reached from the collision-resolved palm. The very-short
+contact shortcut is retained only when no meaningful extension was needed. This
+prevents a thin closed door from being mistaken for direct palm contact while
+preserving forgiving acquisition of visible drawer handles.
+
+Normal palm overlap remains the first interaction target. If it finds nothing,
+each bare hand also performs an aim-cone query for inventory items only. The
+query ranks candidates by angle, distance, and item type, samples the visible
+portion of their bounding box, and requires unobstructed solid-body rays from
+both the controller and the tracked head. The head ray is essential when the
+physical controller has crossed a closed door even though the rendered hand is
+collision-constrained. Only the five best geometric candidates are ray-tested,
+and the broad phase is a tight segment AABB rather than a hand-centred cube.
+Consumables and stacks receive the longest reach, ordinary items an intermediate
+one, and important equipment a shorter one. This permits direct acquisition of
+batteries, healing items, keys, and similar pickups inside narrow shelves
+without adding magnetic forces to props, drawers, doors, or mechanisms.
+Candidate lock uses a subtle per-hand haptic pulse and no additional HUD marker.
+Candidate lock also renders a thin blue line from the visible item sample to the
+posed middle-finger knuckle. It is drawn directly by the normal world player state,
+not through the inventory/menu pointer, and is suppressed whenever those UI
+surfaces are active.
 
 Equipped lights, melee weapons, and thrown objects are separate attachments on
 top of the visible hand rig and retain their original gameplay logic. Each HUD
