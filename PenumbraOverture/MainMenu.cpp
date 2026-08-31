@@ -3674,7 +3674,8 @@ void cMainMenu::CreateWidgets()
   ///////////////////////////////////
   vPos = vTextStart;//cVector3f(400, 260, 40);
 
-AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, (mpInit, vPos, kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
+  AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text,
+    (mpInit, cVector3f(400, vPos.y, vPos.z), kTranslate("MainMenu", "VR Settings"), 25, eFontAlign_Center)));
   vPos.y += 30;
 
   struct sVRSettingSection {
@@ -3715,26 +3716,36 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
     { "VRDisplay", vVRDisplaySettings, 5 }
   };
 
+  // Two columns keep every hit rectangle inside the 800x600 virtual UI.
+  // The previous single column reached y=616 while the cursor clamps at 600,
+  // which made the final setting and Back impossible to select in VR.
+  cVector3f vVRColumnPos[2] = {
+    cVector3f(200, vPos.y, vPos.z),
+    cVector3f(590, vPos.y, vPos.z)
+  };
+
   for(int section = 0; section < 4; ++section)
   {
     const sVRSettingSection& vSection = vVRSections[section];
+	const int column = section < 2 ? 0 : 1;
+	cVector3f& vSectionPos = vVRColumnPos[column];
 
-    vPos.y += 4;
+    vSectionPos.y += 4;
     cMainMenuWidget_Text *pSectionTitle = hplNew(cMainMenuWidget_Text,
-      (mpInit, vPos, kTranslate("MainMenu", vSection.msTitleKey), 14, eFontAlign_Right));
+      (mpInit, vSectionPos, kTranslate("MainMenu", vSection.msTitleKey), 14, eFontAlign_Right));
     pSectionTitle->SetTextColor(cColor(0.6f, 0.85f, 1.0f, 1.0f));
     AddWidgetToState(eMainMenuState_OptionsVRSettings, pSectionTitle);
-    vPos.y += 13;
+    vSectionPos.y += 13;
 
     for(int i = 0; i < vSection.mlCount; ++i)
     {
       const eVRMenuSetting setting = vSection.mpSettings[i];
       cMainMenuWidget_VRSetting *pSetting = hplNew(cMainMenuWidget_VRSetting,
-        (mpInit, vPos, kTranslate("MainMenu", VRSettingsTextName(setting)), 14, eFontAlign_Right, setting));
+        (mpInit, vSectionPos, kTranslate("MainMenu", VRSettingsTextName(setting)), 14, eFontAlign_Right, setting));
       AddWidgetToState(eMainMenuState_OptionsVRSettings, pSetting);
       gpVRSettingButtons[setting] = pSetting;
 
-      cVector3f vValuePos(vTextStart.x + 12, vPos.y, vPos.z);
+      cVector3f vValuePos(vSectionPos.x + 12, vSectionPos.y, vSectionPos.z);
       gpVRSettingTexts[setting] = hplNew(cMainMenuWidget_Text,
         (mpInit, vValuePos, GetVRSettingText(mpInit, setting), 14, eFontAlign_Left, pSetting));
       AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRSettingTexts[setting]);
@@ -3743,31 +3754,32 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
       {
         AddWidgetToState(eMainMenuState_OptionsVRSettings,
           hplNew(cMainMenuWidget_CalibrateHeight, (mpInit,
-            cVector3f(vTextStart.x + 170, vPos.y, vPos.z),
+            cVector3f(vSectionPos.x + 112, vSectionPos.y, vSectionPos.z),
             kTranslate("MainMenu", "VRCalibrateHeight"), 13, eFontAlign_Left)));
       }
-      vPos.y += 14;
+      vSectionPos.y += 14;
     }
 
     if(section == 2)
     {
       // One-shot action inside the calibration section, not a stored setting.
       AddWidgetToState(eMainMenuState_OptionsVRSettings,
-        hplNew(cMainMenuWidget_RecenterButton, (mpInit, vPos,
+        hplNew(cMainMenuWidget_RecenterButton, (mpInit, vSectionPos,
           kTranslate("MainMenu", "VRRecenter"), 14, eFontAlign_Right)));
-      vPos.y += 14;
+      vSectionPos.y += 14;
     }
   }
 
   RefreshVRSettingAvailability(mpInit);
 
+  vPos = vVRColumnPos[1];
   vPos.y += 4;
   cMainMenuWidget_GraphicsPreset *pVRGraphicsPreset = hplNew(cMainMenuWidget_GraphicsPreset,
     (mpInit, vPos, kTranslate("MainMenu", "VRGraphicsPreset"), 14, eFontAlign_Right));
   AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRGraphicsPreset);
   const char* asPresetKeys[] = {"VRPresetPerformance","VRPresetBalanced","VRPresetQuality","VRPresetCustom"};
   gpVRGraphicsPresetText = hplNew(cMainMenuWidget_Text,
-    (mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z),
+    (mpInit, cVector3f(vPos.x + 12, vPos.y, vPos.z),
       kTranslate("MainMenu", asPresetKeys[pVRGraphicsPreset->GetPreset()]), 14, eFontAlign_Left));
   AddWidgetToState(eMainMenuState_OptionsVRSettings, gpVRGraphicsPresetText);
   vPos.y += 14;
@@ -3778,12 +3790,14 @@ AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Text, 
   AddWidgetToState(eMainMenuState_OptionsVRSettings, pVRRenderToMonitor);
   sText = mpInit->mpGame->mbRenderToMonitor ? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
   gpRenderToMonitorText = hplNew(cMainMenuWidget_Text,
-    (mpInit, cVector3f(vTextStart.x + 12, vPos.y, vPos.z), sText, 14, eFontAlign_Left, pVRRenderToMonitor));
+    (mpInit, cVector3f(vPos.x + 12, vPos.y, vPos.z), sText, 14, eFontAlign_Left, pVRRenderToMonitor));
 AddWidgetToState(eMainMenuState_OptionsVRSettings, gpRenderToMonitorText);
   vPos.y += 14;
 
+  const float fVRSettingsBottom = vVRColumnPos[0].y > vPos.y ? vVRColumnPos[0].y : vPos.y;
   AddWidgetToState(eMainMenuState_OptionsVRSettings, hplNew(cMainMenuWidget_Button,
-    (mpInit, vPos, kTranslate("MainMenu", "Back"), eMainMenuState_Options, 18, eFontAlign_Center)));
+    (mpInit, cVector3f(400, fVRSettingsBottom + 18, vPos.z),
+      kTranslate("MainMenu", "Back"), eMainMenuState_Options, 18, eFontAlign_Center)));
 
 	///////////////////////////////////
 	// Options Controls
