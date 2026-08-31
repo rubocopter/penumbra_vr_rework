@@ -167,6 +167,23 @@ poses so bundled tools can be calibrated against measured bounds rather than by
 screen-space guesswork. Rig limitations, especially the short static thumb chain
 and fused ring/middle mesh, still constrain the final pose.
 
+## Rendering and lighting
+
+Each eye renders to an `RGBA8` colour texture with a packed
+`GL_DEPTH24_STENCIL8` renderbuffer. `RenderZ()` writes both depth and the
+texture-modulated ambient base; `RenderLight()` subsequently adds direct lights
+and retains the original stencil shadow-volume implementation. The desktop
+monitor is a distinct render boundary and is marked non-VR by the low-level
+graphics state.
+
+There is currently no SSAO, sampleable depth attachment, HDR path, or
+hemispherical ambient shader. A minimal SSAO feasibility prototype was measured
+and then completely removed because its subtle contact darkening did not justify
+its stereo cost and complexity. The verified current pipeline, measurements,
+decision record, and tightly scoped design for a possible VR-only
+hemispherical-ambient A/B are documented in [Rendering and lighting
+research](LIGHTING.md).
+
 ## Runtime and build constraints
 
 - Rendering uses the established OpenVR compositor path; SteamVR Input actions

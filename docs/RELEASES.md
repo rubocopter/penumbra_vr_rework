@@ -2,7 +2,18 @@
 
 ## Unreleased
 
-No changes yet.
+### Changed
+
+- Reflowed Options → VR Settings into two columns so every setting and the Back button remains inside the 800×600 VR cursor range
+
+### Documentation
+
+- Added a rendering and lighting decision record covering the current HPL1 ambient/direct-light order, packed eye depth/stencil attachment, discarded half-resolution SSAO prototype, measured per-eye cost, visual findings, complete cleanup, and the minimal contract for a future VR-only hemispherical-ambient A/B
+- Corrected the controls guide to reflect the current collision-constrained visible palm instead of the obsolete pass-through description
+
+### Validation
+
+- Release Win32 full rebuild, Large Address Aware verification, `289 checks, 0 failures`, package generation, executable hash comparison, and confirmation that runtime code, shaders and packaged resources contain no leftover SSAO implementation
 
 ---
 

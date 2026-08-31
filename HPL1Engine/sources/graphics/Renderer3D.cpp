@@ -67,7 +67,7 @@ namespace hpl {
 
   int CreateFrameBuffer(int nWidth, int nHeight, FramebufferDesc &framebufferDesc)
   {
-    //RGBA8 2D texture, 24 bit depth texture, 256x256
+    // RGBA8 colour texture plus a packed 24-bit depth/8-bit stencil renderbuffer.
     glGenTextures(1, &framebufferDesc.m_nRenderTextureId);
     glBindTexture(GL_TEXTURE_2D, framebufferDesc.m_nRenderTextureId);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);

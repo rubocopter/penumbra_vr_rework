@@ -32,6 +32,7 @@ $requiredPaths = @(
     'data\vr\bindings\pico_neo3_controller.json',
     'data\vr\bindings\holographic_controller.json',
     'docs\INPUT_ARCHITECTURE.md',
+    'docs\LIGHTING.md',
     'scripts\deploy.ps1'
 )
 

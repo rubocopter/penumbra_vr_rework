@@ -9,6 +9,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
+- Graphics evaluation — a conservative VR-only hemispherical-ambient A/B using the existing `RenderZ()` normals, without another pass or any direct-light changes
 
 ## Next
 
@@ -17,6 +18,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Refine notebook, ladder, door, and held-object interactions for tracked controllers
 - Design a two-hand state model without breaking the original single-state interaction callbacks
 - Prototype an OpenXR backend behind the existing runtime boundary and compare it with the SteamVR path
+- Prototype fixed hemispherical ambient (`Up = 1.0`, `Down = 0.75`) behind an Off-by-default hot toggle; preserve the exact original shaders when Off and for the monitor, then retain it only if headset A/B and per-eye GPU measurements justify it
 
 ## Future
 
@@ -57,3 +59,5 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Generated controller bindings — single declarative spec in `scripts/generate-bindings.ps1` with build-time drift enforcement
 - Unit tests for tracking space, stick dead zones, VR hand-collision policy, high-speed wall/closed-door blocking, contact rotation, and constrained recovery executed by every build
 - CI pipeline building and packaging Release Win32 on every push, PR, and tag
+- VR Settings accessibility layout — two columns keep every option and the Back button within the cursor's 800×600 selectable area
+- HPL1 lighting audit and minimal half-resolution SSAO feasibility test — depth/stencil sampling, per-eye reconstruction, ambient-only composition and GPU timing were validated; the experiment was then fully removed because its roughly 0.46 ms stereo cost produced negligible visible benefit

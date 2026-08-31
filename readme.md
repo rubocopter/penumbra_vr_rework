@@ -49,6 +49,7 @@ Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime s
 - [Troubleshooting and compatibility](docs/TROUBLESHOOTING.md) — crash dumps and logs, laptop GPUs, audio devices, controller resets, non-Steam installs
 - [Controls and VR settings](docs/INPUT.md) — bindings, comfort options, compatibility, and diagnostics
 - [VR architecture](docs/VR_ARCHITECTURE.md) — tracking space, world placement, UI, and hands
+- [Rendering and lighting research](docs/LIGHTING.md) — current HPL1 light path, the discarded SSAO test, measurements, and the proposed hemispherical A/B
 - [Input architecture](docs/INPUT_ARCHITECTURE.md) — input flow and the engine/game boundary
 - [Roadmap](docs/ROADMAP.md) — current priorities and future work
 - [Release history](docs/RELEASES.md) — changes and known limitations by version

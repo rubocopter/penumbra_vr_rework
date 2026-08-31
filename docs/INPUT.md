@@ -225,13 +225,13 @@ Every bundled profile ships a default binding for the off-hand trigger — L2/R2
 
 If normal palm contact finds no target, point a bare hand at a visible inventory pickup and press that hand's trigger. Batteries, healing items, and other consumables receive the strongest assistance up to 2.35 metres; keys and ordinary small items use a medium range, while weapons and important equipment require closer intent. Pickups use their normal direct inventory acquisition. The assist requires clear solid-body line of sight from both the controller and the headset, never reaches through closed doors, walls, or shelves, and does not affect doors/drawers/physics props. A thin blue line connects a valid pickup to the posed middle-finger knuckle and a very light pulse marks initial lock; the line disappears when aim/visibility is lost or the item is collected. This world cue is separate from, and disabled during, the inventory and menu pointer.
 
-Moving an unoccupied hand into an ordinary dynamic prop or hinged door applies a bounded impulse at the contact point. Inventory pickups are excluded, and grabbable or movable props receive gentler limits so they remain easy to collect. This is a dynamic-object interaction proxy rather than a rigid hand collider: the rendered hand can still pass through static walls and scenery.
+Moving an unoccupied hand into an ordinary dynamic prop or hinged door applies a bounded impulse at the contact point. Inventory pickups are excluded, and grabbable or movable props receive gentler limits so they remain easy to collect. This nudge is a separate dynamic-object interaction proxy; the visible palm itself is collision-constrained by static walls, scenery, and closed doors, while individual animated fingers can still clip through thin geometry.
 
 The original game exposes one active player-interaction state. Consequently, both hands can initiate interaction, but holding two different physics objects simultaneously or constraining one object with both hands is not yet supported.
 
 ## VR settings
 
-Open **Options → VR Settings** to change controls, movement, calibration, and display options. Aim at a row and use R2 to increase or select the next value, R3 to decrease or select the previous value, and Circle to return.
+Open **Options → VR Settings** to change controls, movement, calibration, and display options. Controls and Movement occupy the left column; Calibration, Display, the graphics preset, and the desktop-mirror toggle occupy the right. The two-column layout keeps every row and the Back button inside the VR cursor's selectable area. Aim at a row and use R2 to increase or select the next value, R3 to decrease or select the previous value, and Circle to return.
 
 Changes are saved immediately. Render scale and HRTF require a restart. Settings that do not apply to the selected turn or crouch mode are shown greyed out.
 
