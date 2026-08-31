@@ -1022,6 +1022,7 @@ enum eVRMenuSetting
 	eVRMenuSetting_UIDistance,
 	eVRMenuSetting_UIScale,
 	eVRMenuSetting_RenderScale,
+	eVRMenuSetting_HemisphericalAmbient,
 	eVRMenuSetting_HRTF,
 	eVRMenuSetting_SubtitleScale,
 	eVRMenuSetting_LastEnum
@@ -1053,6 +1054,7 @@ static const char *VRSettingsTextName(eVRMenuSetting aSetting)
 	case eVRMenuSetting_UIDistance: return "VRUIDistance";
 	case eVRMenuSetting_UIScale: return "VRUIScale";
 	case eVRMenuSetting_RenderScale: return "VRRenderScale";
+	case eVRMenuSetting_HemisphericalAmbient: return "VRHemisphericalAmbient";
 	case eVRMenuSetting_HRTF: return "VRHRTF";
 	case eVRMenuSetting_SubtitleScale: return "VRSubtitleScale";
 	default: return "";
@@ -1125,6 +1127,9 @@ switch(aSetting)
 	case eVRMenuSetting_RenderScale:
 		sprintf_s(sValue, sizeof(sValue), "%.2fx", settings.GetRenderScale());
 		break;
+	case eVRMenuSetting_HemisphericalAmbient:
+		return settings.GetHemisphericalAmbientEnabled()
+			? kTranslate("MainMenu", "On") : kTranslate("MainMenu", "Off");
 	case eVRMenuSetting_HRTF:
 		switch(settings.GetHRTFMode())
 		{
@@ -1231,6 +1236,9 @@ cVRSettings& settings = mpInit->mVRSettings;
 			break;
 		case eVRMenuSetting_RenderScale:
 			settings.SetRenderScale(settings.GetRenderScale() + 0.05f * direction);
+			break;
+		case eVRMenuSetting_HemisphericalAmbient:
+			settings.SetHemisphericalAmbientEnabled(!settings.GetHemisphericalAmbientEnabled());
 			break;
 		case eVRMenuSetting_HRTF:
 		{
@@ -3706,6 +3714,7 @@ void cMainMenu::CreateWidgets()
     eVRMenuSetting_UIDistance,
     eVRMenuSetting_UIScale,
     eVRMenuSetting_RenderScale,
+		eVRMenuSetting_HemisphericalAmbient,
     eVRMenuSetting_HRTF,
     eVRMenuSetting_SubtitleScale
   };
@@ -3713,7 +3722,7 @@ void cMainMenu::CreateWidgets()
     { "VRControls", vVRControlsSettings, 1 },
     { "VRMovement", vVRMovementSettings, 8 },
     { "VRCalibration", vVRCalibrationSettings, 3 },
-    { "VRDisplay", vVRDisplaySettings, 5 }
+	{ "VRDisplay", vVRDisplaySettings, 6 }
   };
 
   // Two columns keep every hit rectangle inside the 800x600 virtual UI.

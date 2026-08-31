@@ -1,0 +1,25 @@
+// Copyright 2006-2010 (C) - Frictional Games
+//
+// This file is part of HPL1 Engine
+//
+// For conditions of distribution and use, see copyright notice in LICENSE-shaders
+//
+
+///////////////////////////////////////////////////////
+/// VR HEMISPHERICAL AMBIENT FRAGMENT PROGRAM ///////
+///////////////////////////////////////////////////////
+
+void main(half4 pos : POSITION,
+		  half4 lightColor : COLOR0,
+		  half2 uv : TEXCOORD0,
+		  half hemisphere : TEXCOORD1,
+
+		  out half4 oColor : COLOR,
+
+		  uniform sampler2D diffuseMap : TEXUNIT0,
+		  uniform float3 ambientColor)
+{
+	oColor = tex2D(diffuseMap, uv);
+	float ambientFactor = lerp(0.75, 1.0, saturate(hemisphere));
+	oColor.xyz *= ambientColor * ambientFactor;
+}

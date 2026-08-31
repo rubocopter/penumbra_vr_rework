@@ -113,6 +113,8 @@ namespace hpl {
 		
 		case eRenderStateType_VertexProgram:	mpVtxProgram = apState->mpVtxProgram;
 												mpVtxProgramSetup = apState->mpVtxProgramSetup;
+												mpVRVtxProgram = apState->mpVRVtxProgram;
+												mpVRVtxProgramSetup = apState->mpVRVtxProgramSetup;
 												mbUsesEye = apState->mbUsesEye;
 												mbUsesLight = apState->mbUsesLight;
 												mpLight = apState->mpLight;
@@ -120,6 +122,8 @@ namespace hpl {
 		
 		case eRenderStateType_FragmentProgram:	mpFragProgram = apState->mpFragProgram;
 												mpFragProgramSetup = apState->mpFragProgramSetup;
+												mpVRFragProgram = apState->mpVRFragProgram;
+												mpVRFragProgramSetup = apState->mpVRFragProgramSetup;
 												break;
 		
 		case eRenderStateType_Texture:			for(int i=0;i<MAX_TEXTUREUNITS;i++)
@@ -302,34 +306,38 @@ namespace hpl {
 
 	void iRenderState::SetVtxProgMode(cRenderSettings* apSettings)
 	{
-		if(mpVtxProgram != apSettings->mpVertexProgram)
+		const bool bUseVRProgram = apSettings->mbVRAmbientActive && mpVRVtxProgram != NULL;
+		iGpuProgram *pVtxProgram = bUseVRProgram ? mpVRVtxProgram : mpVtxProgram;
+		iMaterialProgramSetup *pVtxProgramSetup = bUseVRProgram ? mpVRVtxProgramSetup : mpVtxProgramSetup;
+
+		if(pVtxProgram != apSettings->mpVertexProgram)
 		{
 			if(apSettings->mbLog){
-				if(mpVtxProgram)
-					Log("Setting vertex program: '%s'/%d ",mpVtxProgram->GetName().c_str(), 
-																		(size_t)mpVtxProgram);
+				if(pVtxProgram)
+					Log("Setting vertex program: '%s'/%d ",pVtxProgram->GetName().c_str(),
+																			(size_t)pVtxProgram);
 				else
 					Log("Setting vertex program: NULL ");
 			}
 			
-			if(mpVtxProgram==NULL && apSettings->mpVertexProgram)
+			if(pVtxProgram==NULL && apSettings->mpVertexProgram)
 			{
 				apSettings->mpVertexProgram->UnBind();
 				if(apSettings->mbLog)Log("Unbinding old ");
 			}
-			apSettings->mpVertexProgram = mpVtxProgram;
+			apSettings->mpVertexProgram = pVtxProgram;
 
-			if(mpVtxProgram)
+			if(pVtxProgram)
 			{
 				if(apSettings->mbLog)Log("Binding new ");
-				mpVtxProgram->Bind();
+				pVtxProgram->Bind();
 				
-				if(mpVtxProgramSetup)
+				if(pVtxProgramSetup)
 				{
-					if(apSettings->mbLog)Log("Custom setup %d ", mpVtxProgram);
-                    mpVtxProgramSetup->Setup(mpVtxProgram, apSettings);
+					if(apSettings->mbLog)Log("Custom setup %d ", pVtxProgram);
+					pVtxProgramSetup->Setup(pVtxProgram, apSettings);
 				}
-				apSettings->mpVtxProgramSetup = mpVtxProgramSetup;
+				apSettings->mpVtxProgramSetup = pVtxProgramSetup;
 				
 				//reset this so all matrix setting are set to vertex program.
 				apSettings->mbMatrixWasNULL = false;
@@ -339,7 +347,7 @@ namespace hpl {
 					if(apSettings->mbLog)Log("Setting light properites ");
 					
 					//mpVtxProgram->SetFloat("LightRadius",mpLight->GetFarAttenuation());
-					mpVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
+					pVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
 					
 					apSettings->mpLight = mpLight;
 				}
@@ -351,6 +359,10 @@ namespace hpl {
 				apSettings->mbUsesLight = mbUsesLight;
 				apSettings->mbUsesEye = mbUsesEye;
 			}
+			else
+			{
+				apSettings->mpVtxProgramSetup = NULL;
+			}
 			if(apSettings->mbLog)Log("\n");
 		}
 		else
@@ -359,7 +371,7 @@ namespace hpl {
 			{
 				if(apSettings->mbLog)Log("Setting new light properites\n");
 				//mpVtxProgram->SetFloat("LightRadius",mpLight->GetFarAttenuation());
-				mpVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
+				pVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
 
 				apSettings->mpLight = mpLight;
 			}
@@ -370,13 +382,17 @@ namespace hpl {
 
 	void iRenderState::SetFragProgMode(cRenderSettings* apSettings)
 	{
-		if(mpFragProgram != apSettings->mpFragmentProgram)
+		const bool bUseVRProgram = apSettings->mbVRAmbientActive && mpVRFragProgram != NULL;
+		iGpuProgram *pFragProgram = bUseVRProgram ? mpVRFragProgram : mpFragProgram;
+		iMaterialProgramSetup *pFragProgramSetup = bUseVRProgram ? mpVRFragProgramSetup : mpFragProgramSetup;
+
+		if(pFragProgram != apSettings->mpFragmentProgram)
 		{
 			if(apSettings->mbLog)
 			{
-				if(mpFragProgram)
-					Log("Setting fragment program: '%s' /%d ",mpFragProgram->GetName().c_str(),
-																		(size_t) mpFragProgram);
+				if(pFragProgram)
+					Log("Setting fragment program: '%s' /%d ",pFragProgram->GetName().c_str(),
+																			(size_t) pFragProgram);
 				else
 					Log("Setting fragment program: NULL");
 			}
@@ -384,14 +400,14 @@ namespace hpl {
 			//if(mpFragProgram==NULL && apSettings->mpFragmentProgram) apSettings->mpFragmentProgram->UnBind();
 			if(apSettings->mpFragmentProgram) apSettings->mpFragmentProgram->UnBind();
 			
-			apSettings->mpFragmentProgram = mpFragProgram;
+			apSettings->mpFragmentProgram = pFragProgram;
 
-			if(mpFragProgram)
+			if(pFragProgram)
 			{
 				if(apSettings->mbLog)Log("Binding new ");
-				mpFragProgram->Bind();
+				pFragProgram->Bind();
 
-				if(mpFragProgramSetup) mpFragProgramSetup->Setup(mpFragProgram,apSettings);
+				if(pFragProgramSetup) pFragProgramSetup->Setup(pFragProgram,apSettings);
 			}
 
 			if(apSettings->mbLog)Log("\n");
@@ -613,13 +629,21 @@ namespace hpl {
 	
 	int iRenderState::CompareVtxProg(const iRenderState* apState) const
 	{
-		return GetCompareVal(mpVtxProgram, apState->mpVtxProgram);
+		int lRet = GetCompareVal(mpVtxProgram, apState->mpVtxProgram);
+		if(lRet == 0) lRet = GetCompareVal(mpVRVtxProgram, apState->mpVRVtxProgram);
+		if(lRet == 0) lRet = GetCompareVal(mpVtxProgramSetup, apState->mpVtxProgramSetup);
+		if(lRet == 0) lRet = GetCompareVal(mpVRVtxProgramSetup, apState->mpVRVtxProgramSetup);
+		return lRet;
 	}
 	//-----------------------------------------------------------------------
 	
 	int iRenderState::CompareFragProg(const iRenderState* apState) const
 	{
-		return GetCompareVal(mpFragProgram, apState->mpFragProgram);
+		int lRet = GetCompareVal(mpFragProgram, apState->mpFragProgram);
+		if(lRet == 0) lRet = GetCompareVal(mpVRFragProgram, apState->mpVRFragProgram);
+		if(lRet == 0) lRet = GetCompareVal(mpFragProgramSetup, apState->mpFragProgramSetup);
+		if(lRet == 0) lRet = GetCompareVal(mpVRFragProgramSetup, apState->mpVRFragProgramSetup);
+		return lRet;
 	}
 
 	//-----------------------------------------------------------------------

@@ -176,13 +176,15 @@ and retains the original stencil shadow-volume implementation. The desktop
 monitor is a distinct render boundary and is marked non-VR by the low-level
 graphics state.
 
-There is currently no SSAO, sampleable depth attachment, HDR path, or
-hemispherical ambient shader. A minimal SSAO feasibility prototype was measured
-and then completely removed because its subtle contact darkening did not justify
-its stereo cost and complexity. The verified current pipeline, measurements,
-decision record, and tightly scoped design for a possible VR-only
-hemispherical-ambient A/B are documented in [Rendering and lighting
-research](LIGHTING.md).
+There is currently no SSAO, sampleable depth attachment, or HDR path. A minimal
+SSAO feasibility prototype was measured and then completely removed because
+its subtle contact darkening did not justify its stereo cost and complexity.
+The next A/B is implemented as a dedicated VR-only hemispherical ambient shader
+pair selected inside the existing `RenderZ()` material state. Its toggle is Off
+by default; Off and the monitor select the exact original shader pair. No extra
+pass, framebuffer attachment, direct-light change, or stencil change is
+involved. The decision record, fixed factors, fallback, and per-eye `RenderZ()`
+GPU timing are documented in [Rendering and lighting research](LIGHTING.md).
 
 ## Runtime and build constraints
 

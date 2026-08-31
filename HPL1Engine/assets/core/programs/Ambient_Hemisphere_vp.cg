@@ -1,0 +1,31 @@
+// Copyright 2006-2010 (C) - Frictional Games
+//
+// This file is part of HPL1 Engine
+//
+// For conditions of distribution and use, see copyright notice in LICENSE-shaders
+//
+
+///////////////////////////////////////////////////////
+/// VR HEMISPHERICAL AMBIENT VERTEX PROGRAM /////////
+///////////////////////////////////////////////////////
+
+void main(	float4 position : POSITION,
+			float3 normal   : NORMAL,
+			half4 color     : COLOR,
+			half2 uv        : TEXCOORD0,
+
+			out float4 oPosition : POSITION,
+			out half4 oColor : COLOR,
+			out half2 oUv : TEXCOORD0,
+			out half oHemisphere : TEXCOORD1,
+
+			uniform float4x4 worldViewProj,
+			uniform float4x4 objectNormalMatrix)
+{
+	oPosition = mul(worldViewProj, position);
+	oColor = color;
+	oUv = uv;
+
+	float3 worldNormal = normalize(mul((float3x3)objectNormalMatrix, normal));
+	oHemisphere = saturate(worldNormal.y * 0.5 + 0.5);
+}

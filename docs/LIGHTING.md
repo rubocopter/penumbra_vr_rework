@@ -16,8 +16,9 @@ become a shipping renderer dependency.
 - The monitor renderer and all direct-light/material shaders are unchanged.
 - The SSAO feasibility prototype was removed after hardware evaluation showed
   too little visible benefit.
-- Hemispherical ambient lighting is a design candidate only. It has not been
-  implemented and no setting or shader for it currently exists.
+- A conservative VR-only hemispherical ambient prototype is now implemented
+  behind an Off-by-default hot toggle. It still requires headset A/B testing
+  before any decision to keep it.
 
 ## How HPL1 currently produces ambient light
 
@@ -149,16 +150,16 @@ flashlight's existing stencil path was not modified.
 | Candidate | Status | Reasoning |
 | --- | --- | --- |
 | Half-resolution SSAO | Rejected for now | Valid mask and low absolute cost, but negligible perceived improvement in the tested scenes |
-| Hemispherical ambient | Next candidate | Uses existing geometry normals inside the ambient pass; no depth texture or extra pass |
+| Hemispherical ambient | Implemented for A/B | Uses existing geometry normals inside the ambient pass; no depth texture or extra pass; headset result still unknown |
 | Soft ambient direction | Possible later extension | Could increase separation, but should not be mixed into the first controlled test |
 | Separate sky/ground colours | Possible later extension | More art direction and tuning than the initial scalar A/B needs |
 | Fake contact shading | Low priority | The SSAO test indicates that more contact darkening is not the main visual deficit |
 | Distance attenuation/fog | Deferred | Potentially useful for depth separation but much more likely to change Penumbra's original atmosphere |
 | HDR/modern post-processing | Out of scope | The current PCVR/OpenGL path is `RGBA8`, and converting the presentation pipeline is not a minimal lighting improvement |
 
-## Proposed hemispherical ambient prototype
+## Hemispherical ambient A/B prototype
 
-The first test should alter only the orientation of the existing ambient term:
+The implemented test alters only the orientation of the existing ambient term:
 
 ```text
 hemi = saturate(normalWorld.y * 0.5 + 0.5)
@@ -173,19 +174,25 @@ surface keeps the current ambient level, a downward-facing surface receives
 test whether orientation alone separates floors, walls, ceilings and props—not
 to introduce an obvious new light source.
 
-### Minimal implementation seam
+### Implementation boundary
 
-1. Leave the shared `Diffuse_Color_vp.cg` and `Ambient_Color_fp.cg` untouched.
-   They are reused by paths that must remain identical.
-2. Add a dedicated ambient vertex/fragment pair for the BaseLight Z pass.
-3. Feed the geometry normal through an inverse-transpose object-to-world normal
-   matrix and use world Y. View-space Y would make the lighting rotate with the
-   player's head and differ conceptually between eye views.
-4. Select the alternate pair only when the low-level renderer reports VR active
-   and a future runtime toggle is On. A shader creation failure must fall back
-   to the original pair.
-5. Keep `RenderLight()`, materials' direct-light programs, stencil operations,
-   eye FBOs and the monitor path untouched.
+1. The shared `Diffuse_Color_vp.cg` and `Ambient_Color_fp.cg` remain untouched.
+   Off and monitor rendering select those exact original program objects.
+2. `Ambient_Hemisphere_vp.cg` and `Ambient_Hemisphere_fp.cg` form a dedicated
+   alternative pair for the BaseLight Z pass only.
+3. The vertex shader receives the geometry normal through an inverse-transpose
+   object-to-world normal matrix and uses world Y. A singular object matrix
+   falls back to identity instead of producing invalid normals.
+4. The compiled render state retains both original and VR-alternative program
+   pointers. Selection occurs at draw-state application time because one render
+   list is shared by the optional monitor view and both eyes. The alternative
+   is selected only while the low-level renderer marks an eye as VR and the
+   runtime toggle is On.
+5. Both alternative shaders must load. If either fails, both alternative
+   pointers are discarded and state selection automatically uses the original
+   pair.
+6. `RenderLight()`, direct-light shaders, stencil operations, eye FBOs and the
+   monitor path are untouched.
 
 HPL1 already exposes vertex normals and per-object program setup hooks;
 `Material_EnvMap_Reflect.cpp` demonstrates sending `objectWorldMatrix` during a
@@ -194,9 +201,22 @@ keeps the fragment work to a small interpolation/multiply. Passing an
 inverse-transpose normal matrix is safer than taking the object's upper-left
 3×3 directly because non-uniform scale can otherwise skew the result.
 
-The first prototype should cover the normal BaseLight material family. Legacy
-fallback or unusual material paths should retain the original ambient shader
-rather than receive a broad modification to a shared program.
+The prototype covers the normal BaseLight material family. Legacy fallback or
+unusual material paths retain the original ambient shader rather than receiving
+a broad modification to a shared program.
+
+The persisted setting is `[VR] HemisphericalAmbient`, exposed as
+**Options → VR Settings → Display → Hemispherical ambient**. It defaults to
+`Off`, saves immediately, and changes the next eye render without restarting or
+reloading the map. No intensity, colour, direction, or quality setting exists.
+
+When OpenGL 1.5 queries and `GL_EXT_timer_query` are available, asynchronous
+double-buffered queries measure the complete `RenderZ()` GPU interval for each
+eye. `hpl.log` reports a separate 120-sample average for left/right and On/Off,
+for example `VR ambient RenderZ GPU [On, left]`. These are total ambient/depth
+pass timings, not a fictitious isolated cost for an effect that has no separate
+pass. If timer queries are unavailable, rendering continues and the log states
+that GPU timing is disabled.
 
 ### Required A/B contract
 
@@ -215,9 +235,10 @@ rather than receive a broad modification to a shared program.
 Use the same save, camera position, head orientation, render scale and active
 lights for each pair. Capture the same eye with the toggle Off and On after a
 short warm-up. Inspect at least a floor/wall/ceiling junction, a freestanding
-prop, a downward-facing surface and a flashlight shadow edge. Record independent
-GPU time for left and right eyes over enough frames to report a stable median,
-not a single-frame sample.
+prop, a downward-facing surface and a flashlight shadow edge. Record the
+independent 120-frame `RenderZ()` averages printed for left and right eyes in
+both modes; compare like-for-like after a short warm-up rather than reading a
+single frame.
 
 The prototype succeeds only if surface orientation gives perceptible volume
 without looking like a new directional light. If the A/B remains irrelevant,
@@ -233,6 +254,19 @@ After removing SSAO and retaining the two-column VR Settings layout:
 - Unit tests reported `289 checks, 0 failures`.
 - The packaged executable matched the built executable by SHA-256.
 - No runtime code, shader or packaged filename matched the removed SSAO feature.
+
+For the hemispherical ambient prototype on 1 September 2026:
+
+- Release Win32 completed a full rebuild successfully.
+- Large Address Aware remained present in the PE header.
+- Project validation passed and unit tests reported `289 checks, 0 failures`.
+- The package contains both optional shaders and its executable matches the
+  built executable by SHA-256.
+- The original ambient shaders have no source changes; the optional pair and
+  runtime selection are guarded by the project validator.
+- Headset A/B captures, flashlight-shadow comparison and the logged per-eye GPU
+  averages remain pending hardware validation. They must not be inferred from
+  build-only verification.
 
 Relevant code entry points:
 

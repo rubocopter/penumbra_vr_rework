@@ -624,6 +624,8 @@ namespace hpl {
 			
 			pTempState->mpVtxProgram = pMaterial->GetVertexProgram(aPassType,alPass,apLight);
 			pTempState->mpVtxProgramSetup = pMaterial->GetVertexProgramSetup(aPassType,alPass,apLight);
+			pTempState->mpVRVtxProgram = pMaterial->GetVRVertexProgram(aPassType,alPass,apLight);
+			pTempState->mpVRVtxProgramSetup = pMaterial->GetVRVertexProgramSetup(aPassType,alPass,apLight);
 			pTempState->mbUsesLight = pMaterial->VertexProgramUsesLight(aPassType, alPass,apLight);
 			pTempState->mbUsesEye = pMaterial->VertexProgramUsesEye(aPassType, alPass,apLight);
 			pTempState->mpLight = apLight;
@@ -643,6 +645,8 @@ namespace hpl {
 			
 			pTempState->mpFragProgram = pMaterial->GetFragmentProgram(aPassType,alPass,apLight);
 			pTempState->mpFragProgramSetup = pMaterial->GetFragmentProgramSetup(aPassType,alPass,apLight);
+			pTempState->mpVRFragProgram = pMaterial->GetVRFragmentProgram(aPassType,alPass,apLight);
+			pTempState->mpVRFragProgramSetup = pMaterial->GetVRFragmentProgramSetup(aPassType,alPass,apLight);
 
 			pNode = InsertNode(pNode, pTempNode);
 		}

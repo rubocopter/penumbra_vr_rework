@@ -53,6 +53,35 @@ namespace hpl {
 
 	//-----------------------------------------------------------------------
 
+	class cVRAmbientVtxProgramSetup : public iMaterialProgramSetup
+	{
+	public:
+		void Setup(iGpuProgram *apProgram,cRenderSettings* apRenderSettings)
+		{
+		}
+
+		void SetupMatrix(cMatrixf *apModelMatrix, cRenderSettings* apRenderSettings)
+		{
+			cMatrixf mtxNormal = cMatrixf::Identity;
+			if(apModelMatrix)
+			{
+				const cMatrixf& mtxModel = *apModelMatrix;
+				const float fDeterminant =
+					mtxModel.m[0][0] * (mtxModel.m[1][1] * mtxModel.m[2][2] - mtxModel.m[1][2] * mtxModel.m[2][1]) -
+					mtxModel.m[0][1] * (mtxModel.m[1][0] * mtxModel.m[2][2] - mtxModel.m[1][2] * mtxModel.m[2][0]) +
+					mtxModel.m[0][2] * (mtxModel.m[1][0] * mtxModel.m[2][1] - mtxModel.m[1][1] * mtxModel.m[2][0]);
+				if(cMath::Abs(fDeterminant) > 0.000001f)
+					mtxNormal = cMath::MatrixInverse(mtxModel).GetTranspose();
+			}
+
+			apRenderSettings->mpVertexProgram->SetMatrixf("objectNormalMatrix",mtxNormal);
+		}
+	};
+
+	static cVRAmbientVtxProgramSetup gVRAmbientVtxProgramSetup;
+
+	//-----------------------------------------------------------------------
+
 
 	//////////////////////////////////////////////////////////////////////////
 	// CONSTRUCTORS
@@ -73,6 +102,8 @@ namespace hpl {
 		mbIsGlowing= false;
 		mbUsesLights = true;
 		mbUseColorSpecular = false;
+		mpVRAmbientVP = NULL;
+		mpVRAmbientFP = NULL;
 
 		for(int i=0; i<eBaseLightProgram_LastEnum; i++) {
 			mvVtxPrograms[i] =NULL;
@@ -141,6 +172,19 @@ namespace hpl {
 		mpSimpleFP = mpProgramManager->CreateProgram("Diffuse_Color_fp.cg","main",eGpuProgramType_Fragment);
 		mpAmbientFP = mpProgramManager->CreateProgram("Ambient_Color_fp.cg","main",eGpuProgramType_Fragment);
 		
+		// This optional pair is selected only for the VR ambient pass. If either
+		// program fails, render-state selection keeps the original pair intact.
+		mpVRAmbientVP = mpProgramManager->CreateProgram("Ambient_Hemisphere_vp.cg","main",eGpuProgramType_Vertex);
+		mpVRAmbientFP = mpProgramManager->CreateProgram("Ambient_Hemisphere_fp.cg","main",eGpuProgramType_Fragment);
+		if(mpVRAmbientVP == NULL || mpVRAmbientFP == NULL)
+		{
+			if(mpVRAmbientVP) mpProgramManager->Destroy(mpVRAmbientVP);
+			if(mpVRAmbientFP) mpProgramManager->Destroy(mpVRAmbientFP);
+			mpVRAmbientVP = NULL;
+			mpVRAmbientFP = NULL;
+			Log(" VR hemispherical ambient unavailable; using original ambient shaders.\n");
+		}
+
 		///////////////////////////////////////////
 		//Normalization map
 		mpNormalizationMap = mpTextureManager->CreateCubeMap("Normalization", false);
@@ -175,6 +219,9 @@ namespace hpl {
 		}
 
 		if(mpSimpleFP) mpProgramManager->Destroy(mpSimpleFP);
+		if(mpAmbientFP) mpProgramManager->Destroy(mpAmbientFP);
+		if(mpVRAmbientVP) mpProgramManager->Destroy(mpVRAmbientVP);
+		if(mpVRAmbientFP) mpProgramManager->Destroy(mpVRAmbientFP);
 
 	}
 
@@ -201,6 +248,24 @@ namespace hpl {
 		if(aType == eMaterialRenderType_Z) return mpProgram[eGpuProgramType_Vertex][1];
 		if(aType == eMaterialRenderType_Diffuse) return mpProgram[eGpuProgramType_Vertex][1];
         
+		return NULL;
+	}
+
+	//------------------------------------------------------------------------------------
+
+	iGpuProgram* iMaterial_BaseLight::GetVRVertexProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight)
+	{
+		if(aType == eMaterialRenderType_Z && mpVRAmbientVP && mpVRAmbientFP)
+			return mpVRAmbientVP;
+		return NULL;
+	}
+
+	//------------------------------------------------------------------------------------
+
+	iMaterialProgramSetup * iMaterial_BaseLight::GetVRVertexProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight)
+	{
+		if(aType == eMaterialRenderType_Z && mpVRAmbientVP && mpVRAmbientFP)
+			return &gVRAmbientVtxProgramSetup;
 		return NULL;
 	}
 
@@ -255,6 +320,24 @@ namespace hpl {
 		{
 			return mpAmbientFP;
 		}
+		return NULL;
+	}
+
+	//------------------------------------------------------------------------------------
+
+	iGpuProgram* iMaterial_BaseLight::GetVRFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight)
+	{
+		if(aType == eMaterialRenderType_Z && mpVRAmbientVP && mpVRAmbientFP)
+			return mpVRAmbientFP;
+		return NULL;
+	}
+
+	//------------------------------------------------------------------------------------
+
+	iMaterialProgramSetup * iMaterial_BaseLight::GetVRFragmentProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight)
+	{
+		if(aType == eMaterialRenderType_Z && mpVRAmbientVP && mpVRAmbientFP)
+			return &gAmbProgramSetup;
 		return NULL;
 	}
 

@@ -127,6 +127,7 @@ namespace hpl {
 		
 		bool mbUsesLight;
 		bool mbUsesEye;
+		bool mbVRAmbientActive;
 
 		cColor mAmbientColor;
 
@@ -203,6 +204,9 @@ namespace hpl {
 
     void SetVRRenderScale(float afScale) { mfVRRenderScale = afScale; }
     float GetVRRenderScale() const { return mfVRRenderScale; }
+		void SetVRHemisphericalAmbientEnabled(bool abEnabled) { mbVRHemisphericalAmbientEnabled = abEnabled; }
+		bool GetVRHemisphericalAmbientEnabled() const { return mbVRHemisphericalAmbientEnabled; }
+		void SetCurrentVREye(int alEye) { mlCurrentVREye = alEye; }
 
     FramebufferDesc leftEyeDesc;
     FramebufferDesc rightEyeDesc;
@@ -222,6 +226,10 @@ namespace hpl {
 		void RenderSkyBox(cCamera3D *apCamera);
 		
 		void RenderZ(cCamera3D *apCamera);
+		void InitVRAmbientGpuTimers();
+		void BeginVRAmbientGpuTimer();
+		void EndVRAmbientGpuTimer();
+		void StoreVRAmbientGpuTime(int alEye, bool abEnabled, GLuint64EXT alNanoseconds);
 
 		void RenderOcclusionQueries(cCamera3D *apCamera);
 
@@ -243,6 +251,18 @@ namespace hpl {
 		cRendererPostEffects *mpPostEffects;
 
 		bool mbLog;
+		bool mbVRHemisphericalAmbientEnabled;
+		bool mbVRAmbientGpuTimersInitialized;
+		bool mbVRAmbientGpuTimersSupported;
+		int mlCurrentVREye;
+		int mlVRAmbientActiveTimerEye;
+		int mlVRAmbientActiveTimerSlot;
+		GLuint mvVRAmbientTimerQueries[2][2];
+		bool mvVRAmbientTimerPending[2][2];
+		bool mvVRAmbientTimerMode[2][2];
+		int mvVRAmbientTimerWriteSlot[2];
+		double mvVRAmbientTimerSum[2][2];
+		unsigned int mvVRAmbientTimerSamples[2][2];
 
 		float mfRenderTime;
 

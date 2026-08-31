@@ -228,9 +228,13 @@ namespace hpl {
 		virtual bool VertexProgramUsesLight(eMaterialRenderType aType, int alPass, iLight3D *apLight){return false;}
 		virtual bool VertexProgramUsesEye(eMaterialRenderType aType, int alPass, iLight3D *apLight){return false;}
 		virtual iMaterialProgramSetup * GetVertexProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
+		virtual iGpuProgram* GetVRVertexProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
+		virtual iMaterialProgramSetup * GetVRVertexProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
 
 		virtual iGpuProgram* GetFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
 		virtual iMaterialProgramSetup * GetFragmentProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
+		virtual iGpuProgram* GetVRFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
+		virtual iMaterialProgramSetup * GetVRFragmentProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight){return NULL;}
 		
 		virtual eMaterialAlphaMode GetAlphaMode(eMaterialRenderType aType, int alPass, iLight3D *apLight){return eMaterialAlphaMode_Solid;}
 		virtual eMaterialBlendMode GetBlendMode(eMaterialRenderType aType, int alPass, iLight3D *apLight){return eMaterialBlendMode_Replace;}

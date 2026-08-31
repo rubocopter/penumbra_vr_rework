@@ -474,6 +474,7 @@ namespace hpl {
 
             pCamera3D->DisableVRMatrices();
 
+			mpGraphics->GetRenderer3D()->SetCurrentVREye(-1);
             mpGraphics->GetRenderer3D()->RenderWorld(mpCurrentWorld3D, pCamera3D, afFrameTime);
 
             apUpdater->OnPostSceneDraw();
@@ -590,6 +591,7 @@ namespace hpl {
 
             pCamera3D->SetVRViewMatrix(worldEyeViewMat);
 
+			mpGraphics->GetRenderer3D()->SetCurrentVREye(i);
             mpGraphics->GetRenderer3D()->RenderWorld(mpCurrentWorld3D, pCamera3D, (!gGame->mbRenderToMonitor && i == 0) ? afFrameTime : 0);
 
             apUpdater->OnPostSceneDraw();
@@ -681,6 +683,7 @@ namespace hpl {
 
           pCamera3D->SetPosition(ingamePos);
 
+		  mpGraphics->GetRenderer3D()->SetCurrentVREye(-1);
           llg->SetVREnabled(false);
 
 					STOP_TIMING(RenderWorld)

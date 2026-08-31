@@ -250,6 +250,7 @@ Changes are saved immediately. Render scale and HRTF require a restart. Settings
 | `UIDistance` | `1.75` | `0.75`–`3.0` m | Distance of room-anchored menus, cinematics, messages, and subtitles |
 | `UIScale` | `1.0` | `0.5`–`2.0` | Size of the room-anchored UI surface |
 | `RenderScale` | `1.0` | `0.5`–`2.0` | Multiplies SteamVR's recommended eye-buffer size; requires a restart |
+| `HemisphericalAmbient` | `Off` | `Off`, `On` | VR-only fixed orientation shading of the existing ambient term; applies immediately and leaves the monitor unchanged |
 | `HRTF` | `Auto` | `Auto`, `Headphones`, `Off` | Binaural spatialization for positional sounds. Auto enables it only when Windows reports headphones; requires a restart |
 | `CrouchMode` | `Hybrid` | `Physical`, `Button`, `Hybrid` | Chooses body movement, the crouch button, or either |
 | `PhysicalCrouchDepth` | `0.25` | `0.10`–`0.60` m | Sets physical crouch detection depth and the button-crouch view offset |

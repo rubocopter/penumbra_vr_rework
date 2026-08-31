@@ -9,6 +9,8 @@ $requiredPaths = @(
     'PenumbraVR.sln',
     'OALWrapper\OALWrapper.vcxproj',
     'HPL1Engine\HPL.vcxproj',
+	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_vp.cg',
+	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_fp.cg',
     'HPL1Engine\include\game\VRTracking.h',
     'PenumbraOverture\Penumbra.vcxproj',
     'PenumbraOverture\VRHaptics.cpp',
@@ -225,11 +227,15 @@ foreach ($requiredVRStringSetting in @('Handedness', 'PlayMode')) {
         throw "Persistent VR setting '$requiredVRStringSetting' is not saved to the [VR] section."
     }
 }
+if ($vrSettingsSource -notmatch [regex]::Escape('GetBool("VR", "HemisphericalAmbient", false)') -or
+	$vrSettingsSource -notmatch [regex]::Escape('SetBool("VR", "HemisphericalAmbient"')) {
+	throw 'HemisphericalAmbient must persist as an Off-by-default [VR] boolean.'
+}
 
 foreach ($requiredVRSetter in @(
     'SetMoveSpeed', 'SetMoveDeadZone', 'SetHeightOffset', 'SetTurnMode',
     'SetSnapTurnAngle', 'SetSmoothTurnSpeed', 'SetTurnDeadZone',
-    'SetUIDistance', 'SetUIScale', 'SetCrouchMode',
+    'SetUIDistance', 'SetUIScale', 'SetHemisphericalAmbientEnabled', 'SetCrouchMode',
     'SetPhysicalCrouchDepth', 'SetSubtitleScale',
     'SetHandedness', 'SetPlayMode', 'SetPlayerHeight'
 )) {
@@ -251,6 +257,7 @@ foreach ($requiredVRMenuTranslation in @(
     'VRTurnMode', 'VRSnapAngle', 'VRSmoothSpeed', 'VRTurnDeadZone',
     'VRMoveSpeed', 'VRMoveDeadZone', 'VRHeightOffset', 'VRUIDistance',
     'VRUIScale', 'VRCrouchMode', 'VRPhysicalCrouchDepth', 'VRSubtitleScale',
+	'VRHemisphericalAmbient',
     'VRDisabled', 'VRSnap', 'VRSmooth', 'VRPhysical', 'VRButton', 'VRHybrid',
     'TipVRAdjust', 'VRControls', 'VRMovement', 'VRCalibration', 'VRDisplay',
     'VRDetectionDepth', 'VRRecenter', 'TipVRRecenter'
@@ -260,6 +267,28 @@ foreach ($requiredVRMenuTranslation in @(
         -not $spanishEntries.ContainsKey($translationKey)) {
         throw "The in-game VR settings editor is missing translation '$translationKey'."
     }
+}
+
+$baseLightSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\sources\graphics\Material_BaseLight.cpp')
+$rendererSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\sources\graphics\Renderer3D.cpp')
+$hemisphereVertexShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\core\programs\Ambient_Hemisphere_vp.cg')
+$hemisphereFragmentShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\core\programs\Ambient_Hemisphere_fp.cg')
+$packageSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'scripts\package.ps1')
+foreach ($requiredAmbientSnippet in @(
+	'GetVRVertexProgram', 'GetVRFragmentProgram',
+	'objectNormalMatrix', 'worldNormal.y * 0.5 + 0.5',
+	'lerp(0.75, 1.0', 'oColor.xyz *= ambientColor * ambientFactor',
+	'mbVRHemisphericalAmbientEnabled &&', 'mpLowLevelGraphics->GetVREnabled()',
+	'GLEE_EXT_timer_query', 'VR ambient RenderZ GPU'
+)) {
+	if (($baseLightSource + $rendererSource + $hemisphereVertexShader + $hemisphereFragmentShader) -notmatch [regex]::Escape($requiredAmbientSnippet)) {
+		throw "The hemispherical ambient A/B regression guard is missing '$requiredAmbientSnippet'."
+	}
+}
+foreach ($requiredPackagedShader in @('Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg')) {
+	if ($packageSource -notmatch [regex]::Escape($requiredPackagedShader)) {
+		throw "The package script does not include required VR shader '$requiredPackagedShader'."
+	}
 }
 
 $initSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\Init.cpp')

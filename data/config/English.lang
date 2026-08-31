@@ -413,6 +413,7 @@
     <Entry Name="VRDisplay">DISPLAY</Entry>
     <Entry Name="VRDetectionDepth">Detection depth:</Entry>
     <Entry Name="VRRenderScale">Render scale:</Entry>
+	<Entry Name="VRHemisphericalAmbient">Hemispherical ambient:</Entry>
     <Entry Name="TipVRRenderScale">Multiplies the SteamVR recommended eye buffer size. Needs an application restart to take effect.</Entry>
     <Entry Name="VRHRTF">Binaural audio (HRTF):</Entry>
     <Entry Name="TipVRHRTF">Headphone spatialization for positional sounds. Auto enables it only when Windows reports headphones. Needs an application restart to take effect.</Entry>

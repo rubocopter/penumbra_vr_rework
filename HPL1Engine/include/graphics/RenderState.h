@@ -84,6 +84,8 @@ namespace hpl {
 		//Vertex program
 		iGpuProgram *mpVtxProgram;
 		iMaterialProgramSetup* mpVtxProgramSetup;
+		iGpuProgram *mpVRVtxProgram;
+		iMaterialProgramSetup* mpVRVtxProgramSetup;
 		bool mbUsesLight;
 		bool mbUsesEye;
 		iLight3D* mpLight;
@@ -91,6 +93,8 @@ namespace hpl {
 		//Fragment program
 		iGpuProgram *mpFragProgram;
 		iMaterialProgramSetup* mpFragProgramSetup;
+		iGpuProgram *mpVRFragProgram;
+		iMaterialProgramSetup* mpVRFragProgramSetup;
 		
 		//Texture
 		iTexture* mpTexture[MAX_TEXTUREUNITS];

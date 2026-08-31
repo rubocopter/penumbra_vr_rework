@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Off-by-default **Hemispherical ambient** A/B under Options → VR Settings → Display. It applies a fixed `Up = 1.0` / `Down = 0.75` world-normal factor only to the existing VR ambient term, switches immediately, preserves texture alpha, and adds no pass or framebuffer
+- Asynchronous GPU timer queries report independent 120-sample averages for the complete left/right `RenderZ()` pass in On and Off modes; unsupported timer-query hardware simply skips measurement
+
 ### Changed
 
 - Reflowed Options → VR Settings into two columns so every setting and the Back button remains inside the 800×600 VR cursor range
+- The monitor, direct-light shaders, flashlight stencil shadows, eye depth/stencil renderbuffers, and exact original ambient shaders used while the new option is Off remain unchanged; failure to load either optional shader falls back to the original pair
 
 ### Documentation
 
@@ -14,6 +20,7 @@
 ### Validation
 
 - Release Win32 full rebuild, Large Address Aware verification, `289 checks, 0 failures`, package generation, executable hash comparison, and confirmation that runtime code, shaders and packaged resources contain no leftover SSAO implementation
+- Hemispherical prototype source validation: Release Win32 full rebuild, Large Address Aware verification, project checks, `289 checks, 0 failures`, package generation, executable hash comparison, and presence of both optional shaders in the package. Headset A/B captures, flashlight-shadow comparison and per-eye timing remain pending hardware validation
 
 ---
 

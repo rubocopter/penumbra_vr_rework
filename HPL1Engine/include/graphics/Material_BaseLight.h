@@ -54,11 +54,15 @@ namespace hpl {
 		bool UsesType(eMaterialRenderType aType);
 
 		iGpuProgram* GetVertexProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight);
+		iGpuProgram* GetVRVertexProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight);
+		iMaterialProgramSetup * GetVRVertexProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 		bool VertexProgramUsesLight(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 		bool VertexProgramUsesEye(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 
 		iGpuProgram* GetFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 		iMaterialProgramSetup * GetFragmentProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight);
+		iGpuProgram* GetVRFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight);
+		iMaterialProgramSetup * GetVRFragmentProgramSetup(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 
 		eMaterialAlphaMode GetAlphaMode(eMaterialRenderType aType, int alPass, iLight3D *apLight);
 		eMaterialBlendMode GetBlendMode(eMaterialRenderType aType, int alPass, iLight3D *apLight);
@@ -94,6 +98,8 @@ namespace hpl {
 
 		iGpuProgram* mpSimpleFP;
 		iGpuProgram* mpAmbientFP;
+		iGpuProgram* mpVRAmbientVP;
+		iGpuProgram* mpVRAmbientFP;
 
 		iGpuProgram* mvVtxPrograms[eBaseLightProgram_LastEnum];
 		iGpuProgram* mvFragPrograms[eBaseLightProgram_LastEnum];

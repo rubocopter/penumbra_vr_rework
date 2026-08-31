@@ -50,6 +50,7 @@ namespace hpl {
 
 	cRenderSettings::cRenderSettings()
 	{
+		mbVRAmbientActive = false;
 		mbFogActive = false;
 		mfFogStart = 5.0f;
 		mfFogEnd = 5.0f;
@@ -132,6 +133,18 @@ namespace hpl {
 		mDebugFlags = 0;
 
 		mbLog = false;
+		mbVRHemisphericalAmbientEnabled = false;
+		mbVRAmbientGpuTimersInitialized = false;
+		mbVRAmbientGpuTimersSupported = false;
+		mlCurrentVREye = -1;
+		mlVRAmbientActiveTimerEye = -1;
+		mlVRAmbientActiveTimerSlot = -1;
+		memset(mvVRAmbientTimerQueries, 0, sizeof(mvVRAmbientTimerQueries));
+		memset(mvVRAmbientTimerPending, 0, sizeof(mvVRAmbientTimerPending));
+		memset(mvVRAmbientTimerMode, 0, sizeof(mvVRAmbientTimerMode));
+		memset(mvVRAmbientTimerWriteSlot, 0, sizeof(mvVRAmbientTimerWriteSlot));
+		memset(mvVRAmbientTimerSum, 0, sizeof(mvVRAmbientTimerSum));
+		memset(mvVRAmbientTimerSamples, 0, sizeof(mvVRAmbientTimerSamples));
 
 		mfVRRenderScale = 1.0f;
 
@@ -284,6 +297,9 @@ namespace hpl {
 
 	cRenderer3D::~cRenderer3D()
 	{
+		if(mbVRAmbientGpuTimersSupported)
+			glDeleteQueries(4, &mvVRAmbientTimerQueries[0][0]);
+
 		hplDeleteArray(mRenderSettings.mpTempIndexArray);
 
 		if(mRenderSettings.mpVtxExtrudeProgram) mpResources->GetGpuProgramManager()->Destroy(mRenderSettings.mpVtxExtrudeProgram);
@@ -358,6 +374,91 @@ namespace hpl {
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	InitVRAmbientGpuTimers();
+  }
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::InitVRAmbientGpuTimers()
+	{
+		if(mbVRAmbientGpuTimersInitialized) return;
+		mbVRAmbientGpuTimersInitialized = true;
+
+		if(!GLEE_VERSION_1_5 || !GLEE_EXT_timer_query)
+		{
+			Log("   VR ambient GPU timing unavailable (GL_EXT_timer_query required).\n");
+			return;
+		}
+
+		glGenQueries(4, &mvVRAmbientTimerQueries[0][0]);
+		mbVRAmbientGpuTimersSupported = true;
+		Log("   VR ambient GPU timing enabled for left/right RenderZ passes.\n");
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::StoreVRAmbientGpuTime(int alEye, bool abEnabled, GLuint64EXT alNanoseconds)
+	{
+		const int lMode = abEnabled ? 1 : 0;
+		mvVRAmbientTimerSum[lMode][alEye] += (double)alNanoseconds / 1000000.0;
+		++mvVRAmbientTimerSamples[lMode][alEye];
+
+		if(mvVRAmbientTimerSamples[lMode][alEye] >= 120)
+		{
+			const double fAverage = mvVRAmbientTimerSum[lMode][alEye] /
+				(double)mvVRAmbientTimerSamples[lMode][alEye];
+			Log(" VR ambient RenderZ GPU [%s, %s]: %.3f ms average (%u samples).\n",
+				abEnabled ? "On" : "Off", alEye == 0 ? "left" : "right",
+				fAverage, mvVRAmbientTimerSamples[lMode][alEye]);
+			mvVRAmbientTimerSum[lMode][alEye] = 0.0;
+			mvVRAmbientTimerSamples[lMode][alEye] = 0;
+		}
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::BeginVRAmbientGpuTimer()
+	{
+		mlVRAmbientActiveTimerEye = -1;
+		mlVRAmbientActiveTimerSlot = -1;
+		if(!mbVRAmbientGpuTimersSupported || mlCurrentVREye < 0 || mlCurrentVREye > 1 ||
+			!mpLowLevelGraphics->GetVREnabled()) return;
+
+		const int lEye = mlCurrentVREye;
+		const int lSlot = mvVRAmbientTimerWriteSlot[lEye];
+		if(mvVRAmbientTimerPending[lEye][lSlot])
+		{
+			GLint lAvailable = GL_FALSE;
+			glGetQueryObjectiv(mvVRAmbientTimerQueries[lEye][lSlot],
+				GL_QUERY_RESULT_AVAILABLE, &lAvailable);
+			if(lAvailable == GL_FALSE) return;
+
+			GLuint64EXT lNanoseconds = 0;
+			glGetQueryObjectui64vEXT(mvVRAmbientTimerQueries[lEye][lSlot],
+				GL_QUERY_RESULT, &lNanoseconds);
+			StoreVRAmbientGpuTime(lEye, mvVRAmbientTimerMode[lEye][lSlot], lNanoseconds);
+			mvVRAmbientTimerPending[lEye][lSlot] = false;
+		}
+
+		glBeginQuery(GL_TIME_ELAPSED_EXT, mvVRAmbientTimerQueries[lEye][lSlot]);
+		mlVRAmbientActiveTimerEye = lEye;
+		mlVRAmbientActiveTimerSlot = lSlot;
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::EndVRAmbientGpuTimer()
+	{
+		if(mlVRAmbientActiveTimerEye < 0 || mlVRAmbientActiveTimerSlot < 0) return;
+
+		glEndQuery(GL_TIME_ELAPSED_EXT);
+		const int lEye = mlVRAmbientActiveTimerEye;
+		const int lSlot = mlVRAmbientActiveTimerSlot;
+		mvVRAmbientTimerPending[lEye][lSlot] = true;
+		mvVRAmbientTimerMode[lEye][lSlot] = mRenderSettings.mbVRAmbientActive;
+		mvVRAmbientTimerWriteSlot[lEye] = (lSlot + 1) % 2;
+		mlVRAmbientActiveTimerEye = -1;
+		mlVRAmbientActiveTimerSlot = -1;
   }
 
 	void cRenderSettings::Clear()
@@ -378,6 +479,7 @@ namespace hpl {
 
 		mbUsesLight = false;
 		mbUsesEye = false;
+		mbVRAmbientActive = false;
 
 		mbMatrixWasNULL = false;
 
@@ -477,6 +579,8 @@ namespace hpl {
 		BeginRendering(apCamera);
 
 		mRenderSettings.Clear();
+		mRenderSettings.mbVRAmbientActive = mbVRHemisphericalAmbientEnabled &&
+			mpLowLevelGraphics->GetVREnabled();
 
 		////////////////////////////
 		// Render Z
@@ -498,7 +602,9 @@ namespace hpl {
 		mpLowLevelGraphics->SetTextureConstantColor(mRenderSettings.mAmbientColor);
 
 		if(mbLog) Log("Rendering ZBuffer:\n");
+		BeginVRAmbientGpuTimer();
 		RenderZ(apCamera);
+		EndVRAmbientGpuTimer();
 		
         //reset parameters.
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource1,eTextureSource_Previous);
