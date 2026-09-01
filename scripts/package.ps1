@@ -59,7 +59,25 @@ Get-ChildItem -LiteralPath $dataRoot -Force | ForEach-Object {
 # live with the engine source and must be overlaid into the redist explicitly.
 $programRoot = Join-Path $packageRoot 'core\programs'
 New-Item -ItemType Directory -Path $programRoot -Force | Out-Null
-foreach ($vrProgram in @('Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg')) {
+$vrPrograms = @(
+    'Ambient_Hemisphere_vp.cg',
+    'Ambient_Hemisphere_fp.cg',
+    'VR_Enhanced_Final_vp.cg',
+    'VR_Enhanced_Final_fp.cg',
+	'VR_Diffuse_Light_fp.cg',
+	'VR_Bump_Light_fp.cg',
+	'VR_DiffuseSpec_Light_fp.cg',
+	'VR_BumpSpec_Light_fp.cg',
+	'VR_BumpColorSpec_Light_fp.cg',
+    'VR_Diffuse_Light_Spot_fp.cg',
+    'VR_Bump_Light_Spot_fp.cg',
+    'VR_DiffuseSpec_Light_Spot_fp.cg',
+    'VR_BumpSpec_Light_Spot_fp.cg',
+    'VR_BumpColorSpec_Light_Spot_fp.cg',
+    'VR_Glowstick_Halo_fp.cg',
+    'VR_Glowstick_Halo_Fog_fp.cg'
+)
+foreach ($vrProgram in $vrPrograms) {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "HPL1Engine\assets\core\programs\$vrProgram") -Destination $programRoot
 }
 # Overlay the flashlight-specific light entity so its shorter projection near
@@ -73,7 +91,20 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs') -Destination $packageR
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\deploy.ps1') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.ps1')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\Install-PenumbraVR.bat') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.bat')
 
-foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'OpenAL32.dll', 'msvcp140.dll', 'vcruntime140.dll', 'licenses\OpenALSoft-COPYING.txt', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat', 'config\English.lang', 'config\Espanol.lang', 'core\programs\Ambient_Hemisphere_vp.cg', 'core\programs\Ambient_Hemisphere_fp.cg', 'textures\light_player_flashlight_spot.lnt', 'docs\INPUT.md', 'docs\LIGHTING.md', 'docs\TROUBLESHOOTING.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json', 'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json', 'vr\bindings\pico4_controller.json', 'vr\bindings\pico_neo3_controller.json', 'vr\bindings\holographic_controller.json')) {
+$requiredPackagePaths = @(
+    'Penumbra_vr.exe', 'openvr_api.dll', 'OpenAL32.dll', 'msvcp140.dll', 'vcruntime140.dll',
+    'licenses\OpenALSoft-COPYING.txt', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat',
+    'config\English.lang', 'config\Espanol.lang', 'textures\light_player_flashlight_spot.lnt',
+    'docs\INPUT.md', 'docs\LIGHTING.md', 'docs\TROUBLESHOOTING.md', 'docs\ROADMAP.md',
+    'docs\TEXTURE_CREDITS.md', 'docs\TEXTURES.md', 'docs\TEXTURE_SELECTION.json',
+    'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json',
+    'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json',
+    'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json',
+    'vr\bindings\pico4_controller.json', 'vr\bindings\pico_neo3_controller.json',
+    'vr\bindings\holographic_controller.json'
+)
+$requiredPackagePaths += $vrPrograms | ForEach-Object { "core\programs\$_" }
+foreach ($requiredPath in $requiredPackagePaths) {
     $packagedPath = Join-Path $packageRoot $requiredPath
     if (-not (Test-Path -LiteralPath $packagedPath)) {
         throw "Required package entry was not created: $packagedPath"
@@ -84,6 +115,7 @@ if (Test-Path -LiteralPath (Join-Path $packageRoot 'data')) {
     throw "Invalid package layout: data must be merged into the game redist root."
 }
 
+& (Join-Path $PSScriptRoot 'check-texture-selection.ps1') -ContentRoot $packageRoot
 $manifestPath = Join-Path $packageRoot 'SHA256SUMS.txt'
 function Get-RelativePath([string]$basePath, [string]$fullPath) {
     # Path.GetRelativePath only exists on .NET Framework 4.7.1+; Uri works

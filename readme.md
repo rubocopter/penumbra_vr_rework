@@ -40,16 +40,36 @@ Penumbra is about what you hear coming. This rework rebuilds the entire acoustic
 
 Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime ships inside the package since alpha.6.1. To remove the mod, run `Install-PenumbraVR.bat -Restore`; only files owned by the mod are removed, and backed-up originals are restored.
 
+Current **development builds** also include nine reviewed world diffuse
+textures (not part of the published beta). They affect both visual modes and
+the monitor. Run
+`Install-PenumbraVR.bat -SkipTexturePack` to omit them or restore their backed-up
+originals while retaining the mod. The pack is **Penumbra Collection 4x AI
+upscale**, by **Bret2011** (Nexus uploader **c3pohumancyborgrelations**), crediting
+**Frictional Games** for original assets. Redistribution is permitted with
+creator credit; see [permissions](docs/TEXTURE_CREDITS.md) and [selection](docs/TEXTURES.md).
+
 ## Status
 
 **v0.1.0-beta.1 — public beta.** The full game is playable in VR and the main tracking, interaction, collision, comfort, UI, audio, install, and shutdown paths now have repeatable automated and PS VR2 hardware validation. Beta does not mean hardware-complete: PS VR2 Sense remains the only controller family tested end to end on a physical device, while Index, Touch, Pico, WMR, and Vive use bundled profiles that still need device-specific reports. Hand collision uses one approximate palm volume rather than per-finger rigid bodies, the current hand mesh has limited thumb and ring/middle movement, and the original game state still permits only one active grab. See the [release history](docs/RELEASES.md) for build-specific status.
+
+**Development branch — not included in beta.1.** Off-by-default VR-only
+Enhanced visuals combines MSAA 2×, stronger surface relief/masked highlights,
+dark image treatment, bounded ambient and restrained held-light/halo response.
+The latest v4 calibration received positive headset feedback; broader scene
+checks and matched GPU timings remain open. Off retains the original renderer,
+but does not undo installed texture replacements. The development branch also
+contains the two-column VR settings layout, flashlight alignment fix and the
+nine-texture selection above. See [Unreleased](docs/RELEASES.md#unreleased) and
+the [next-beta checkpoint](docs/ROADMAP.md#next-beta-checkpoint).
 
 ## Documentation
 
 - [Troubleshooting and compatibility](docs/TROUBLESHOOTING.md) — crash dumps and logs, laptop GPUs, audio devices, controller resets, non-Steam installs
 - [Controls and VR settings](docs/INPUT.md) — bindings, comfort options, compatibility, and diagnostics
 - [VR architecture](docs/VR_ARCHITECTURE.md) — tracking space, world placement, UI, and hands
-- [Rendering and lighting research](docs/LIGHTING.md) — current HPL1 light path, the discarded SSAO test, measurements, and the proposed hemispherical A/B
+- [Rendering and lighting research](docs/LIGHTING.md) — HPL1 light path, discarded SSAO measurements, baked-shadow diagnosis, and the current Enhanced visuals A/B
+- [Texture selection](docs/TEXTURES.md) — development allowlist, exclusions, memory budget and rollback
 - [Input architecture](docs/INPUT_ARCHITECTURE.md) — input flow and the engine/game boundary
 - [Roadmap](docs/ROADMAP.md) — current priorities and future work
 - [Release history](docs/RELEASES.md) — changes and known limitations by version
@@ -65,8 +85,15 @@ This is a community-maintained continuation of [veryjos/penumbra_vr](https://git
 - `tests/VRTrackingTest` — unit tests for tracking and VR hand-collision policy, executed by every build
 - `.github/workflows/build.yml` — CI compiles and packages Win32 on every push, PR, and tag
 
+Successful runs provide a development package under
+[Actions](https://github.com/rubocopter/penumbra_vr_rework/actions/workflows/build.yml).
+These artifacts are not new public releases; release downloads remain separate.
+
 When working from a source checkout, deploy with `scripts/build.ps1 -Deploy`. The packaged release places `Install-PenumbraVR.bat` in its root; the repository copy lives under `scripts/`.
 
 ## License
 
 Licensed under GPL v3 or later. See `HPL1Engine/COPYING` and `PenumbraOverture/COPYING` for details and third-party notices.
+
+The externally supplied textures are not relicensed by this statement; their
+separate [attribution and permissions](docs/TEXTURE_CREDITS.md) accompany the package.

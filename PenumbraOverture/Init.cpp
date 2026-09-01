@@ -774,8 +774,8 @@ void cInit::ApplyVRSettings(bool abSave)
 		mpGame->vr_tracking.SetHeightCalibration(mVRSettings.GetHeightOffset());
 		mpGame->GetScene()->SetVRMainUIDistance(mVRSettings.GetUIDistance());
 		mpGame->GetScene()->SetVRMainUIScale(mVRSettings.GetUIScale());
-		mpGame->GetGraphics()->GetRenderer3D()->SetVRHemisphericalAmbientEnabled(
-			mVRSettings.GetHemisphericalAmbientEnabled());
+		mpGame->GetGraphics()->GetRenderer3D()->SetVREnhancedVisualsEnabled(
+			mVRSettings.GetEnhancedVisualsEnabled());
 
 		// The dominant hand is an application preference exposed by the VR
 		// layer; gameplay and UI read it instead of assuming the right hand.

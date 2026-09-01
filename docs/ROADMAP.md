@@ -9,7 +9,27 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
-- Graphics evaluation — headset A/B and per-eye `RenderZ()` timing for the Off-by-default enhanced-ambient prototype
+- Graphics evaluation — the office-feedback v4 calibration received positive headset feedback after reduced diffuse recovery/specular gain and a small ambient-only lift. Keep it as the current comparison baseline; broader scene checks and matched GPU timings remain open. The nine-texture selection is not exhaustive; provenance and redistribution credits are documented
+
+## Next-beta checkpoint
+
+Keep the current work under **Unreleased** while committing and pushing tested
+checkpoints. Publishing source and CI packages does not require publishing a
+new release or moving an existing tag.
+
+Recommended bounded scope for the next beta:
+
+1. Preserve v4 as the visual baseline, with Enhanced visuals Off by default and
+   the original renderer/fallback intact. Do not reopen the discarded SSAO test.
+2. Decide whether to include one more reviewed texture batch or defer it. The
+   current nine can ship independently; do not wait for the entire pack or an
+   open-ended series of graphics experiments.
+3. Complete a short grouped regression run: lit office and dark cave, flashlight
+   and glowstick, On/Off at fixed scale, shadow silhouettes and map transitions.
+   Record per-eye timings and process-memory headroom, and verify installation
+   and texture-only rollback for the final package.
+4. Publish the next beta after that scope is frozen and the checks pass. Keep
+   larger textures and further lighting experiments for a later checkpoint.
 
 ## Next
 
@@ -60,4 +80,4 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - CI pipeline building and packaging Release Win32 on every push, PR, and tag
 - VR Settings accessibility layout — two columns keep every option and the Back button within the cursor's 800×600 selectable area
 - HPL1 lighting audit and minimal half-resolution SSAO feasibility test — depth/stencil sampling, per-eye reconstruction, ambient-only composition and GPU timing were validated; the experiment was then fully removed because its roughly 0.46 ms stereo cost produced negligible visible benefit
-- Enhanced-ambient A/B — dedicated BaseLight `RenderZ()` shaders group a strong `Up = 1.15`/`Down = 0.35` hemisphere, fixed soft world direction and warm-ground/cool-sky tint after the conservative first headset test proved too subtle; exact original-shader selection remains in use when Off and on the monitor, with the hot Off-by-default setting, shader-load fallback and asynchronous left/right GPU timing unchanged
+- Enhanced-ambient feasibility A/B — dedicated BaseLight `RenderZ()` shaders established a hot, monitor-isolated alternative path; two headset tests found the ambient-only result too subtle, so it is now one component of the broader Enhanced visuals comparison rather than a standalone proposal

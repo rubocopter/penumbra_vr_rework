@@ -9,7 +9,10 @@ param(
 
     [bool]$SteamLauncher = $true,
 
-    [switch]$Restore
+    [switch]$Restore,
+
+    # Also restores these textures from deployment backups when already installed.
+    [switch]$SkipTexturePack
 )
 
 Set-StrictMode -Version Latest
@@ -274,6 +277,19 @@ if ($SteamLauncher) {
         Path = 'Penumbra.exe'
         SourcePath = Join-Path $resolvedPackageRoot 'Penumbra_vr.exe'
     }
+}
+
+if ($SkipTexturePack) {
+    $textureManifest = Join-Path $resolvedPackageRoot 'docs\TEXTURE_SELECTION.json'
+    if (-not (Test-Path -LiteralPath $textureManifest)) { throw 'Texture selection manifest is missing.' }
+    $selection = Get-Content -Raw -LiteralPath $textureManifest | ConvertFrom-Json
+    if ($selection.Version -ne 1) { throw 'Unsupported texture selection manifest.' }
+    foreach ($texture in $selection.Files) {
+        $texturePath = [string]$texture.Path
+        if ($texturePath -notmatch '^textures/[a-z0-9_]+/[a-z0-9_]+\.jpg$') { throw 'Invalid selected texture path.' }
+        $mappings.Remove($texturePath)
+    }
+    Write-Host 'Selected texture pack skipped; previous managed copies will be restored from backup.'
 }
 
 $previousEntries = @{}

@@ -11,6 +11,18 @@ $requiredPaths = @(
     'HPL1Engine\HPL.vcxproj',
 	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_vp.cg',
 	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_Enhanced_Final_vp.cg',
+	'HPL1Engine\assets\core\programs\VR_Enhanced_Final_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_Diffuse_Light_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_Bump_Light_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_DiffuseSpec_Light_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_BumpSpec_Light_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_BumpColorSpec_Light_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_Diffuse_Light_Spot_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_Bump_Light_Spot_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_DiffuseSpec_Light_Spot_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_BumpSpec_Light_Spot_fp.cg',
+	'HPL1Engine\assets\core\programs\VR_BumpColorSpec_Light_Spot_fp.cg',
 	'HPL1Engine\assets\textures\light_player_flashlight_spot.lnt',
     'HPL1Engine\include\game\VRTracking.h',
     'PenumbraOverture\Penumbra.vcxproj',
@@ -229,15 +241,16 @@ foreach ($requiredVRStringSetting in @('Handedness', 'PlayMode')) {
         throw "Persistent VR setting '$requiredVRStringSetting' is not saved to the [VR] section."
     }
 }
-if ($vrSettingsSource -notmatch [regex]::Escape('GetBool("VR", "HemisphericalAmbient", false)') -or
-	$vrSettingsSource -notmatch [regex]::Escape('SetBool("VR", "HemisphericalAmbient"')) {
-	throw 'HemisphericalAmbient must persist as an Off-by-default [VR] boolean.'
+if ($vrSettingsSource -notmatch [regex]::Escape('GetBool("VR", "EnhancedVisuals"') -or
+	$vrSettingsSource -notmatch [regex]::Escape('SetBool("VR", "EnhancedVisuals"') -or
+	$vrSettingsSource -notmatch [regex]::Escape('GetBool("VR", "HemisphericalAmbient", false)')) {
+	throw 'EnhancedVisuals must persist as an Off-by-default [VR] boolean and migrate the legacy ambient switch.'
 }
 
 foreach ($requiredVRSetter in @(
     'SetMoveSpeed', 'SetMoveDeadZone', 'SetHeightOffset', 'SetTurnMode',
     'SetSnapTurnAngle', 'SetSmoothTurnSpeed', 'SetTurnDeadZone',
-    'SetUIDistance', 'SetUIScale', 'SetHemisphericalAmbientEnabled', 'SetCrouchMode',
+    'SetUIDistance', 'SetUIScale', 'SetEnhancedVisualsEnabled', 'SetCrouchMode',
     'SetPhysicalCrouchDepth', 'SetSubtitleScale',
     'SetHandedness', 'SetPlayMode', 'SetPlayerHeight'
 )) {
@@ -259,7 +272,7 @@ foreach ($requiredVRMenuTranslation in @(
     'VRTurnMode', 'VRSnapAngle', 'VRSmoothSpeed', 'VRTurnDeadZone',
     'VRMoveSpeed', 'VRMoveDeadZone', 'VRHeightOffset', 'VRUIDistance',
     'VRUIScale', 'VRCrouchMode', 'VRPhysicalCrouchDepth', 'VRSubtitleScale',
-	'VRHemisphericalAmbient',
+	'VREnhancedVisuals',
     'VRDisabled', 'VRSnap', 'VRSmooth', 'VRPhysical', 'VRButton', 'VRHybrid',
     'TipVRAdjust', 'VRControls', 'VRMovement', 'VRCalibration', 'VRDisplay',
     'VRDetectionDepth', 'VRRecenter', 'TipVRRecenter'
@@ -275,22 +288,90 @@ $baseLightSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL
 $rendererSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\sources\graphics\Renderer3D.cpp')
 $hemisphereVertexShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\core\programs\Ambient_Hemisphere_vp.cg')
 $hemisphereFragmentShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\core\programs\Ambient_Hemisphere_fp.cg')
+$enhancedFinalShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\core\programs\VR_Enhanced_Final_fp.cg')
+$enhancedLightShaders = ''
+foreach ($enhancedLightShaderName in @(
+	'VR_Diffuse_Light_fp.cg', 'VR_Bump_Light_fp.cg',
+	'VR_DiffuseSpec_Light_fp.cg', 'VR_BumpSpec_Light_fp.cg',
+	'VR_BumpColorSpec_Light_fp.cg', 'VR_Diffuse_Light_Spot_fp.cg',
+	'VR_Bump_Light_Spot_fp.cg', 'VR_DiffuseSpec_Light_Spot_fp.cg',
+	'VR_BumpSpec_Light_Spot_fp.cg', 'VR_BumpColorSpec_Light_Spot_fp.cg'
+)) {
+	$lightShader = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "HPL1Engine\assets\core\programs\$enhancedLightShaderName")
+	$enhancedLightShaders += $lightShader
+	if ($lightShader -match 'texCUBE\(') {
+		throw "VR light direction normalization must not sample the legacy cube: $enhancedLightShaderName."
+	}
+	if ($enhancedLightShaderName -like 'VR_Bump*' -and
+		$lightShader -notmatch [regex]::Escape('normalize(half3(bumpVec.xy * 1.65, max(bumpVec.z, 0.05)))')) {
+		throw "The VR surface-relief guard is missing in $enhancedLightShaderName."
+	}
+	if ($enhancedLightShaderName -like '*Spec*' -and
+		($lightShader -notmatch [regex]::Escape('24) * 1.00 * lightColor.w') -or
+		 $lightShader -notmatch 'specular \*= saturate\(.+ \* 4\.0\)')) {
+		throw "The material-masked VR highlight guard is missing in $enhancedLightShaderName."
+	}
+}
 $packageSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'scripts\package.ps1')
 foreach ($requiredAmbientSnippet in @(
 	'GetVRVertexProgram', 'GetVRFragmentProgram',
 	'objectNormalMatrix', 'worldNormal.y * 0.5 + 0.5',
 	'float3(0.35, 0.85, 0.40)', 'dot(worldNormal, ambientDirection)',
-	'lerp(0.35, 1.15', 'lerp(0.65, 1.35',
-	'float3(1.08, 0.90, 0.76)', 'float3(0.88, 1.02, 1.18)',
-	'oColor.xyz *= ambientColor * orientationFactor * directionFactor * ambientTint',
-	'mbVRHemisphericalAmbientEnabled &&', 'mpLowLevelGraphics->GetVREnabled()',
-	'GLEE_EXT_timer_query', 'VR ambient RenderZ GPU'
+	'lerp(0.65, 0.90', 'lerp(0.90, 1.00',
+	'float3(1.00, 0.99, 0.98)', 'float3(0.98, 0.99, 1.00)',
+	'oAmbientResponse = orientationFactor * directionFactor * ambientTint',
+	'oColor.xyz *= ambientColor * ambientResponse',
+	'oColor.xyz * 0.38 + min(oColor.xyz * 3.0, 0.031)',
+	'mbVREnhancedVisualsEnabled &&', 'mbVREnhancedVisualsAvailable &&',
+	'mpLowLevelGraphics->GetVREnabled()', 'GLEE_EXT_timer_query', 'VR eye GPU'
 )) {
 	if (($baseLightSource + $rendererSource + $hemisphereVertexShader + $hemisphereFragmentShader) -notmatch [regex]::Escape($requiredAmbientSnippet)) {
 		throw "The enhanced ambient A/B regression guard is missing '$requiredAmbientSnippet'."
 	}
 }
-foreach ($requiredPackagedShader in @('Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg')) {
+foreach ($requiredVisualSnippet in @(
+	'GL_RGBA16F_ARB', 'glRenderbufferStorageMultisample',
+	'GL_DEPTH24_STENCIL8', 'glBlitFramebuffer',
+	'BeginVREyeRender', 'EndVREyeRender',
+	'AdvanceVREyeGpuTimer(eVREyeGpuStage_Resolve)', 'AdvanceVREyeGpuTimer(eVREyeGpuStage_Final)',
+	'GL_QUERY_RESULT_AVAILABLE', 'mvVREyeTimerStageCount',
+	'scene/UI=%.3f ms, resolve=%.3f ms, final=%.3f ms',
+	'(2.51 * color + 0.03)', '(center.xyz - neighbours) * 0.65',
+	'(color - 0.5) * 1.08 + 0.5', 'dark SDR curve',
+	'localMin, localMax',
+	'center.w', 'mpVREnhancedPointFP', 'mpVREnhancedSpotFP'
+)) {
+	if (($baseLightSource + $rendererSource + $enhancedFinalShader) -notmatch [regex]::Escape($requiredVisualSnippet)) {
+		throw "The enhanced VR visual pipeline regression guard is missing '$requiredVisualSnippet'."
+	}
+}
+if ($hemisphereFragmentShader -match 'lerp\(' -or $enhancedFinalShader -match 'displayPeak') {
+	throw 'Keep normal response per vertex and do not reintroduce the rejected global soft-toe mapping.'
+}
+if ($rendererSource -match 'GL_DEPTH_BUFFER_BIT\s*\|\s*GL_STENCIL_BUFFER_BIT') {
+	throw 'The enhanced path must not attempt a multisample-to-single-sample depth/stencil blit.'
+}
+foreach ($requiredLightSnippet in @(
+	'dot(diffuse, half3(0.299, 0.587, 0.114))',
+	'(1.0 - saturate(luma / 0.28)) * 0.06',
+	'(dot(light', '+ 0.08) / 1.08'
+)) {
+	if ($enhancedLightShaders -notmatch [regex]::Escape($requiredLightSnippet)) {
+		throw "The baked-shadow light-response regression guard is missing '$requiredLightSnippet'."
+	}
+}
+$requiredVRShaders = @(
+	'Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg',
+	'VR_Enhanced_Final_vp.cg', 'VR_Enhanced_Final_fp.cg',
+	'VR_Diffuse_Light_fp.cg', 'VR_Bump_Light_fp.cg',
+	'VR_DiffuseSpec_Light_fp.cg', 'VR_BumpSpec_Light_fp.cg',
+	'VR_BumpColorSpec_Light_fp.cg',
+	'VR_Diffuse_Light_Spot_fp.cg', 'VR_Bump_Light_Spot_fp.cg',
+	'VR_DiffuseSpec_Light_Spot_fp.cg', 'VR_BumpSpec_Light_Spot_fp.cg',
+	'VR_BumpColorSpec_Light_Spot_fp.cg',
+	'VR_Glowstick_Halo_fp.cg', 'VR_Glowstick_Halo_Fog_fp.cg'
+)
+foreach ($requiredPackagedShader in $requiredVRShaders) {
 	if ($packageSource -notmatch [regex]::Escape($requiredPackagedShader)) {
 		throw "The package script does not include required VR shader '$requiredPackagedShader'."
 	}

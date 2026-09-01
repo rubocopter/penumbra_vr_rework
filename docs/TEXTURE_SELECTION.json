@@ -1,0 +1,142 @@
+{
+  "Version": 1,
+  "SourceName": "Penumbra Collection 4x AI upscale",
+  "SourceURL": "https://www.nexusmods.com/penumbraoverture/mods/5?tab=description",
+  "Creator": "Bret2011",
+  "Uploader": "c3pohumancyborgrelations",
+  "OriginalAssetCredit": "Frictional Games",
+  "PermissionsChecked": "2026-09-01",
+  "Distribution": "Pack permits redistribution with creator credit; see TEXTURE_CREDITS.md. Not relicensed as GPL.",
+  "MaxDimension": 1024,
+  "ExtraRGBABytesBudget": 41943040,
+  "EstimatedExtraRGBABytes": 39321600.0,
+  "Files": [
+    {
+      "Path": "textures/iron_mine/iron_mine_briks.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 618951,
+      "SHA256": "C286AA6628B4BF8E80FB5066BB536AF4AF8D0CCF3282AF22BE3C1F706501B449",
+      "StockSHA256": "3137B7DD107D0222079F0E401EE3B3E6E9963E84B8E263064E23426E4197C00D",
+      "ReviewedMaterials": [
+        "textures/iron_mine/iron_mine_briks.mat"
+      ]
+    },
+    {
+      "Path": "textures/iron_mine/iron_mine_pillar.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 529034,
+      "SHA256": "557FAAE0D929ABDD9FF0BEA89AFFB98B993786A54187E64E0831D7049C78F3A2",
+      "StockSHA256": "D73908BAE2E0CF89D6F45D6AFB8F97A20A0D6D25DF314F4E656B32F4F3A9FDF3",
+      "ReviewedMaterials": [
+        "textures/iron_mine/iron_mine_pillar.mat"
+      ]
+    },
+    {
+      "Path": "textures/iron_mine/iron_mine_pipe_end.jpg",
+      "Width": 512,
+      "Height": 512,
+      "StockWidth": 128,
+      "StockHeight": 128,
+      "EstimatedExtraRGBABytes": 1310720,
+      "Bytes": 146639,
+      "SHA256": "E4335ADD8D5F99C5447CBB65AE602486444F59892D3695D75D2F7D66F334E2DF",
+      "StockSHA256": "23C99BD594AEB04C319DC0B69C2E9C2FB22B57E111925340C26CC9FD96A9F890",
+      "ReviewedMaterials": [
+        "textures/iron_mine/iron_mine_pipe_end.mat"
+      ]
+    },
+    {
+      "Path": "textures/locker_room/locker_room_walltiles.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 428210,
+      "SHA256": "3E8A035E14DBEF325803568FE209145360FF2630F62B5ABCFAD16DBC0206C91D",
+      "StockSHA256": "D467175E176664199A401119DBD0955287466F9A08174136D577C97819F371F3",
+      "ReviewedMaterials": [
+        "textures/locker_room/locker_room_walltiles.mat"
+      ]
+    },
+    {
+      "Path": "textures/locker_room/locker_room_walltiles_dirty.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 509863,
+      "SHA256": "32FE8AE0C72EF142AC07CDBB66AFD57F89CCC28144DCA7ACDC8B49B4C2C49BEF",
+      "StockSHA256": "E9B1AC31BD5A2AE0D10F3BA9C81EE5993DF97CCEF6E30A35E8DD1A31647582F1",
+      "ReviewedMaterials": [
+        "textures/locker_room/locker_room_walltiles_dirty.mat"
+      ]
+    },
+    {
+      "Path": "textures/modern_mine/modern_mine_bluemetal.jpg",
+      "Width": 512,
+      "Height": 512,
+      "StockWidth": 128,
+      "StockHeight": 128,
+      "EstimatedExtraRGBABytes": 1310720,
+      "Bytes": 165475,
+      "SHA256": "B131ED3E6EF427FB6CA250C5E0A00228DE7B6DF198AC1086EB24F9158E0A1855",
+      "StockSHA256": "5396F3407CFD12CE28304176CFC86736FDD295DE9F417DA56370AE08575E7A93",
+      "ReviewedMaterials": [
+        "textures/modern_mine/modern_mine_bluemetal.mat"
+      ]
+    },
+    {
+      "Path": "textures/modern_mine/modern_mine_green_metal.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 456594,
+      "SHA256": "278AC8A4A5CC4A2B942D52CDEC74702A0DA91631B8842959F4D0AD34523253E7",
+      "StockSHA256": "21D59644FC5E22AFB955CD043A6425FAEDFCBD5835F62D922444E3C93BAEBAD6",
+      "ReviewedMaterials": [
+        "textures/modern_mine/modern_mine_green_metal.mat"
+      ]
+    },
+    {
+      "Path": "textures/modern_mine/modern_mine_pipe.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 628172,
+      "SHA256": "A5C2074CFEAEDEE701CA227CAA8A95C30E9757664BD14AA3230EE3FF88F110CC",
+      "StockSHA256": "C3E9D094DD36890585D3CFD9A01CA50B493BFA409667BB5DD3D517EBD5CB86BC",
+      "ReviewedMaterials": [
+        "textures/modern_mine/modern_mine_pipe_special.mat",
+        "textures/modern_mine/modern_mine_pipe.mat"
+      ]
+    },
+    {
+      "Path": "textures/new_storage_room/new_storage_room_rust.jpg",
+      "Width": 1024,
+      "Height": 1024,
+      "StockWidth": 256,
+      "StockHeight": 256,
+      "EstimatedExtraRGBABytes": 5242880,
+      "Bytes": 533390,
+      "SHA256": "C443CB2C18E32B9B7954BC8E9E661D28880465B701078B63407192C9CE4DB2CF",
+      "StockSHA256": "604EE9398A147D260029164D399FFA8BB419E4310FF2A758DC8621F82707693C",
+      "ReviewedMaterials": [
+        "textures/new_storage_room/new_storage_room_rust.mat"
+      ]
+    }
+  ]
+}

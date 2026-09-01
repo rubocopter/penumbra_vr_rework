@@ -2,27 +2,51 @@
 
 ## Unreleased
 
+Development checkpoint: the latest office-feedback v4 headset test was reported
+as better. Keep this calibration as the comparison baseline; this is not yet a
+new public release or a complete map-wide/performance sign-off. The published
+beta remains `v0.1.0-beta.1`; a push to `master` produces a CI package, not a
+GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
+
 ### Added
 
-- Off-by-default **Enhanced ambient** A/B under Options → VR Settings → Display. It combines a strong `Up = 1.15` / `Down = 0.35` world-normal factor (`0.75` on vertical surfaces), a fixed soft world direction and warm-ground/cool-sky tint only inside the existing VR ambient term; it switches immediately, preserves texture alpha, and adds no pass, framebuffer or sampled texture
-- Asynchronous GPU timer queries report independent 120-sample averages for the complete left/right `RenderZ()` pass in On and Off modes; unsupported timer-query hardware simply skips measurement
+- Off-by-default **Enhanced visuals** A/B under Options → VR Settings → Display. One hot toggle groups bounded hemisphere/direction/tint with an internal `RGBA16F` scene target, MSAA 2×, enhanced point/spot response and a dark final image/sharpening pass
+- Asynchronous GPU timer queries report independent 120-sample On/Off averages per eye, split into scene/UI, MSAA colour resolve, final pass and their sum. Sequential queries never nest or wait for a busy GPU; unsupported timing hardware simply skips measurement
+- Offline compilation of all 16 VR shaders against the bundled x86 Cg runtime is a build preflight, including compiled texture-fetch-count checks
+- CPU-reference visual regression tests guard the restored tone, pure black, neutral monotonicity, bounded ambient display, halo profile/alpha and sharpening bounds
+- First conservative selection of nine opaque world diffuse textures (<=1024, 37.5 MiB estimated extra RGBA+mips), with audited material uses, hashes and budget checks. Not every compatible texture is included. Source confirmed as Bret2011's Penumbra Collection 4x AI upscale; verified permissions and credits accompany the package
+- Installer `-SkipTexturePack` omits or restores only those nine images using the existing backup/ownership mechanism; normal installation re-enables them
 
 ### Changed
 
 - Reflowed Options → VR Settings into two columns so every setting and the Back button remains inside the 800×600 VR cursor range
 - Aligned the held flashlight's bulb, projection near plane and front flare with the physical lens. The flashlight-specific near plane now starts at the lens instead of leaving an approximately 2.8 cm unlit gap, and the flare no longer floats roughly 8 cm in front of the model
-- Strengthened and grouped the nearly free ambient candidates after the first headset A/B proved the conservative `Up = 1.0` / `Down = 0.75` range technically correct but too subtle: the same toggle now tests strong vertical separation, opposing-wall directionality and sky/ground colour in one run
-- The monitor, direct-light shaders, stencil shadow-volume algorithm, eye depth/stencil renderbuffers, and exact original ambient shaders used while the new option is Off remain unchanged; failure to load either optional shader falls back to the original pair. The flashlight's shadow source moves only because its bulb is now aligned physically behind the lens
+- The second, deliberately strong ambient-only headset test also remained too subtle. The option has therefore become a broader one-shot visual comparison rather than adding more ambient coefficients or reviving SSAO
+- Very dark diffuse samples can now receive visible VR-only point/spot light while preserving each light's colour, falloff, projection, normal/specular maps and stencil visibility. This targets black shadows baked into legacy map textures that the original multiply-only light shaders cannot brighten
+- Surface refinement: existing tangent-space relief is strengthened by 1.65×, already-masked highlights are tighter and follow real light/projection colour, and five-tap sharpening is limited to local colour extrema
+- Soft-toe v2 was tested and rejected as too bright, especially with the glowstick/flashlight. Restore the earlier dark tone exactly; apply a small capped lift only to RenderZ ambient, with orientation response <=0.90 and zero ambient remaining zero
+- Held-light rendering gains: Glowstick RGB 0.70, Flashlight RGB 0.90 only in Enhanced VR. Simulation colours, fades, radius, projection, alignment, stencil inputs and alpha remain unchanged; other lights keep gain 1.0
+- A smooth analytic envelope replaces only the held glowstick halo's Enhanced RGB, retaining original alpha, fog, blend, depth and occlusion. Shader failure falls back to its original material
+- Office-feedback v4 keeps the now-preferred final curve and halo unchanged. Gray diffuse recovery falls from 0.18 to 0.06, specular peak boost from 1.35 to 1.00, and the ambient-only pre-tone cap rises from 0.028 to 0.031. No additional pass, fetch, framebuffer or quality option; Off/monitor shader paths are unchanged
+- Retained savings: ambient normal response remains per vertex; Diffuse/Bump point/spot programs use analytic normalization (one fewer texture instruction in each). Restoring the dark RGB curve also restores three gamma powers; no new fullscreen pass, quality controls or personal-setting changes
+- The monitor and exact direct-to-`RGBA8` Off path remain unchanged. The auxiliary path requires float textures, framebuffer multisample/blit support, at least two samples, complete targets for both eyes and the final shaders; failure retains the original renderer. OpenVR submission remains gamma-space `RGBA8`, so internal `RGBA16F` does not imply HDR headset output
+- The old `[VR] HemisphericalAmbient` value migrates into `[VR] EnhancedVisuals`; the option remains Off by default and changes in hot without reloading a map
 
 ### Documentation
 
-- Added a rendering and lighting decision record covering the current HPL1 ambient/direct-light order, packed eye depth/stencil attachment, discarded half-resolution SSAO prototype, measured per-eye cost, visual findings, complete cleanup, and the contract and evolution of the VR-only enhanced-ambient A/B
+- Updated the lighting decision record with discarded SSAO/ambient-only tests, both brightness extremes, split GPU timings, bounded-ambient/held-light calibration and the conservative local texture selection/rollback
 - Corrected the controls guide to reflect the current collision-constrained visible palm instead of the obsolete pass-through description
+- Distinguished the published beta from development-only visual/texture features and recorded the positive v4 feedback, remaining checks and next-beta scope decision
 
 ### Validation
 
 - Release Win32 full rebuild, Large Address Aware verification, `289 checks, 0 failures`, package generation, executable hash comparison, and confirmation that runtime code, shaders and packaged resources contain no leftover SSAO implementation
-- Enhanced-ambient and flashlight-alignment source validation: Release Win32 full rebuild, Large Address Aware verification, project checks, `289 checks, 0 failures`, package generation, executable hash comparison, and manifest verification for both optional shaders, the corrected flashlight DAE, its `.lnt` overlay and both translated menu labels. Headset A/B captures, flashlight-shadow comparison and per-eye timing remain pending hardware validation
+- The prior enhanced-ambient/flashlight build passed Release Win32, Large Address Aware, project checks, `289 checks, 0 failures`, package and hash verification. Headset testing found the ambient result too subtle and confirmed the corrected flashlight beam origin
+- The first complete Enhanced visuals bundle passed Release Win32, Large Address Aware, project/unit/package/hash checks and a positive PSVR2 headset run on 1 September 2026. Logs confirm loaded Cg programs and active float/MSAA targets; 5100×5202 per eye at experimental scale 1.50 prevents treating the observed On/Off timings as a controlled effect-cost benchmark
+- The surface-refinement follow-up passed a full Release Win32 rebuild (3m53s), Large Address Aware, project validation and `289 checks, 0 failures`. Its scale-1.00 headset run logged about 1.86/1.99 ms per eye and 0.70% session reprojection at 90 Hz, but rejected excessive darkness. Scenes/windows were not matched, so these are not isolated effect costs
+- Soft-toe v2 passed Release Win32, Large Address Aware, project validation, 289 engine/VR checks, 14 Cg compilations and 2231 CPU visual checks; the subsequent headset run rejected its excessive brightness. Those checks did not predict subjective acceptance
+- The dark-curve/held-light calibration passed a full Release Win32 rebuild (3m46s), Large Address Aware, project validation, 289 engine/VR checks, 16 Cg compilations, 8460 CPU visual checks and texture checks. Installer fixtures passed all 38 assertions, including Windows PowerShell 5.1. The subsequent headset test was better but reported office flashlight washout and slightly low ambient; session timings are documented in LIGHTING
+- V4 passed Release Win32 (safe incremental build, unchanged headers), Large Address Aware, 289 engine/VR checks, 16 offline Cg compilations with unchanged texture-fetch counts, 8752 CPU visual checks, source/texture validation and packaging. The subsequent headset feedback was positive ("está mejor"). This does not establish matched On/Off GPU cost, exhaustive map coverage or separate acceptance of every texture/halo condition
 
 ---
 

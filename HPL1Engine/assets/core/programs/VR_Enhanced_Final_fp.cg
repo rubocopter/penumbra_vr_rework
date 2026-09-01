@@ -1,0 +1,35 @@
+// VR-only final image treatment. The scene is supplied in RGBA16F after the
+// 2x MSAA resolve; alpha is deliberately copied without modification.
+
+void main(float4 position : POSITION,
+		  float2 uv : TEXCOORD0,
+		  out float4 oColor : COLOR,
+		  uniform sampler2D sceneMap : TEXUNIT0,
+		  uniform float2 texelSize)
+{
+	float4 center = tex2D(sceneMap, uv);
+	float3 east = tex2D(sceneMap, uv + float2( texelSize.x, 0)).xyz;
+	float3 west = tex2D(sceneMap, uv + float2(-texelSize.x, 0)).xyz;
+	float3 north = tex2D(sceneMap, uv + float2(0,  texelSize.y)).xyz;
+	float3 south = tex2D(sceneMap, uv + float2(0, -texelSize.y)).xyz;
+	float3 neighbours = (east + west + north + south) * 0.25;
+
+	// Reuse the same five taps to prevent new bright/dark ringing extrema.
+	// The limiter cannot invent a bright halo around a dark pixel.
+	float3 localMin = min(center.xyz, min(min(east, west), min(north, south)));
+	float3 localMax = max(center.xyz, max(max(east, west), max(north, south)));
+	float3 color = max(clamp(center.xyz + (center.xyz - neighbours) * 0.65,
+		localMin, localMax), 0.0);
+
+	// Restore the accepted dark SDR treatment. Ambient readability is adjusted
+	// in RenderZ only, not by lifting every light/emissive with a global toe.
+	color *= 1.25;
+	color = (color * (2.51 * color + 0.03)) /
+		(color * (2.43 * color + 0.59) + 0.14);
+	float luminance = dot(color, float3(0.2126, 0.7152, 0.0722));
+	color = lerp(float3(luminance, luminance, luminance), color, 1.12);
+	color = saturate((color - 0.5) * 1.08 + 0.5);
+	color = pow(max(color, 0.0), 0.94);
+
+	oColor = float4(saturate(color), center.w);
+}

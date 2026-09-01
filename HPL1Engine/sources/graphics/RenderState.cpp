@@ -304,9 +304,20 @@ namespace hpl {
 	
 	//-----------------------------------------------------------------------
 
+	static cColor GetVRRenderLightColor(iLight3D* apLight, const cRenderSettings* apSettings)
+	{
+		cColor color = apLight->GetDiffuseColor();
+		if(apSettings->mbVREnhancedVisualsActive)
+		{
+			const float gain = apLight->GetVREnhancedGain();
+			color.r *= gain; color.g *= gain; color.b *= gain;
+		}
+		return color; // alpha/specular mask is unchanged
+	}
+
 	void iRenderState::SetVtxProgMode(cRenderSettings* apSettings)
 	{
-		const bool bUseVRProgram = apSettings->mbVRAmbientActive && mpVRVtxProgram != NULL;
+		const bool bUseVRProgram = apSettings->mbVREnhancedVisualsActive && mpVRVtxProgram != NULL;
 		iGpuProgram *pVtxProgram = bUseVRProgram ? mpVRVtxProgram : mpVtxProgram;
 		iMaterialProgramSetup *pVtxProgramSetup = bUseVRProgram ? mpVRVtxProgramSetup : mpVtxProgramSetup;
 
@@ -347,7 +358,7 @@ namespace hpl {
 					if(apSettings->mbLog)Log("Setting light properites ");
 					
 					//mpVtxProgram->SetFloat("LightRadius",mpLight->GetFarAttenuation());
-					pVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
+					pVtxProgram->SetColor4f("LightColor",GetVRRenderLightColor(mpLight, apSettings));
 					
 					apSettings->mpLight = mpLight;
 				}
@@ -371,7 +382,7 @@ namespace hpl {
 			{
 				if(apSettings->mbLog)Log("Setting new light properites\n");
 				//mpVtxProgram->SetFloat("LightRadius",mpLight->GetFarAttenuation());
-				pVtxProgram->SetColor4f("LightColor",mpLight->GetDiffuseColor());
+				pVtxProgram->SetColor4f("LightColor",GetVRRenderLightColor(mpLight, apSettings));
 
 				apSettings->mpLight = mpLight;
 			}
@@ -382,7 +393,7 @@ namespace hpl {
 
 	void iRenderState::SetFragProgMode(cRenderSettings* apSettings)
 	{
-		const bool bUseVRProgram = apSettings->mbVRAmbientActive && mpVRFragProgram != NULL;
+		const bool bUseVRProgram = apSettings->mbVREnhancedVisualsActive && mpVRFragProgram != NULL;
 		iGpuProgram *pFragProgram = bUseVRProgram ? mpVRFragProgram : mpFragProgram;
 		iMaterialProgramSetup *pFragProgramSetup = bUseVRProgram ? mpVRFragProgramSetup : mpFragProgramSetup;
 

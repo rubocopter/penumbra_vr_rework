@@ -17,8 +17,7 @@ void main(	float4 position : POSITION,
 			out float4 oPosition : POSITION,
 			out half4 oColor : COLOR,
 			out half2 oUv : TEXCOORD0,
-			out half oHemisphere : TEXCOORD1,
-			out half oAmbientDirection : TEXCOORD2,
+			out half3 oAmbientResponse : TEXCOORD1,
 
 			uniform float4x4 worldViewProj,
 			uniform float4x4 objectNormalMatrix)
@@ -28,7 +27,14 @@ void main(	float4 position : POSITION,
 	oUv = uv;
 
 	float3 worldNormal = normalize(mul((float3x3)objectNormalMatrix, normal));
-	oHemisphere = saturate(worldNormal.y * 0.5 + 0.5);
+	float hemisphere = saturate(worldNormal.y * 0.5 + 0.5);
 	float3 ambientDirection = normalize(float3(0.35, 0.85, 0.40));
-	oAmbientDirection = saturate(dot(worldNormal, ambientDirection) * 0.5 + 0.5);
+	float direction = saturate(dot(worldNormal, ambientDirection) * 0.5 + 0.5);
+	// Never boost the original ambient response: every RGB channel <= 0.90.
+	// Keep this normal-dependent work per vertex, as in the previous build.
+	float orientationFactor = lerp(0.65, 0.90, hemisphere);
+	float directionFactor = lerp(0.90, 1.00, direction);
+	float3 ambientTint = lerp(float3(1.00, 0.99, 0.98),
+		float3(0.98, 0.99, 1.00), hemisphere);
+	oAmbientResponse = orientationFactor * directionFactor * ambientTint;
 }

@@ -12,8 +12,7 @@
 void main(half4 pos : POSITION,
 		  half4 lightColor : COLOR0,
 		  half2 uv : TEXCOORD0,
-		  half hemisphere : TEXCOORD1,
-		  half ambientDirection : TEXCOORD2,
+		  half3 ambientResponse : TEXCOORD1,
 
 		  out half4 oColor : COLOR,
 
@@ -21,11 +20,8 @@ void main(half4 pos : POSITION,
 		  uniform float3 ambientColor)
 {
 	oColor = tex2D(diffuseMap, uv);
-	float hemi = saturate(hemisphere);
-	float orientationFactor = lerp(0.35, 1.15, hemi);
-	float directionFactor = lerp(0.65, 1.35, saturate(ambientDirection));
-	float3 groundTint = float3(1.08, 0.90, 0.76);
-	float3 skyTint = float3(0.88, 1.02, 1.18);
-	float3 ambientTint = lerp(groundTint, skyTint, hemi);
-	oColor.xyz *= ambientColor * orientationFactor * directionFactor * ambientTint;
+	oColor.xyz *= ambientColor * ambientResponse;
+	// Small, capped preconditioning for the dark final curve. No illumination
+	// is invented at zero ambient. Applies before RenderLight, RGB only.
+	oColor.xyz = oColor.xyz * 0.38 + min(oColor.xyz * 3.0, 0.031);
 }

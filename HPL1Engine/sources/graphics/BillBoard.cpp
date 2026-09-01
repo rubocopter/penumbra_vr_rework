@@ -97,6 +97,7 @@ namespace hpl {
 		mpVtxBuffer->Compile(eVertexCompileFlag_CreateTangents);
 
 		mbIsHalo = false;
+		mbVREnhancedSoftHalo = false;
 		mbHaloSourceIsParent = false;
 		mvHaloSourceSize = 1;
 

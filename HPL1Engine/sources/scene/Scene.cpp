@@ -570,8 +570,6 @@ namespace hpl {
               hmd->GetProjectionRaw(vr::Eye_Left, &left, &right, &top, &bottom);
               pCamera3D->SetVRProjectionMatrix(top, left, right, bottom);
 
-              glBindFramebuffer(GL_FRAMEBUFFER, mpGraphics->GetRenderer3D()->leftEyeDesc.m_nRenderFramebufferId);
-
               llg->SetVREnabled(true, mpGraphics->GetRenderer3D()->m_nVRRenderWidth, mpGraphics->GetRenderer3D()->m_nVRRenderHeight);
               glViewport(0, 0, mpGraphics->GetRenderer3D()->m_nVRRenderWidth, mpGraphics->GetRenderer3D()->m_nVRRenderHeight);
             }
@@ -581,8 +579,6 @@ namespace hpl {
               hmd->GetProjectionRaw(vr::Eye_Right, &left, &right, &top, &bottom);
               pCamera3D->SetVRProjectionMatrix(top, left, right, bottom);
 
-              glBindFramebuffer(GL_FRAMEBUFFER, mpGraphics->GetRenderer3D()->rightEyeDesc.m_nRenderFramebufferId);
-
               llg->SetVREnabled(true, mpGraphics->GetRenderer3D()->m_nVRRenderWidth, mpGraphics->GetRenderer3D()->m_nVRRenderHeight);
               glViewport(0, 0, mpGraphics->GetRenderer3D()->m_nVRRenderWidth, mpGraphics->GetRenderer3D()->m_nVRRenderHeight);
             }
@@ -591,8 +587,11 @@ namespace hpl {
 
             pCamera3D->SetVRViewMatrix(worldEyeViewMat);
 
-			mpGraphics->GetRenderer3D()->SetCurrentVREye(i);
-            mpGraphics->GetRenderer3D()->RenderWorld(mpCurrentWorld3D, pCamera3D, (!gGame->mbRenderToMonitor && i == 0) ? afFrameTime : 0);
+			cRenderer3D *pRenderer3D = mpGraphics->GetRenderer3D();
+			pRenderer3D->SetCurrentVREye(i);
+			pRenderer3D->BeginVREyeRender(i);
+			pRenderer3D->BeginVREyeGpuTimer();
+            pRenderer3D->RenderWorld(mpCurrentWorld3D, pCamera3D, (!gGame->mbRenderToMonitor && i == 0) ? afFrameTime : 0);
 
             apUpdater->OnPostSceneDraw();
 
@@ -677,6 +676,13 @@ namespace hpl {
 			}
 
             glEnable(GL_CULL_FACE);
+
+			// Keep all per-eye world, hand, pointer and UI drawing in the same
+			// multisampled depth/stencil target. Resolve only once the eye is
+			// complete; multisample depth/stencil cannot be portably blitted into
+			// the original single-sample submission target.
+			pRenderer3D->EndVREyeRender(i);
+			pRenderer3D->EndVREyeGpuTimer();
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
           }

@@ -104,6 +104,8 @@ namespace hpl {
 		mbUseColorSpecular = false;
 		mpVRAmbientVP = NULL;
 		mpVRAmbientFP = NULL;
+		mpVREnhancedPointFP = NULL;
+		mpVREnhancedSpotFP = NULL;
 
 		for(int i=0; i<eBaseLightProgram_LastEnum; i++) {
 			mvVtxPrograms[i] =NULL;
@@ -185,6 +187,32 @@ namespace hpl {
 			Log(" VR hemispherical ambient unavailable; using original ambient shaders.\n");
 		}
 
+		// High-quality lights get a VR-only material response that can illuminate
+		// very dark texels. Point lights cover the map lamps; spot lights include
+		// the player's flashlight. This compensates for shadows baked into legacy
+		// diffuse textures without changing stencil shadows or the monitor path.
+		mpVREnhancedPointFP = mpProgramManager->CreateProgram("VR_" + asLightFragmentProgram,
+			"main", eGpuProgramType_Fragment);
+		if(mpVREnhancedPointFP == NULL)
+			Log(" VR enhanced point response unavailable for '%s'; original point shader retained.\n",
+				asLightFragmentProgram.c_str());
+
+		// High-quality spot lights (including the player's flashlight) get a
+		// VR-only material response that can illuminate very dark texels. This
+		// compensates for shadows baked into legacy diffuse textures without
+		// changing the light, stencil-shadow or monitor render paths.
+		if(!mbUsesTwoPassSpot)
+		{
+			tString sEnhancedSpotFragProgram = "VR_" +
+				cString::Sub(asLightFragmentProgram, 0, (int)asLightFragmentProgram.size() - 5) +
+				"Spot_fp.cg";
+			mpVREnhancedSpotFP = mpProgramManager->CreateProgram(sEnhancedSpotFragProgram,
+				"main", eGpuProgramType_Fragment);
+			if(mpVREnhancedSpotFP == NULL)
+				Log(" VR enhanced spot response unavailable for '%s'; original spot shader retained.\n",
+					asLightFragmentProgram.c_str());
+		}
+
 		///////////////////////////////////////////
 		//Normalization map
 		mpNormalizationMap = mpTextureManager->CreateCubeMap("Normalization", false);
@@ -222,6 +250,8 @@ namespace hpl {
 		if(mpAmbientFP) mpProgramManager->Destroy(mpAmbientFP);
 		if(mpVRAmbientVP) mpProgramManager->Destroy(mpVRAmbientVP);
 		if(mpVRAmbientFP) mpProgramManager->Destroy(mpVRAmbientFP);
+		if(mpVREnhancedPointFP) mpProgramManager->Destroy(mpVREnhancedPointFP);
+		if(mpVREnhancedSpotFP) mpProgramManager->Destroy(mpVREnhancedSpotFP);
 
 	}
 
@@ -327,6 +357,14 @@ namespace hpl {
 
 	iGpuProgram* iMaterial_BaseLight::GetVRFragmentProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight)
 	{
+		if(aType == eMaterialRenderType_Light && apLight &&
+			apLight->GetLightType() == eLight3DType_Point && alPass == 0 &&
+			mpVREnhancedPointFP)
+			return mpVREnhancedPointFP;
+		if(aType == eMaterialRenderType_Light && apLight &&
+			apLight->GetLightType() == eLight3DType_Spot && alPass == 0 &&
+			!mbUsesTwoPassSpot && mpVREnhancedSpotFP)
+			return mpVREnhancedSpotFP;
 		if(aType == eMaterialRenderType_Z && mpVRAmbientVP && mpVRAmbientFP)
 			return mpVRAmbientFP;
 		return NULL;

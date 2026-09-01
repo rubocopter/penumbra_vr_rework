@@ -127,6 +127,10 @@ namespace hpl {
 
 		cVector3f GetLightPosition();
 
+		// Render-only HUD calibration. Not saved, and ignored by OFF/monitor.
+		void SetVREnhancedGain(float afGain){ mfVREnhancedGain = afGain; }
+		float GetVREnhancedGain() const { return mfVREnhancedGain; }
+
 		virtual bool BeginDraw(cRenderSettings *apRenderSettings,iLowLevelGraphics *apLowLevelGraphics);
 		virtual void EndDraw(cRenderSettings *apRenderSettings,iLowLevelGraphics *apLowLevelGraphics);
 
@@ -194,6 +198,7 @@ namespace hpl {
 		virtual bool CreateClipRect(cRect2l &aCliprect, cRenderSettings *apRenderSettings,iLowLevelGraphics *apLowLevelGraphics)=0;
 
 		eLight3DType mLightType;
+		float mfVREnhancedGain;
 
 		cTextureManager *mpTextureManager;
 		cFileSearcher *mpFileSearcher;

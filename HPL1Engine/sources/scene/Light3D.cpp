@@ -49,6 +49,7 @@ namespace hpl {
 
 	iLight3D::iLight3D(tString asName, cResources *apResources) : iLight(), iRenderable(asName)
 	{
+		mfVREnhancedGain = 1.0f;
 		mbStaticCasterAdded = false;
 
 		mbOnlyAffectInInSector = false;

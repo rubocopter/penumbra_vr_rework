@@ -1,0 +1,12 @@
+// VR-only replacement of the held glowstick's JPEG halo RGB. The original
+// alpha, billboard visibility/occlusion, blend, size and depth test survive.
+void main(float2 uv : TEXCOORD0, half4 color : COLOR0,
+          out half4 oColor : COLOR,
+          uniform sampler2D diffuseMap : TEXUNIT0)
+{
+    float2 q = uv * 2.0 - 1.0;
+    float envelope = saturate(1.0 - dot(q, q));
+    envelope = envelope * envelope * envelope;
+    oColor = half4(half3(0.030, 0.075, 0.055) * envelope * color.rgb,
+                  tex2D(diffuseMap, uv).a * color.a);
+}

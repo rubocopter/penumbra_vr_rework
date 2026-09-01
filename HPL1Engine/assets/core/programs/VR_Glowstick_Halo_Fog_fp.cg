@@ -1,0 +1,15 @@
+// Same continuous halo as VR_Glowstick_Halo_fp, with the original additive
+// fog texture/coordinate supplied by Fog_Trans_vp and its existing setup.
+void main(float2 uv : TEXCOORD0, half fogUv : TEXCOORD1, half4 color : COLOR0,
+          out half4 oColor : COLOR,
+          uniform sampler2D diffuseMap : TEXUNIT0,
+          uniform sampler1D fogMap : TEXUNIT1)
+{
+    float2 q = uv * 2.0 - 1.0;
+    float envelope = saturate(1.0 - dot(q, q));
+    envelope = envelope * envelope * envelope;
+    half4 fog = tex1D(fogMap, fogUv);
+    // Preserve the stock alpha expression and multiplication order exactly.
+    oColor = tex2D(diffuseMap, uv) * fog * color;
+    oColor.rgb = half3(0.030, 0.075, 0.055) * envelope * color.rgb * fog.rgb;
+}

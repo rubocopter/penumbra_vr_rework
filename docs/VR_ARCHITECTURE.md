@@ -169,24 +169,39 @@ and fused ring/middle mesh, still constrain the final pose.
 
 ## Rendering and lighting
 
-Each eye renders to an `RGBA8` colour texture with a packed
-`GL_DEPTH24_STENCIL8` renderbuffer. `RenderZ()` writes both depth and the
-texture-modulated ambient base; `RenderLight()` subsequently adds direct lights
-and retains the original stencil shadow-volume implementation. The desktop
-monitor is a distinct render boundary and is marked non-VR by the low-level
-graphics state.
+The compositor always receives the original per-eye `RGBA8` texture with a
+packed `GL_DEPTH24_STENCIL8` renderbuffer. With **Enhanced visuals** Off, the
+world renders directly into that target exactly as before. With it On, each eye
+instead renders into an auxiliary `RGBA16F`, two-sample colour/depth/stencil
+framebuffer. The world and post-scene VR/UI geometry share that target, so
+world-positioned UI retains the world depth without an invalid multisample
+depth/stencil resolve. Completed eye colour then resolves through one final
+image pass into the compositor texture. `RenderZ()` still writes the
+ambient base and `RenderLight()` still uses the original stencil shadow-volume
+algorithm.
 
-There is currently no SSAO, sampleable depth attachment, or HDR path. A minimal
-SSAO feasibility prototype was measured and then completely removed because
-its subtle contact darkening did not justify its stereo cost and complexity.
-The graphics A/B is implemented as a dedicated VR-only enhanced-ambient shader
-pair selected inside the existing `RenderZ()` material state. It groups strong
-hemispherical separation, one soft world direction and fixed sky/ground tint.
-Its toggle is Off by default; Off and the monitor select the exact original
-shader pair. No extra pass, framebuffer attachment, sampled texture,
-direct-light change, or stencil change is involved. The decision record, fixed
-factors, fallback, and per-eye `RenderZ()` GPU timing are documented in
-[Rendering and lighting research](LIGHTING.md).
+There is no SSAO or sampleable depth attachment. The measured SSAO feasibility
+prototype was completely removed because its subtle contact darkening did not
+justify its stereo cost. The current Off-by-default VR A/B groups the earlier
+hemispherical ambient with enhanced point/spot material response, MSAA 2× and a
+final exposure, dark filmic curve, contrast/gamma and sharpening pass. It can
+lift very dark baked diffuse texels only while a real light affects them; it
+does not replace stencil visibility. Missing float-FBO, multisample/blit or
+shader support automatically retains the exact direct-to-`RGBA8` path. The
+desktop monitor remains a separate non-VR render boundary and never enters the
+bundle. Its surface-refinement follow-up strengthens existing normal maps and
+masked highlights in the same light programs, bounds sharpening using the same
+five samples. After both an overly dark and an overly bright (soft-toe v2) test,
+the current calibration restores the dark curve with bounded RenderZ ambient
+preconditioning, render-only held-light RGB gains and an analytic glowstick halo.
+The halo keeps original alpha, fog, occlusion and blend, with stock-material
+fallback. Normal response stays per vertex and four normalization-cube lookups
+remain replaced with analytic light directions. Consecutive,
+asynchronous GPU queries split scene/UI, colour resolve and final treatment per
+eye; Off executes only scene/UI, and the logged total is their sum. No nested
+time-elapsed query, depth sampling or additional image pass is introduced.
+Details and evaluation constraints are in [Rendering and lighting
+research](LIGHTING.md).
 
 ## Runtime and build constraints
 
@@ -195,8 +210,12 @@ factors, fallback, and per-eye `RenderZ()` GPU timing are documented in
 - The executable remains Win32 because Newton, FLTK, SDL, OpenAL, Cg, and other
   checked-in dependencies are 32-bit. It is marked Large Address Aware for more
   memory headroom on 64-bit Windows.
-- Release builds perform a full solution `Rebuild`. Legacy project metadata can
+- Header/project changes force a full solution `Rebuild`; otherwise the build
+  script permits a safe incremental build. Legacy project metadata can
   otherwise reuse objects compiled against old class layouts and corrupt the
   heap. `/FS` serializes parallel PDB writes.
+- A small local-only texture selection changes diffuse assets in On, Off and
+  monitor views; it does not change their renderer selection. See [TEXTURES](TEXTURES.md)
+  for the 37.5 MiB incremental estimate and installer-only opt-out/restore.
 - World scale remains `1.0`; calibration, seated play, crouch, turning, and
   recentering operate through explicit offsets or the TrackingToWorld boundary.

@@ -1,0 +1,31 @@
+// VR enhanced coloured-specular point-light response.
+
+void main(half4 pos : POSITION,
+		  half4 lightColor : COLOR0,
+		  half2 uv : TEXCOORD0,
+		  half3 lightDir : TEXCOORD1,
+		  half3 halfVec : TEXCOORD2,
+		  out half4 oColor : COLOR,
+		  uniform sampler2D diffuseMap : TEXUNIT0,
+		  uniform sampler2D normalMap : TEXUNIT1,
+		  uniform samplerCUBE normalCubeMap : TEXUNIT2,
+		  uniform sampler1D falloffMap : TEXUNIT3,
+		  uniform sampler2D specularMap : TEXUNIT6)
+{
+	half3 diffuse = tex2D(diffuseMap, uv).xyz;
+	half luma = dot(diffuse, half3(0.299, 0.587, 0.114));
+	// Retain a little baked-shadow recovery without flattening dark texture contrast.
+	diffuse += (1.0 - saturate(luma / 0.28)) * 0.06;
+	half attenuation = tex1D(falloffMap, dot(lightDir, lightDir)).x;
+	half3 bumpVec = 2 * tex2D(normalMap, uv).xyz - 1;
+	// Strengthen existing tangent-space relief only; flat maps stay flat.
+	bumpVec = normalize(half3(bumpVec.xy * 1.65, max(bumpVec.z, 0.05)));
+	half3 lightVec = normalize(lightDir);
+	half3 viewHalf = normalize(halfVec);
+	half ndotl = saturate((dot(lightVec, bumpVec) + 0.08) / 1.08);
+	// Preserve the coloured material mask; reflections follow the real light.
+	half specular = pow(saturate(dot(viewHalf, bumpVec)), 24) * 1.00 * lightColor.w;
+	specular *= saturate(dot(lightVec, bumpVec) * 4.0);
+	half3 lit = (diffuse * ndotl + specular * tex2D(specularMap, uv).xyz) * lightColor.xyz;
+	oColor = half4(lit * attenuation, 0);
+}

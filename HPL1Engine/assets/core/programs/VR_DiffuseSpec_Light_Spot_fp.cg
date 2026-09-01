@@ -1,0 +1,30 @@
+// VR enhanced diffuse/specular spotlight response.
+
+void main(half4 pos : POSITION,
+		  half4 lightColor : COLOR0,
+		  half2 uv : TEXCOORD0,
+		  half3 lightDir : TEXCOORD1,
+		  half3 halfVec : TEXCOORD2,
+		  float3 spotlightUv : TEXCOORD3,
+		  out half4 oColor : COLOR,
+		  uniform sampler2D diffuseMap : TEXUNIT0,
+		  uniform samplerCUBE normalCubeMap : TEXUNIT2,
+		  uniform sampler1D falloffMap : TEXUNIT3,
+		  uniform sampler2D spotlightMap : TEXUNIT4,
+		  uniform sampler1D spotNegRejectMap : TEXUNIT5)
+{
+	half3 diffuse = tex2D(diffuseMap, uv).xyz;
+	half luma = dot(diffuse, half3(0.299, 0.587, 0.114));
+	// Retain a little baked-shadow recovery without flattening dark texture contrast.
+	diffuse += (1.0 - saturate(luma / 0.28)) * 0.06;
+	half3 lightNormal = normalize(lightDir);
+	half3 viewHalf = normalize(halfVec);
+	half ndotl = saturate((dot(lightNormal, half3(0, 0, 1)) + 0.08) / 1.08);
+	half attenuation = tex1D(falloffMap, dot(lightDir, lightDir)).x;
+	half4 spotColor = tex2Dproj(spotlightMap, spotlightUv);
+	half rejectNeg = tex1D(spotNegRejectMap, spotlightUv.z + 0.5).x;
+	// Only this already-specular material family receives the tighter lobe.
+	half specular = pow(saturate(dot(viewHalf, half3(0, 0, 1))), 24) * 1.00 * lightColor.w * spotColor.w;
+	specular *= saturate(lightNormal.z * 4.0);
+	oColor = half4((specular + diffuse * ndotl) * lightColor.xyz * spotColor.xyz * attenuation * rejectNeg, 0);
+}

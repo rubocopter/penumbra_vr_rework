@@ -1,0 +1,26 @@
+// VR enhanced diffuse spotlight response.
+
+void main(half4 pos : POSITION,
+		  half4 lightColor : COLOR0,
+		  half2 uv : TEXCOORD0,
+		  half3 lightDir : TEXCOORD1,
+		  float3 spotlightUv : TEXCOORD2,
+		  out half4 oColor : COLOR,
+		  uniform sampler2D diffuseMap : TEXUNIT0,
+		  uniform sampler1D falloffMap : TEXUNIT3,
+		  uniform sampler2D spotlightMap : TEXUNIT4,
+		  uniform sampler1D spotNegRejectMap : TEXUNIT5)
+{
+	half3 diffuse = tex2D(diffuseMap, uv).xyz;
+	half luma = dot(diffuse, half3(0.299, 0.587, 0.114));
+	// Retain a little baked-shadow recovery without flattening dark texture contrast.
+	diffuse += (1.0 - saturate(luma / 0.28)) * 0.06;
+	// Normalize analytically: one less texture lookup, no cube quantization.
+	float lightDistanceSq = dot((float3)lightDir, (float3)lightDir);
+	half3 lightNormal = lightDir * rsqrt(max(lightDistanceSq, 0.000001));
+	half ndotl = saturate((dot(lightNormal, half3(0, 0, 1)) + 0.08) / 1.08);
+	half attenuation = tex1D(falloffMap, dot(lightDir, lightDir)).x;
+	half3 spotColor = tex2Dproj(spotlightMap, spotlightUv).xyz;
+	half rejectNeg = tex1D(spotNegRejectMap, spotlightUv.z + 0.5).x;
+	oColor = half4(diffuse * ndotl * attenuation * lightColor.xyz * spotColor * rejectNeg, 0);
+}

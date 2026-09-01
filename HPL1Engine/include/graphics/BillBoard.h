@@ -106,6 +106,8 @@ namespace hpl {
 		//Halo stuff
 		void SetIsHalo(bool abX);
 		bool IsHalo(){ return mbIsHalo;}
+		void SetVREnhancedSoftHalo(bool abX){ mbVREnhancedSoftHalo = abX; }
+		bool GetVREnhancedSoftHalo() const { return mbVREnhancedSoftHalo; }
 
 		void SetHaloSourceSize(const cVector3f &avSize);
 		cVector3f GetHaloSourceSize(){return mvHaloSourceSize;}
@@ -146,6 +148,8 @@ namespace hpl {
 		virtual void SaveDataSetup(cSaveObjectHandler *apSaveObjectHandler, cGame *apGame);
 
 	private:
+		// Transient HUD tag; all world billboards retain their original material.
+		bool mbVREnhancedSoftHalo;
 		eBillboardType ToType(const char* apString);
 
 		void UpdateSourceBufferSize();

@@ -1,0 +1,10 @@
+// VR enhanced final image vertex program.
+
+void main(float4 position : POSITION,
+		  float2 uv : TEXCOORD0,
+		  out float4 oPosition : POSITION,
+		  out float2 oUv : TEXCOORD0)
+{
+	oPosition = position;
+	oUv = uv;
+}

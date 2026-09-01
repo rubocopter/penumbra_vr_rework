@@ -36,6 +36,7 @@
 #include "scene/World3D.h"
 #include "scene/RenderableContainer.h"
 #include "scene/Light3D.h"
+#include "graphics/BillBoard.h"
 #include "math/BoundingVolume.h"
 #include "resources/GpuProgramManager.h"
 #include "graphics/GPUProgram.h"
@@ -50,7 +51,7 @@ namespace hpl {
 
 	cRenderSettings::cRenderSettings()
 	{
-		mbVRAmbientActive = false;
+		mbVREnhancedVisualsActive = false;
 		mbFogActive = false;
 		mfFogStart = 5.0f;
 		mfFogEnd = 5.0f;
@@ -133,18 +134,26 @@ namespace hpl {
 		mDebugFlags = 0;
 
 		mbLog = false;
-		mbVRHemisphericalAmbientEnabled = false;
-		mbVRAmbientGpuTimersInitialized = false;
-		mbVRAmbientGpuTimersSupported = false;
+		mbVREnhancedVisualsEnabled = false;
+		mbVREnhancedVisualsAvailable = false;
+		mbVREyeGpuTimersInitialized = false;
+		mbVREyeGpuTimersSupported = false;
 		mlCurrentVREye = -1;
-		mlVRAmbientActiveTimerEye = -1;
-		mlVRAmbientActiveTimerSlot = -1;
-		memset(mvVRAmbientTimerQueries, 0, sizeof(mvVRAmbientTimerQueries));
-		memset(mvVRAmbientTimerPending, 0, sizeof(mvVRAmbientTimerPending));
-		memset(mvVRAmbientTimerMode, 0, sizeof(mvVRAmbientTimerMode));
-		memset(mvVRAmbientTimerWriteSlot, 0, sizeof(mvVRAmbientTimerWriteSlot));
-		memset(mvVRAmbientTimerSum, 0, sizeof(mvVRAmbientTimerSum));
-		memset(mvVRAmbientTimerSamples, 0, sizeof(mvVRAmbientTimerSamples));
+		mlVREyeActiveTimerEye = -1;
+		mlVREyeActiveTimerSlot = -1;
+		mlVREyeActiveTimerStage = -1;
+		memset(mvVREyeTimerQueries, 0, sizeof(mvVREyeTimerQueries));
+		memset(mvVREyeTimerPending, 0, sizeof(mvVREyeTimerPending));
+		memset(mvVREyeTimerMode, 0, sizeof(mvVREyeTimerMode));
+		memset(mvVREyeTimerStageCount, 0, sizeof(mvVREyeTimerStageCount));
+		memset(mvVREyeTimerWriteSlot, 0, sizeof(mvVREyeTimerWriteSlot));
+		memset(mvVREyeTimerSum, 0, sizeof(mvVREyeTimerSum));
+		memset(mvVREyeTimerSamples, 0, sizeof(mvVREyeTimerSamples));
+		memset(mVREnhancedEyeDesc, 0, sizeof(mVREnhancedEyeDesc));
+		mpVREnhancedFinalVP = NULL;
+		mpVREnhancedFinalFP = NULL;
+		mpVRGlowstickHaloFP = NULL;
+		mpVRGlowstickHaloFogFP = NULL;
 
 		mfVRRenderScale = 1.0f;
 
@@ -175,6 +184,30 @@ namespace hpl {
 		Log("    Extrude\n");
 
 		cGpuProgramManager *pProgramManager = apResources->GetGpuProgramManager();
+		mpVREnhancedFinalVP = pProgramManager->CreateProgram("VR_Enhanced_Final_vp.cg", "main",
+			eGpuProgramType_Vertex);
+		mpVREnhancedFinalFP = pProgramManager->CreateProgram("VR_Enhanced_Final_fp.cg", "main",
+			eGpuProgramType_Fragment);
+		if(mpVREnhancedFinalVP == NULL || mpVREnhancedFinalFP == NULL)
+		{
+			if(mpVREnhancedFinalVP) pProgramManager->Destroy(mpVREnhancedFinalVP);
+			if(mpVREnhancedFinalFP) pProgramManager->Destroy(mpVREnhancedFinalFP);
+			mpVREnhancedFinalVP = NULL;
+			mpVREnhancedFinalFP = NULL;
+			Log("   VR enhanced final pass unavailable; exact legacy eye rendering will be used.\n");
+		}
+		mpVRGlowstickHaloFP = pProgramManager->CreateProgram("VR_Glowstick_Halo_fp.cg", "main",
+			eGpuProgramType_Fragment);
+		mpVRGlowstickHaloFogFP = pProgramManager->CreateProgram("VR_Glowstick_Halo_Fog_fp.cg", "main",
+			eGpuProgramType_Fragment);
+		if(mpVRGlowstickHaloFP == NULL || mpVRGlowstickHaloFogFP == NULL)
+		{
+			if(mpVRGlowstickHaloFP) pProgramManager->Destroy(mpVRGlowstickHaloFP);
+			if(mpVRGlowstickHaloFogFP) pProgramManager->Destroy(mpVRGlowstickHaloFogFP);
+			mpVRGlowstickHaloFP = NULL;
+			mpVRGlowstickHaloFogFP = NULL;
+			Log("   VR glowstick halo programs unavailable; its stock material will be used.\n");
+		}
 		mRenderSettings.mpVtxExtrudeProgram = pProgramManager->CreateProgram("ShadowExtrude_vp.cg","main",eGpuProgramType_Vertex);
 		if(mRenderSettings.mpVtxExtrudeProgram==NULL)
 		{
@@ -297,8 +330,13 @@ namespace hpl {
 
 	cRenderer3D::~cRenderer3D()
 	{
-		if(mbVRAmbientGpuTimersSupported)
-			glDeleteQueries(4, &mvVRAmbientTimerQueries[0][0]);
+		if(mbVREyeGpuTimersSupported)
+			glDeleteQueries(4 * eVREyeGpuStage_Count, &mvVREyeTimerQueries[0][0][0]);
+
+		DestroyVREnhancedFramebuffer(mVREnhancedEyeDesc[0]);
+		DestroyVREnhancedFramebuffer(mVREnhancedEyeDesc[1]);
+		DestroyFrameBuffer(leftEyeDesc);
+		DestroyFrameBuffer(rightEyeDesc);
 
 		hplDeleteArray(mRenderSettings.mpTempIndexArray);
 
@@ -307,6 +345,10 @@ namespace hpl {
 
 		if(mpDiffuseVtxProgram) mpResources->GetGpuProgramManager()->Destroy(mpDiffuseVtxProgram);
 		if(mpDiffuseFragProgram) mpResources->GetGpuProgramManager()->Destroy(mpDiffuseFragProgram);
+		if(mpVREnhancedFinalVP) mpResources->GetGpuProgramManager()->Destroy(mpVREnhancedFinalVP);
+		if(mpVREnhancedFinalFP) mpResources->GetGpuProgramManager()->Destroy(mpVREnhancedFinalFP);
+		if(mpVRGlowstickHaloFP) mpResources->GetGpuProgramManager()->Destroy(mpVRGlowstickHaloFP);
+		if(mpVRGlowstickHaloFogFP) mpResources->GetGpuProgramManager()->Destroy(mpVRGlowstickHaloFogFP);
 		
 		if(mpSolidFogVtxProgram)mpResources->GetGpuProgramManager()->Destroy(mpSolidFogVtxProgram);
 		if(mpSolidFogFragProgram)mpResources->GetGpuProgramManager()->Destroy(mpSolidFogFragProgram);
@@ -374,91 +416,304 @@ namespace hpl {
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	InitVRAmbientGpuTimers();
+
+	mbVREnhancedVisualsAvailable = false;
+	const bool bFramebufferFeatures =
+		(GLEE_VERSION_3_0 || GLEE_ARB_framebuffer_object) &&
+		(GLEE_VERSION_3_0 || GLEE_ARB_texture_float);
+	if(mpVREnhancedFinalVP && mpVREnhancedFinalFP && bFramebufferFeatures)
+	{
+		GLint lMaxSamples = 0;
+		glGetIntegerv(GL_MAX_SAMPLES, &lMaxSamples);
+		if(lMaxSamples >= 2 &&
+			CreateVREnhancedFramebuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight,
+				mVREnhancedEyeDesc[0]) &&
+			CreateVREnhancedFramebuffer((int)m_nVRRenderWidth, (int)m_nVRRenderHeight,
+				mVREnhancedEyeDesc[1]))
+		{
+			mbVREnhancedVisualsAvailable = true;
+			Log("   VR enhanced visuals ready: RGBA16F scene, 2x MSAA and final image pass.\n");
+			Log("   VR visual calibration: dark SDR curve v4, ambient cap 0.031, diffuse recovery 0.06, specular gain 1.00.\n");
+		}
+		else
+		{
+			DestroyVREnhancedFramebuffer(mVREnhancedEyeDesc[0]);
+			DestroyVREnhancedFramebuffer(mVREnhancedEyeDesc[1]);
+			Log("   VR enhanced framebuffer allocation failed; exact legacy eye rendering remains available.\n");
+		}
+	}
+	else
+	{
+		Log("   VR enhanced visuals unsupported (RGBA16F/MSAA framebuffer or shader unavailable); using legacy eye rendering.\n");
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	InitVREyeGpuTimers();
   }
 
 	//-----------------------------------------------------------------------
 
-	void cRenderer3D::InitVRAmbientGpuTimers()
+	bool cRenderer3D::CreateVREnhancedFramebuffer(int alWidth, int alHeight,
+		VREnhancedFramebufferDesc& aDesc)
 	{
-		if(mbVRAmbientGpuTimersInitialized) return;
-		mbVRAmbientGpuTimersInitialized = true;
+		memset(&aDesc, 0, sizeof(aDesc));
+
+		glGenTextures(1, &aDesc.m_nHDRTextureId);
+		glBindTexture(GL_TEXTURE_2D, aDesc.m_nHDRTextureId);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F_ARB, alWidth, alHeight, 0,
+			GL_RGBA, GL_FLOAT, NULL);
+
+		glGenFramebuffers(1, &aDesc.m_nHDRFramebufferId);
+		glBindFramebuffer(GL_FRAMEBUFFER, aDesc.m_nHDRFramebufferId);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+			aDesc.m_nHDRTextureId, 0);
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		{
+			DestroyVREnhancedFramebuffer(aDesc);
+			return false;
+		}
+
+		glGenFramebuffers(1, &aDesc.m_nMultisampleFramebufferId);
+		glBindFramebuffer(GL_FRAMEBUFFER, aDesc.m_nMultisampleFramebufferId);
+
+		glGenRenderbuffers(1, &aDesc.m_nMultisampleColorBufferId);
+		glBindRenderbuffer(GL_RENDERBUFFER, aDesc.m_nMultisampleColorBufferId);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, 2, GL_RGBA16F_ARB, alWidth, alHeight);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+			aDesc.m_nMultisampleColorBufferId);
+
+		glGenRenderbuffers(1, &aDesc.m_nMultisampleDepthStencilBufferId);
+		glBindRenderbuffer(GL_RENDERBUFFER, aDesc.m_nMultisampleDepthStencilBufferId);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, 2, GL_DEPTH24_STENCIL8, alWidth, alHeight);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
+			aDesc.m_nMultisampleDepthStencilBufferId);
+
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		{
+			DestroyVREnhancedFramebuffer(aDesc);
+			return false;
+		}
+
+		return true;
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::DestroyVREnhancedFramebuffer(VREnhancedFramebufferDesc& aDesc)
+	{
+		if(aDesc.m_nMultisampleFramebufferId)
+			glDeleteFramebuffers(1, &aDesc.m_nMultisampleFramebufferId);
+		if(aDesc.m_nMultisampleColorBufferId)
+			glDeleteRenderbuffers(1, &aDesc.m_nMultisampleColorBufferId);
+		if(aDesc.m_nMultisampleDepthStencilBufferId)
+			glDeleteRenderbuffers(1, &aDesc.m_nMultisampleDepthStencilBufferId);
+		if(aDesc.m_nHDRFramebufferId)
+			glDeleteFramebuffers(1, &aDesc.m_nHDRFramebufferId);
+		if(aDesc.m_nHDRTextureId)
+			glDeleteTextures(1, &aDesc.m_nHDRTextureId);
+		memset(&aDesc, 0, sizeof(aDesc));
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::BeginVREyeRender(int alEye)
+	{
+		if(alEye < 0 || alEye > 1) return;
+		const bool bEnhanced = mbVREnhancedVisualsEnabled && mbVREnhancedVisualsAvailable;
+		if(bEnhanced)
+			glBindFramebuffer(GL_FRAMEBUFFER, mVREnhancedEyeDesc[alEye].m_nMultisampleFramebufferId);
+		else
+			glBindFramebuffer(GL_FRAMEBUFFER,
+				alEye == 0 ? leftEyeDesc.m_nRenderFramebufferId : rightEyeDesc.m_nRenderFramebufferId);
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::RenderVREnhancedFinalPass(GLuint alSourceTexture)
+	{
+		mpLowLevelGraphics->SetTexture(0, NULL);
+		glPushAttrib(GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT |
+			GL_ENABLE_BIT | GL_STENCIL_BUFFER_BIT | GL_TEXTURE_BIT);
+		// Use raw GL state inside the pushed block. Calling the cached low-level
+		// setters here would leave their cache describing the temporary state
+		// after glPopAttrib restores the world state, corrupting later draws.
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_FALSE);
+		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_CULL_FACE);
+
+		glActiveTextureARB(GL_TEXTURE0_ARB);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, alSourceTexture);
+
+		mpVREnhancedFinalVP->Bind();
+		mpVREnhancedFinalFP->Bind();
+		mpVREnhancedFinalFP->SetVec2f("texelSize",
+			1.0f / (float)m_nVRRenderWidth, 1.0f / (float)m_nVRRenderHeight);
+
+		glColor4f(1, 1, 1, 1);
+		glBegin(GL_QUADS);
+			glTexCoord2f(0, 0); glVertex4f(-1, -1, 0, 1);
+			glTexCoord2f(1, 0); glVertex4f( 1, -1, 0, 1);
+			glTexCoord2f(1, 1); glVertex4f( 1,  1, 0, 1);
+			glTexCoord2f(0, 1); glVertex4f(-1,  1, 0, 1);
+		glEnd();
+
+		mpVREnhancedFinalFP->UnBind();
+		mpVREnhancedFinalVP->UnBind();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDisable(GL_TEXTURE_2D);
+		glPopAttrib();
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::EndVREyeRender(int alEye)
+	{
+		if(alEye < 0 || alEye > 1) return;
+		if(!mbVREnhancedVisualsEnabled || !mbVREnhancedVisualsAvailable) return;
+
+		VREnhancedFramebufferDesc& enhanced = mVREnhancedEyeDesc[alEye];
+		FramebufferDesc& output = alEye == 0 ? leftEyeDesc : rightEyeDesc;
+
+		AdvanceVREyeGpuTimer(eVREyeGpuStage_Resolve);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, enhanced.m_nMultisampleFramebufferId);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, enhanced.m_nHDRFramebufferId);
+		glBlitFramebuffer(0, 0, m_nVRRenderWidth, m_nVRRenderHeight,
+			0, 0, m_nVRRenderWidth, m_nVRRenderHeight,
+			GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		AdvanceVREyeGpuTimer(eVREyeGpuStage_Final);
+		glBindFramebuffer(GL_FRAMEBUFFER, output.m_nRenderFramebufferId);
+		RenderVREnhancedFinalPass(enhanced.m_nHDRTextureId);
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::InitVREyeGpuTimers()
+	{
+		if(mbVREyeGpuTimersInitialized) return;
+		mbVREyeGpuTimersInitialized = true;
 
 		if(!GLEE_VERSION_1_5 || !GLEE_EXT_timer_query)
 		{
-			Log("   VR ambient GPU timing unavailable (GL_EXT_timer_query required).\n");
+			Log("   VR eye GPU timing unavailable (GL_EXT_timer_query required).\n");
 			return;
 		}
 
-		glGenQueries(4, &mvVRAmbientTimerQueries[0][0]);
-		mbVRAmbientGpuTimersSupported = true;
-		Log("   VR ambient GPU timing enabled for left/right RenderZ passes.\n");
+		GLint lCounterBits = 0;
+		glGetQueryiv(GL_TIME_ELAPSED_EXT, GL_QUERY_COUNTER_BITS, &lCounterBits);
+		if(lCounterBits == 0)
+		{
+			Log("   VR eye GPU timing unavailable (no elapsed-time counter).\n");
+			return;
+		}
+
+		glGenQueries(4 * eVREyeGpuStage_Count, &mvVREyeTimerQueries[0][0][0]);
+		mbVREyeGpuTimersSupported = true;
+		Log("   VR eye GPU timing enabled: scene/UI, MSAA resolve, final image; left/right separately.\n");
 	}
 
 	//-----------------------------------------------------------------------
 
-	void cRenderer3D::StoreVRAmbientGpuTime(int alEye, bool abEnabled, GLuint64EXT alNanoseconds)
+	void cRenderer3D::StoreVREyeGpuTime(int alEye, bool abEnabled, const GLuint64EXT* apNanoseconds)
 	{
 		const int lMode = abEnabled ? 1 : 0;
-		mvVRAmbientTimerSum[lMode][alEye] += (double)alNanoseconds / 1000000.0;
-		++mvVRAmbientTimerSamples[lMode][alEye];
+		for(int i = 0; i < eVREyeGpuStage_Count; ++i)
+			mvVREyeTimerSum[lMode][alEye][i] += (double)apNanoseconds[i] / 1000000.0;
+		++mvVREyeTimerSamples[lMode][alEye];
 
-		if(mvVRAmbientTimerSamples[lMode][alEye] >= 120)
+		if(mvVREyeTimerSamples[lMode][alEye] >= 120)
 		{
-			const double fAverage = mvVRAmbientTimerSum[lMode][alEye] /
-				(double)mvVRAmbientTimerSamples[lMode][alEye];
-			Log(" VR ambient RenderZ GPU [%s, %s]: %.3f ms average (%u samples).\n",
+			double vAverage[eVREyeGpuStage_Count];
+			double fTotal = 0.0;
+			for(int i = 0; i < eVREyeGpuStage_Count; ++i)
+			{
+				vAverage[i] = mvVREyeTimerSum[lMode][alEye][i] /
+					(double)mvVREyeTimerSamples[lMode][alEye];
+				fTotal += vAverage[i];
+				mvVREyeTimerSum[lMode][alEye][i] = 0.0;
+			}
+			Log(" VR eye GPU [%s, %s]: scene/UI=%.3f ms, resolve=%.3f ms, final=%.3f ms, total=%.3f ms (%u samples).\n",
 				abEnabled ? "On" : "Off", alEye == 0 ? "left" : "right",
-				fAverage, mvVRAmbientTimerSamples[lMode][alEye]);
-			mvVRAmbientTimerSum[lMode][alEye] = 0.0;
-			mvVRAmbientTimerSamples[lMode][alEye] = 0;
+				vAverage[0], vAverage[1], vAverage[2], fTotal, mvVREyeTimerSamples[lMode][alEye]);
+			mvVREyeTimerSamples[lMode][alEye] = 0;
 		}
 	}
 
 	//-----------------------------------------------------------------------
 
-	void cRenderer3D::BeginVRAmbientGpuTimer()
+	void cRenderer3D::BeginVREyeGpuTimer()
 	{
-		mlVRAmbientActiveTimerEye = -1;
-		mlVRAmbientActiveTimerSlot = -1;
-		if(!mbVRAmbientGpuTimersSupported || mlCurrentVREye < 0 || mlCurrentVREye > 1 ||
+		// GL_TIME_ELAPSED queries cannot nest. An unavailable slot skips the
+		// entire eye sample without blocking or partially collecting stages.
+		if(mlVREyeActiveTimerEye >= 0) return;
+		if(!mbVREyeGpuTimersSupported || mlCurrentVREye < 0 || mlCurrentVREye > 1 ||
 			!mpLowLevelGraphics->GetVREnabled()) return;
 
 		const int lEye = mlCurrentVREye;
-		const int lSlot = mvVRAmbientTimerWriteSlot[lEye];
-		if(mvVRAmbientTimerPending[lEye][lSlot])
+		const int lSlot = mvVREyeTimerWriteSlot[lEye];
+		if(mvVREyeTimerPending[lEye][lSlot])
 		{
-			GLint lAvailable = GL_FALSE;
-			glGetQueryObjectiv(mvVRAmbientTimerQueries[lEye][lSlot],
-				GL_QUERY_RESULT_AVAILABLE, &lAvailable);
-			if(lAvailable == GL_FALSE) return;
+			const int lStages = mvVREyeTimerStageCount[lEye][lSlot];
+			for(int i = 0; i < lStages; ++i)
+			{
+				GLint lAvailable = GL_FALSE;
+				glGetQueryObjectiv(mvVREyeTimerQueries[lEye][lSlot][i],
+					GL_QUERY_RESULT_AVAILABLE, &lAvailable);
+				if(lAvailable == GL_FALSE) return;
+			}
 
-			GLuint64EXT lNanoseconds = 0;
-			glGetQueryObjectui64vEXT(mvVRAmbientTimerQueries[lEye][lSlot],
-				GL_QUERY_RESULT, &lNanoseconds);
-			StoreVRAmbientGpuTime(lEye, mvVRAmbientTimerMode[lEye][lSlot], lNanoseconds);
-			mvVRAmbientTimerPending[lEye][lSlot] = false;
+			GLuint64EXT vNanoseconds[eVREyeGpuStage_Count] = {0};
+			for(int i = 0; i < lStages; ++i)
+				glGetQueryObjectui64vEXT(mvVREyeTimerQueries[lEye][lSlot][i],
+					GL_QUERY_RESULT, &vNanoseconds[i]);
+			StoreVREyeGpuTime(lEye, mvVREyeTimerMode[lEye][lSlot], vNanoseconds);
+			mvVREyeTimerPending[lEye][lSlot] = false;
 		}
 
-		glBeginQuery(GL_TIME_ELAPSED_EXT, mvVRAmbientTimerQueries[lEye][lSlot]);
-		mlVRAmbientActiveTimerEye = lEye;
-		mlVRAmbientActiveTimerSlot = lSlot;
+		mvVREyeTimerMode[lEye][lSlot] = mbVREnhancedVisualsEnabled && mbVREnhancedVisualsAvailable;
+		glBeginQuery(GL_TIME_ELAPSED_EXT, mvVREyeTimerQueries[lEye][lSlot][eVREyeGpuStage_SceneUI]);
+		mlVREyeActiveTimerEye = lEye;
+		mlVREyeActiveTimerSlot = lSlot;
+		mlVREyeActiveTimerStage = eVREyeGpuStage_SceneUI;
 	}
 
 	//-----------------------------------------------------------------------
 
-	void cRenderer3D::EndVRAmbientGpuTimer()
+	void cRenderer3D::AdvanceVREyeGpuTimer(eVREyeGpuStage aStage)
 	{
-		if(mlVRAmbientActiveTimerEye < 0 || mlVRAmbientActiveTimerSlot < 0) return;
+		if(mlVREyeActiveTimerEye < 0 || mlVREyeActiveTimerSlot < 0 ||
+			aStage != mlVREyeActiveTimerStage + 1 || aStage >= eVREyeGpuStage_Count) return;
 
 		glEndQuery(GL_TIME_ELAPSED_EXT);
-		const int lEye = mlVRAmbientActiveTimerEye;
-		const int lSlot = mlVRAmbientActiveTimerSlot;
-		mvVRAmbientTimerPending[lEye][lSlot] = true;
-		mvVRAmbientTimerMode[lEye][lSlot] = mRenderSettings.mbVRAmbientActive;
-		mvVRAmbientTimerWriteSlot[lEye] = (lSlot + 1) % 2;
-		mlVRAmbientActiveTimerEye = -1;
-		mlVRAmbientActiveTimerSlot = -1;
+		glBeginQuery(GL_TIME_ELAPSED_EXT,
+			mvVREyeTimerQueries[mlVREyeActiveTimerEye][mlVREyeActiveTimerSlot][aStage]);
+		mlVREyeActiveTimerStage = aStage;
+	}
+
+	//-----------------------------------------------------------------------
+
+	void cRenderer3D::EndVREyeGpuTimer()
+	{
+		if(mlVREyeActiveTimerEye < 0 || mlVREyeActiveTimerSlot < 0) return;
+
+		glEndQuery(GL_TIME_ELAPSED_EXT);
+		const int lEye = mlVREyeActiveTimerEye;
+		const int lSlot = mlVREyeActiveTimerSlot;
+		mvVREyeTimerPending[lEye][lSlot] = true;
+		mvVREyeTimerStageCount[lEye][lSlot] = mlVREyeActiveTimerStage + 1;
+		mvVREyeTimerWriteSlot[lEye] = (lSlot + 1) % 2;
+		mlVREyeActiveTimerEye = -1;
+		mlVREyeActiveTimerSlot = -1;
+		mlVREyeActiveTimerStage = -1;
   }
 
 	void cRenderSettings::Clear()
@@ -479,7 +734,7 @@ namespace hpl {
 
 		mbUsesLight = false;
 		mbUsesEye = false;
-		mbVRAmbientActive = false;
+		mbVREnhancedVisualsActive = false;
 
 		mbMatrixWasNULL = false;
 
@@ -579,7 +834,8 @@ namespace hpl {
 		BeginRendering(apCamera);
 
 		mRenderSettings.Clear();
-		mRenderSettings.mbVRAmbientActive = mbVRHemisphericalAmbientEnabled &&
+		mRenderSettings.mbVREnhancedVisualsActive = mbVREnhancedVisualsEnabled &&
+			mbVREnhancedVisualsAvailable &&
 			mpLowLevelGraphics->GetVREnabled();
 
 		////////////////////////////
@@ -602,9 +858,7 @@ namespace hpl {
 		mpLowLevelGraphics->SetTextureConstantColor(mRenderSettings.mAmbientColor);
 
 		if(mbLog) Log("Rendering ZBuffer:\n");
-		BeginVRAmbientGpuTimer();
 		RenderZ(apCamera);
-		EndVRAmbientGpuTimer();
 		
         //reset parameters.
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource1,eTextureSource_Previous);
@@ -1183,6 +1437,24 @@ namespace hpl {
 			iMaterialProgramSetup* pVtxProgramSetup = pMaterial->GetVertexProgramSetup(eMaterialRenderType_Diffuse,0,NULL);
 
 			iGpuProgram *pFragProgram = pMaterial->GetFragmentProgram(eMaterialRenderType_Diffuse,0,NULL);
+			// Replace only the tagged held-glowstick halo while Enhanced visuals
+			// is active. Its size, occlusion, depth test, blend and textures stay
+			// on the stock material path; missing shaders fall back automatically.
+			if(mRenderSettings.mbVREnhancedVisualsActive &&
+				mpVRGlowstickHaloFP && mpVRGlowstickHaloFogFP &&
+				(mRenderSettings.mbFogActive ? pVtxProgram != NULL : mpDiffuseVtxProgram != NULL) &&
+				blendMode == eMaterialBlendMode_Add &&
+				pObject->GetEntityType() == "Billboard" &&
+				static_cast<cBillboard*>(pObject)->GetVREnhancedSoftHalo())
+			{
+				pFragProgram = mRenderSettings.mbFogActive ?
+					mpVRGlowstickHaloFogFP : mpVRGlowstickHaloFP;
+				if(!mRenderSettings.mbFogActive)
+				{
+					pVtxProgram = mpDiffuseVtxProgram;
+					pVtxProgramSetup = NULL;
+				}
+			}
 			
 			for(int i=0; i<MAX_TEXTUREUNITS; ++i) vTextures[i] = pMaterial->GetTexture(i,eMaterialRenderType_Diffuse,0,NULL);
 			

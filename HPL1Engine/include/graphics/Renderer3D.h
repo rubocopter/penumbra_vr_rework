@@ -72,8 +72,15 @@ namespace hpl {
     GLuint m_nDepthBufferId;
     GLuint m_nRenderTextureId;
     GLuint m_nRenderFramebufferId;
-    GLuint m_nResolveTextureId;
-    GLuint m_nResolveFramebufferId;
+  };
+
+  struct VREnhancedFramebufferDesc
+  {
+    GLuint m_nMultisampleFramebufferId;
+    GLuint m_nMultisampleColorBufferId;
+    GLuint m_nMultisampleDepthStencilBufferId;
+    GLuint m_nHDRFramebufferId;
+    GLuint m_nHDRTextureId;
   };
 
 	class cRenderSettings
@@ -127,7 +134,7 @@ namespace hpl {
 		
 		bool mbUsesLight;
 		bool mbUsesEye;
-		bool mbVRAmbientActive;
+		bool mbVREnhancedVisualsActive;
 
 		cColor mAmbientColor;
 
@@ -201,11 +208,16 @@ namespace hpl {
 		void FetchOcclusionQueries();
 
     void CreateVREyeTextures(vr::IVRSystem* vr_hmd);
+    void BeginVREyeRender(int alEye);
+    void EndVREyeRender(int alEye);
+    void BeginVREyeGpuTimer();
+    void EndVREyeGpuTimer();
 
     void SetVRRenderScale(float afScale) { mfVRRenderScale = afScale; }
     float GetVRRenderScale() const { return mfVRRenderScale; }
-		void SetVRHemisphericalAmbientEnabled(bool abEnabled) { mbVRHemisphericalAmbientEnabled = abEnabled; }
-		bool GetVRHemisphericalAmbientEnabled() const { return mbVRHemisphericalAmbientEnabled; }
+		void SetVREnhancedVisualsEnabled(bool abEnabled) { mbVREnhancedVisualsEnabled = abEnabled; }
+		bool GetVREnhancedVisualsEnabled() const { return mbVREnhancedVisualsEnabled; }
+		bool GetVREnhancedVisualsAvailable() const { return mbVREnhancedVisualsAvailable; }
 		void SetCurrentVREye(int alEye) { mlCurrentVREye = alEye; }
 
     FramebufferDesc leftEyeDesc;
@@ -226,10 +238,19 @@ namespace hpl {
 		void RenderSkyBox(cCamera3D *apCamera);
 		
 		void RenderZ(cCamera3D *apCamera);
-		void InitVRAmbientGpuTimers();
-		void BeginVRAmbientGpuTimer();
-		void EndVRAmbientGpuTimer();
-		void StoreVRAmbientGpuTime(int alEye, bool abEnabled, GLuint64EXT alNanoseconds);
+		enum eVREyeGpuStage
+		{
+			eVREyeGpuStage_SceneUI = 0,
+			eVREyeGpuStage_Resolve,
+			eVREyeGpuStage_Final,
+			eVREyeGpuStage_Count
+		};
+		void InitVREyeGpuTimers();
+		void AdvanceVREyeGpuTimer(eVREyeGpuStage aStage);
+		void StoreVREyeGpuTime(int alEye, bool abEnabled, const GLuint64EXT* apNanoseconds);
+		bool CreateVREnhancedFramebuffer(int alWidth, int alHeight, VREnhancedFramebufferDesc& aDesc);
+		void DestroyVREnhancedFramebuffer(VREnhancedFramebufferDesc& aDesc);
+		void RenderVREnhancedFinalPass(GLuint alSourceTexture);
 
 		void RenderOcclusionQueries(cCamera3D *apCamera);
 
@@ -251,18 +272,26 @@ namespace hpl {
 		cRendererPostEffects *mpPostEffects;
 
 		bool mbLog;
-		bool mbVRHemisphericalAmbientEnabled;
-		bool mbVRAmbientGpuTimersInitialized;
-		bool mbVRAmbientGpuTimersSupported;
+		bool mbVREnhancedVisualsEnabled;
+		bool mbVREnhancedVisualsAvailable;
+		bool mbVREyeGpuTimersInitialized;
+		bool mbVREyeGpuTimersSupported;
 		int mlCurrentVREye;
-		int mlVRAmbientActiveTimerEye;
-		int mlVRAmbientActiveTimerSlot;
-		GLuint mvVRAmbientTimerQueries[2][2];
-		bool mvVRAmbientTimerPending[2][2];
-		bool mvVRAmbientTimerMode[2][2];
-		int mvVRAmbientTimerWriteSlot[2];
-		double mvVRAmbientTimerSum[2][2];
-		unsigned int mvVRAmbientTimerSamples[2][2];
+		int mlVREyeActiveTimerEye;
+		int mlVREyeActiveTimerSlot;
+		int mlVREyeActiveTimerStage;
+		GLuint mvVREyeTimerQueries[2][2][eVREyeGpuStage_Count];
+		bool mvVREyeTimerPending[2][2];
+		bool mvVREyeTimerMode[2][2];
+		int mvVREyeTimerStageCount[2][2];
+		int mvVREyeTimerWriteSlot[2];
+		double mvVREyeTimerSum[2][2][eVREyeGpuStage_Count];
+		unsigned int mvVREyeTimerSamples[2][2];
+		VREnhancedFramebufferDesc mVREnhancedEyeDesc[2];
+		iGpuProgram *mpVREnhancedFinalVP;
+		iGpuProgram *mpVREnhancedFinalFP;
+		iGpuProgram *mpVRGlowstickHaloFP;
+		iGpuProgram *mpVRGlowstickHaloFogFP;
 
 		float mfRenderTime;
 

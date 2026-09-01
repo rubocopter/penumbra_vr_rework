@@ -187,6 +187,10 @@ void iHudModel::LoadEntities()
 	{
 		iLight3D* pLight = mpMesh->CreateLightInWorld(msName,mpMesh->GetLight(i),mpEntity,pWorld);
 		if(pLight){
+			// Do not change entity colours/radii: equip fades, flicker, saves,
+			// culling and shadow volumes must keep their existing inputs.
+			if(msName == "Glowstick") pLight->SetVREnhancedGain(0.70f);
+			else if(msName == "Flashlight") pLight->SetVREnhancedGain(0.90f);
 			mvLightColors.push_back(pLight->GetDiffuseColor());
 			mvLightRadii.push_back(pLight->GetFarAttenuation());
 			mvLights.push_back(pLight);
@@ -197,7 +201,10 @@ void iHudModel::LoadEntities()
 	for(int i=0; i< mpMesh->GetBillboardNum(); i++)
 	{
 		cBillboard *pBill = mpMesh->CreateBillboardInWorld(msName,mpMesh->GetBillboard(i),mpEntity,pWorld);
-		if(pBill) mvBillboards.push_back(pBill);
+		if(pBill) {
+			if(msName == "Glowstick" && pBill->IsHalo()) pBill->SetVREnhancedSoftHalo(true);
+			mvBillboards.push_back(pBill);
+		}
 	}
 
 	// Create particle systems

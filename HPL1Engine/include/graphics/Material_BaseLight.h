@@ -100,6 +100,8 @@ namespace hpl {
 		iGpuProgram* mpAmbientFP;
 		iGpuProgram* mpVRAmbientVP;
 		iGpuProgram* mpVRAmbientFP;
+		iGpuProgram* mpVREnhancedPointFP;
+		iGpuProgram* mpVREnhancedSpotFP;
 
 		iGpuProgram* mvVtxPrograms[eBaseLightProgram_LastEnum];
 		iGpuProgram* mvFragPrograms[eBaseLightProgram_LastEnum];
