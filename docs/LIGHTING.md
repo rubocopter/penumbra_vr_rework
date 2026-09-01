@@ -16,9 +16,10 @@ become a shipping renderer dependency.
 - The monitor renderer and all direct-light/material shaders are unchanged.
 - The SSAO feasibility prototype was removed after hardware evaluation showed
   too little visible benefit.
-- A conservative VR-only hemispherical ambient prototype is now implemented
-  behind an Off-by-default hot toggle. It still requires headset A/B testing
-  before any decision to keep it.
+- A strong VR-only enhanced-ambient prototype is implemented behind an
+  Off-by-default hot toggle. It combines hemispherical separation, a soft fixed
+  direction and sky/ground tint in the existing ambient shader and still
+  requires headset A/B testing before any decision to keep it.
 
 ## How HPL1 currently produces ambient light
 
@@ -150,29 +151,43 @@ flashlight's existing stencil path was not modified.
 | Candidate | Status | Reasoning |
 | --- | --- | --- |
 | Half-resolution SSAO | Rejected for now | Valid mask and low absolute cost, but negligible perceived improvement in the tested scenes |
-| Hemispherical ambient | Implemented for A/B | Uses existing geometry normals inside the ambient pass; no depth texture or extra pass; headset result still unknown |
-| Soft ambient direction | Possible later extension | Could increase separation, but should not be mixed into the first controlled test |
-| Separate sky/ground colours | Possible later extension | More art direction and tuning than the initial scalar A/B needs |
+| Hemispherical ambient | Implemented for A/B | Uses existing geometry normals inside the ambient pass; the first conservative headset test was correct but too subtle, so the fixed range was strengthened without adding a pass |
+| Soft ambient direction | Included in strong A/B | Adds separation between opposing vertical walls with one vertex dot product and one interpolator |
+| Separate sky/ground colours | Included in strong A/B | Uses fixed warm ground and cool sky multipliers; no textures, uniforms or additional controls |
 | Fake contact shading | Low priority | The SSAO test indicates that more contact darkening is not the main visual deficit |
 | Distance attenuation/fog | Deferred | Potentially useful for depth separation but much more likely to change Penumbra's original atmosphere |
 | HDR/modern post-processing | Out of scope | The current PCVR/OpenGL path is `RGBA8`, and converting the presentation pipeline is not a minimal lighting improvement |
 
-## Hemispherical ambient A/B prototype
+## Enhanced ambient A/B prototype
 
-The implemented test alters only the orientation of the existing ambient term:
+The implemented test alters only the existing ambient term:
 
 ```text
 hemi = saturate(normalWorld.y * 0.5 + 0.5)
-ambientFactor = 0.75 + (1.0 - 0.75) * hemi
-output.rgb = diffuse.rgb * globalAmbient * sectorAmbient * ambientFactor
+direction = saturate(dot(normalWorld, normalize(0.35, 0.85, 0.40)) * 0.5 + 0.5)
+orientationFactor = lerp(0.35, 1.15, hemi)
+directionFactor = lerp(0.65, 1.35, direction)
+ambientTint = lerp((1.08, 0.90, 0.76), (0.88, 1.02, 1.18), hemi)
+output.rgb = diffuse.rgb * globalAmbient * sectorAmbient
+             * orientationFactor * directionFactor * ambientTint
 output.a = diffuse.a
 ```
 
-`Up = 1.0` and `Down = 0.75` are deliberately conservative. An upward-facing
-surface keeps the current ambient level, a downward-facing surface receives
-75 per cent, and a vertical surface lands halfway between them. The aim is to
-test whether orientation alone separates floors, walls, ceilings and props—not
-to introduce an obvious new light source.
+The first headset build used deliberately conservative `Up = 1.0` and
+`Down = 0.75` values. It produced the expected orientation response, but the
+result was barely perceptible: vertical surfaces retained 87.5 per cent of an
+ambient component that is already only about one tenth of the final colour,
+and direct flashlight lighting masked most of the remaining difference.
+
+The strong A/B keeps exactly the same render path but deliberately groups the
+three nearly free candidates so they can be judged in one headset run. Its
+vertical endpoints are `Up = 1.15` and `Down = 0.35`, with `0.75` on vertical
+surfaces. A normalized world direction `(0.35, 0.85, 0.40)` then supplies a
+`0.65`–`1.35` multiplier so opposing walls no longer receive identical
+ambient. Finally, fixed warm-ground `(1.08, 0.90, 0.76)` and cool-sky
+`(0.88, 1.02, 1.18)` multipliers give the orientation difference a visible
+colour cue. These intentionally broad values are diagnostic, not proposed
+shipping calibration.
 
 ### Implementation boundary
 
@@ -181,8 +196,9 @@ to introduce an obvious new light source.
 2. `Ambient_Hemisphere_vp.cg` and `Ambient_Hemisphere_fp.cg` form a dedicated
    alternative pair for the BaseLight Z pass only.
 3. The vertex shader receives the geometry normal through an inverse-transpose
-   object-to-world normal matrix and uses world Y. A singular object matrix
-   falls back to identity instead of producing invalid normals.
+   object-to-world normal matrix. It derives both the world-Y hemisphere and
+   the soft directional response per vertex; a singular object matrix falls
+   back to identity instead of producing invalid normals.
 4. The compiled render state retains both original and VR-alternative program
    pointers. Selection occurs at draw-state application time because one render
    list is shared by the optional monitor view and both eyes. The alternative
@@ -196,8 +212,8 @@ to introduce an obvious new light source.
 
 HPL1 already exposes vertex normals and per-object program setup hooks;
 `Material_EnvMap_Reflect.cpp` demonstrates sending `objectWorldMatrix` during a
-draw. Computing and interpolating the hemispherical factor in the vertex shader
-keeps the fragment work to a small interpolation/multiply. Passing an
+draw. Computing and interpolating both orientation factors in the vertex shader
+keeps the fragment work to fixed lerps and multiplies. Passing an
 inverse-transpose normal matrix is safer than taking the object's upper-left
 3×3 directly because non-uniform scale can otherwise skew the result.
 
@@ -205,10 +221,11 @@ The prototype covers the normal BaseLight material family. Legacy fallback or
 unusual material paths retain the original ambient shader rather than receiving
 a broad modification to a shared program.
 
-The persisted setting is `[VR] HemisphericalAmbient`, exposed as
-**Options → VR Settings → Display → Hemispherical ambient**. It defaults to
-`Off`, saves immediately, and changes the next eye render without restarting or
-reloading the map. No intensity, colour, direction, or quality setting exists.
+The persisted setting remains `[VR] HemisphericalAmbient` for configuration
+compatibility, exposed as **Options → VR Settings → Display → Enhanced
+ambient** (`Ambiente mejorado` in Spanish). It defaults to `Off`, saves
+immediately, and changes the next eye render without restarting or reloading
+the map. No intensity, colour, direction, or quality setting exists.
 
 When OpenGL 1.5 queries and `GL_EXT_timer_query` are available, asynchronous
 double-buffered queries measure the complete `RenderZ()` GPU interval for each
@@ -222,13 +239,15 @@ that GPU timing is disabled.
 
 - `VR toggle Off`: select the exact original ambient programs, not a factor of
   one inside the experimental shader.
-- `VR toggle On`: apply only the fixed `Up = 1.0`, `Down = 0.75` orientation
-  factor.
+- `VR toggle On`: apply the fixed strong hemisphere, soft world direction and
+  sky/ground tint described above.
 - Monitor rendering: always select the original programs.
 - Runtime change: immediate, with no map reload or restart.
 - Default during evaluation: Off.
-- Alpha, direct lights, flashlight stencil shadows, fog and materials: unchanged.
-- No intensity, direction, colour, radius or quality controls in the first test.
+- Alpha, direct-light programs, the flashlight stencil algorithm, fog and
+  materials: unchanged by the ambient toggle.
+- No intensity, direction, colour, radius or quality controls in this grouped
+  diagnostic test.
 
 ### Evaluation protocol
 
@@ -240,10 +259,36 @@ independent 120-frame `RenderZ()` averages printed for left and right eyes in
 both modes; compare like-for-like after a short warm-up rather than reading a
 single frame.
 
-The prototype succeeds only if surface orientation gives perceptible volume
-without looking like a new directional light. If the A/B remains irrelevant,
-remove it as completely as SSAO. If it succeeds, tuning and optional sky/ground
-colour can be considered in a separate change.
+The strong A/B succeeds only if surface orientation gives clearly perceptible
+volume without crushing downward-facing geometry or making the fixed tint and
+direction look unrelated to the scene. If it remains irrelevant, remove it as
+completely as SSAO. If it succeeds, separate which parts deserve to remain and
+tune the diagnostic constants down for shipping.
+
+## Held-flashlight lens alignment
+
+The flashlight gap reported during the first hemispherical headset test was
+unrelated to ambient shading. The held model used three incompatible forward
+positions after its `VrScale = 1.6` transform:
+
+- the physical front of the reconstructed mesh was approximately `0.1638 m`;
+- the spotlight origin was at DAE `Y = -0.02`, while its flashlight-specific
+  light entity kept `NearClipPlane = 0.1`; the scaled near plane consequently
+  started at approximately `0.192 m`, leaving about `2.8 cm` beyond the lens;
+- the front flare was at DAE `Y = -0.154435`, or approximately `0.247 m` after
+  scaling, roughly `8.3 cm` in front of the physical lens.
+
+The asset-only correction places the bulb at DAE `Y = -0.092`, shortens the
+flashlight-specific near plane to `0.01`, and places the flare at the measured
+lens plane `Y = -0.1024`. With the existing VR scale, the projected near plane
+is approximately `0.1632 m`, within a millimetre of the reconstructed front.
+The bulb remains about `1.7 cm` behind the lens, which gives the stencil shadows
+a plausible physical source instead of placing it beyond the glass.
+
+No renderer, gobo, falloff texture, direct-light shader or stencil algorithm is
+changed. `scripts/package.ps1` explicitly overlays the corrected
+`light_player_flashlight_spot.lnt`, because the stock game otherwise supplies
+that engine resource while the DAE already ships from `data/models`.
 
 ## Verification record
 
@@ -267,6 +312,22 @@ For the hemispherical ambient prototype on 1 September 2026:
 - Headset A/B captures, flashlight-shadow comparison and the logged per-eye GPU
   averages remain pending hardware validation. They must not be inferred from
   build-only verification.
+
+For the strong enhanced-ambient bundle and flashlight alignment on 1 September
+2026:
+
+- Release Win32 completed a clean full rebuild; after the final shader and
+  documentation constants were selected, an incremental build confirmed that
+  compiled sources were unchanged and regenerated the package.
+- Large Address Aware remained present and unit tests again reported
+  `289 checks, 0 failures`.
+- Project validation guards the fixed hemisphere, direction, tint, bulb, lens,
+  near-plane and packaging values.
+- The package manifest contains the final optional shaders, corrected DAE,
+  flashlight-specific `.lnt` overlay and renamed English/Spanish menu labels;
+  their recorded SHA-256 values match the generated files.
+- Runtime shader compilation, headset appearance, the corrected flare/beam
+  origin and flashlight shadow direction still require hardware validation.
 
 Relevant code entry points:
 

@@ -1056,7 +1056,7 @@
   <library_visual_scenes>
     <visual_scene id="DefaultScene" name="untitled">
       <node id="light_player_flashlight_spot_light1" name="light_player_flashlight_spot_light1" sid="light_player_flashlight_spot_light1">
-        <translate sid="translate">0 -0.02 0</translate>
+        <translate sid="translate">0 -0.092 0</translate>
         <rotate sid="rotateZ">0 0 1 0</rotate>
         <rotate sid="rotateY">0 1 0 0</rotate>
         <rotate sid="rotateX">1 0 0 -90.000076</rotate>
@@ -1064,7 +1064,7 @@
         <instance_light url="#light_player_flashlight_spot_light1Shape-lib"/>
       </node>
       <node id="_bb_flashlight_lightray_flare1" name="_bb_flashlight_lightray_flare1" sid="_bb_flashlight_lightray_flare1">
-        <translate sid="translate">0 -0.154435 0</translate>
+        <translate sid="translate">0 -0.1024 0</translate>
         <rotate sid="rotateZ">0 0 1 0</rotate>
         <rotate sid="rotateY">0 1 0 0</rotate>
         <rotate sid="rotateX">1 0 0 0</rotate>

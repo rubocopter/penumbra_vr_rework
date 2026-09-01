@@ -62,13 +62,18 @@ New-Item -ItemType Directory -Path $programRoot -Force | Out-Null
 foreach ($vrProgram in @('Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg')) {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "HPL1Engine\assets\core\programs\$vrProgram") -Destination $programRoot
 }
+# Overlay the flashlight-specific light entity so its shorter projection near
+# plane ships with the corrected HUD-model bulb and lens positions.
+$textureRoot = Join-Path $packageRoot 'textures'
+New-Item -ItemType Directory -Path $textureRoot -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\textures\light_player_flashlight_spot.lnt') -Destination $textureRoot
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'readme.md') -Destination (Join-Path $packageRoot 'README.md')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\COPYING') -Destination (Join-Path $packageRoot 'COPYING.txt')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs') -Destination $packageRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\deploy.ps1') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.ps1')
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\Install-PenumbraVR.bat') -Destination (Join-Path $packageRoot 'Install-PenumbraVR.bat')
 
-foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'OpenAL32.dll', 'msvcp140.dll', 'vcruntime140.dll', 'licenses\OpenALSoft-COPYING.txt', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat', 'config\English.lang', 'config\Espanol.lang', 'core\programs\Ambient_Hemisphere_vp.cg', 'core\programs\Ambient_Hemisphere_fp.cg', 'docs\INPUT.md', 'docs\LIGHTING.md', 'docs\TROUBLESHOOTING.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json', 'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json', 'vr\bindings\pico4_controller.json', 'vr\bindings\pico_neo3_controller.json', 'vr\bindings\holographic_controller.json')) {
+foreach ($requiredPath in @('Penumbra_vr.exe', 'openvr_api.dll', 'OpenAL32.dll', 'msvcp140.dll', 'vcruntime140.dll', 'licenses\OpenALSoft-COPYING.txt', 'Install-PenumbraVR.ps1', 'Install-PenumbraVR.bat', 'config\English.lang', 'config\Espanol.lang', 'core\programs\Ambient_Hemisphere_vp.cg', 'core\programs\Ambient_Hemisphere_fp.cg', 'textures\light_player_flashlight_spot.lnt', 'docs\INPUT.md', 'docs\LIGHTING.md', 'docs\TROUBLESHOOTING.md', 'docs\ROADMAP.md', 'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json', 'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json', 'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json', 'vr\bindings\pico4_controller.json', 'vr\bindings\pico_neo3_controller.json', 'vr\bindings\holographic_controller.json')) {
     $packagedPath = Join-Path $packageRoot $requiredPath
     if (-not (Test-Path -LiteralPath $packagedPath)) {
         throw "Required package entry was not created: $packagedPath"

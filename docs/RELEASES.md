@@ -4,23 +4,25 @@
 
 ### Added
 
-- Off-by-default **Hemispherical ambient** A/B under Options → VR Settings → Display. It applies a fixed `Up = 1.0` / `Down = 0.75` world-normal factor only to the existing VR ambient term, switches immediately, preserves texture alpha, and adds no pass or framebuffer
+- Off-by-default **Enhanced ambient** A/B under Options → VR Settings → Display. It combines a strong `Up = 1.15` / `Down = 0.35` world-normal factor (`0.75` on vertical surfaces), a fixed soft world direction and warm-ground/cool-sky tint only inside the existing VR ambient term; it switches immediately, preserves texture alpha, and adds no pass, framebuffer or sampled texture
 - Asynchronous GPU timer queries report independent 120-sample averages for the complete left/right `RenderZ()` pass in On and Off modes; unsupported timer-query hardware simply skips measurement
 
 ### Changed
 
 - Reflowed Options → VR Settings into two columns so every setting and the Back button remains inside the 800×600 VR cursor range
-- The monitor, direct-light shaders, flashlight stencil shadows, eye depth/stencil renderbuffers, and exact original ambient shaders used while the new option is Off remain unchanged; failure to load either optional shader falls back to the original pair
+- Aligned the held flashlight's bulb, projection near plane and front flare with the physical lens. The flashlight-specific near plane now starts at the lens instead of leaving an approximately 2.8 cm unlit gap, and the flare no longer floats roughly 8 cm in front of the model
+- Strengthened and grouped the nearly free ambient candidates after the first headset A/B proved the conservative `Up = 1.0` / `Down = 0.75` range technically correct but too subtle: the same toggle now tests strong vertical separation, opposing-wall directionality and sky/ground colour in one run
+- The monitor, direct-light shaders, stencil shadow-volume algorithm, eye depth/stencil renderbuffers, and exact original ambient shaders used while the new option is Off remain unchanged; failure to load either optional shader falls back to the original pair. The flashlight's shadow source moves only because its bulb is now aligned physically behind the lens
 
 ### Documentation
 
-- Added a rendering and lighting decision record covering the current HPL1 ambient/direct-light order, packed eye depth/stencil attachment, discarded half-resolution SSAO prototype, measured per-eye cost, visual findings, complete cleanup, and the minimal contract for a future VR-only hemispherical-ambient A/B
+- Added a rendering and lighting decision record covering the current HPL1 ambient/direct-light order, packed eye depth/stencil attachment, discarded half-resolution SSAO prototype, measured per-eye cost, visual findings, complete cleanup, and the contract and evolution of the VR-only enhanced-ambient A/B
 - Corrected the controls guide to reflect the current collision-constrained visible palm instead of the obsolete pass-through description
 
 ### Validation
 
 - Release Win32 full rebuild, Large Address Aware verification, `289 checks, 0 failures`, package generation, executable hash comparison, and confirmation that runtime code, shaders and packaged resources contain no leftover SSAO implementation
-- Hemispherical prototype source validation: Release Win32 full rebuild, Large Address Aware verification, project checks, `289 checks, 0 failures`, package generation, executable hash comparison, and presence of both optional shaders in the package. Headset A/B captures, flashlight-shadow comparison and per-eye timing remain pending hardware validation
+- Enhanced-ambient and flashlight-alignment source validation: Release Win32 full rebuild, Large Address Aware verification, project checks, `289 checks, 0 failures`, package generation, executable hash comparison, and manifest verification for both optional shaders, the corrected flashlight DAE, its `.lnt` overlay and both translated menu labels. Headset A/B captures, flashlight-shadow comparison and per-eye timing remain pending hardware validation
 
 ---
 

@@ -4,7 +4,7 @@
 		Aspect = 	 "1"
 		FalloffImage = 	 "player_flashlight_falloff"
 		CastsShadows =   "true"
-		NearClipPlane =  "0.1"
+		NearClipPlane =  "0.01"
 		Specular=	 "1"
 	/>
 </LIGHTENTITY>

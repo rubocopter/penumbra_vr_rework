@@ -11,6 +11,7 @@ $requiredPaths = @(
     'HPL1Engine\HPL.vcxproj',
 	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_vp.cg',
 	'HPL1Engine\assets\core\programs\Ambient_Hemisphere_fp.cg',
+	'HPL1Engine\assets\textures\light_player_flashlight_spot.lnt',
     'HPL1Engine\include\game\VRTracking.h',
     'PenumbraOverture\Penumbra.vcxproj',
     'PenumbraOverture\VRHaptics.cpp',
@@ -24,6 +25,7 @@ $requiredPaths = @(
     'dependencies\lib\win32\SDL.dll',
     'data\config\English.lang',
     'data\config\Espanol.lang',
+	'data\models\hud_objects\hud_object_flashlight.dae',
     'data\vr\actions.json',
     'data\vr\bindings\psvr2_sense.json',
     'data\vr\bindings\vive_controller.json',
@@ -277,18 +279,36 @@ $packageSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'scrip
 foreach ($requiredAmbientSnippet in @(
 	'GetVRVertexProgram', 'GetVRFragmentProgram',
 	'objectNormalMatrix', 'worldNormal.y * 0.5 + 0.5',
-	'lerp(0.75, 1.0', 'oColor.xyz *= ambientColor * ambientFactor',
+	'float3(0.35, 0.85, 0.40)', 'dot(worldNormal, ambientDirection)',
+	'lerp(0.35, 1.15', 'lerp(0.65, 1.35',
+	'float3(1.08, 0.90, 0.76)', 'float3(0.88, 1.02, 1.18)',
+	'oColor.xyz *= ambientColor * orientationFactor * directionFactor * ambientTint',
 	'mbVRHemisphericalAmbientEnabled &&', 'mpLowLevelGraphics->GetVREnabled()',
 	'GLEE_EXT_timer_query', 'VR ambient RenderZ GPU'
 )) {
 	if (($baseLightSource + $rendererSource + $hemisphereVertexShader + $hemisphereFragmentShader) -notmatch [regex]::Escape($requiredAmbientSnippet)) {
-		throw "The hemispherical ambient A/B regression guard is missing '$requiredAmbientSnippet'."
+		throw "The enhanced ambient A/B regression guard is missing '$requiredAmbientSnippet'."
 	}
 }
 foreach ($requiredPackagedShader in @('Ambient_Hemisphere_vp.cg', 'Ambient_Hemisphere_fp.cg')) {
 	if ($packageSource -notmatch [regex]::Escape($requiredPackagedShader)) {
 		throw "The package script does not include required VR shader '$requiredPackagedShader'."
 	}
+}
+
+$flashlightModel = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'data\models\hud_objects\hud_object_flashlight.dae')
+$flashlightLight = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'HPL1Engine\assets\textures\light_player_flashlight_spot.lnt')
+foreach ($requiredFlashlightSnippet in @(
+	'<translate sid="translate">0 -0.092 0</translate>',
+	'<translate sid="translate">0 -0.1024 0</translate>',
+	'NearClipPlane =  "0.01"'
+)) {
+	if (($flashlightModel + $flashlightLight) -notmatch [regex]::Escape($requiredFlashlightSnippet)) {
+		throw "The aligned VR flashlight configuration is missing '$requiredFlashlightSnippet'."
+	}
+}
+if ($packageSource -notmatch [regex]::Escape('light_player_flashlight_spot.lnt')) {
+	throw 'The package script does not include the corrected flashlight light entity.'
 }
 
 $initSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'PenumbraOverture\Init.cpp')

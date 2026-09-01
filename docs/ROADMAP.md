@@ -9,7 +9,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
-- Graphics evaluation — headset A/B and per-eye `RenderZ()` timing for the Off-by-default hemispherical-ambient prototype
+- Graphics evaluation — headset A/B and per-eye `RenderZ()` timing for the Off-by-default enhanced-ambient prototype
 
 ## Next
 
@@ -60,4 +60,4 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - CI pipeline building and packaging Release Win32 on every push, PR, and tag
 - VR Settings accessibility layout — two columns keep every option and the Back button within the cursor's 800×600 selectable area
 - HPL1 lighting audit and minimal half-resolution SSAO feasibility test — depth/stencil sampling, per-eye reconstruction, ambient-only composition and GPU timing were validated; the experiment was then fully removed because its roughly 0.46 ms stereo cost produced negligible visible benefit
-- Minimal hemispherical-ambient A/B — dedicated BaseLight `RenderZ()` shaders with fixed `Up = 1.0`/`Down = 0.75`, exact original-shader selection when Off and on the monitor, hot Off-by-default VR setting, shader-load fallback, and asynchronous left/right GPU timing of the complete ambient/depth pass
+- Enhanced-ambient A/B — dedicated BaseLight `RenderZ()` shaders group a strong `Up = 1.15`/`Down = 0.35` hemisphere, fixed soft world direction and warm-ground/cool-sky tint after the conservative first headset test proved too subtle; exact original-shader selection remains in use when Off and on the monitor, with the hot Off-by-default setting, shader-load fallback and asynchronous left/right GPU timing unchanged

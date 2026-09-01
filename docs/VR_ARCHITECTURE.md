@@ -179,12 +179,14 @@ graphics state.
 There is currently no SSAO, sampleable depth attachment, or HDR path. A minimal
 SSAO feasibility prototype was measured and then completely removed because
 its subtle contact darkening did not justify its stereo cost and complexity.
-The next A/B is implemented as a dedicated VR-only hemispherical ambient shader
-pair selected inside the existing `RenderZ()` material state. Its toggle is Off
-by default; Off and the monitor select the exact original shader pair. No extra
-pass, framebuffer attachment, direct-light change, or stencil change is
-involved. The decision record, fixed factors, fallback, and per-eye `RenderZ()`
-GPU timing are documented in [Rendering and lighting research](LIGHTING.md).
+The graphics A/B is implemented as a dedicated VR-only enhanced-ambient shader
+pair selected inside the existing `RenderZ()` material state. It groups strong
+hemispherical separation, one soft world direction and fixed sky/ground tint.
+Its toggle is Off by default; Off and the monitor select the exact original
+shader pair. No extra pass, framebuffer attachment, sampled texture,
+direct-light change, or stencil change is involved. The decision record, fixed
+factors, fallback, and per-eye `RenderZ()` GPU timing are documented in
+[Rendering and lighting research](LIGHTING.md).
 
 ## Runtime and build constraints
 

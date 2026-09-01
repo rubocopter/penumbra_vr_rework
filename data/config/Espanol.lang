@@ -409,7 +409,7 @@
     <Entry Name="VRDisplay">PANTALLA</Entry>
     <Entry Name="VRDetectionDepth">Profundidad de detección:</Entry>
     <Entry Name="VRRenderScale">Escala de render:</Entry>
-	<Entry Name="VRHemisphericalAmbient">Ambiente hemisférico:</Entry>
+	<Entry Name="VRHemisphericalAmbient">Ambiente mejorado:</Entry>
     <Entry Name="TipVRRenderScale">Multiplica el tamaño de ojo recomendado por SteamVR. Requiere reiniciar la aplicación para aplicarse.</Entry>
     <Entry Name="VRHRTF">Audio binaural (HRTF):</Entry>
     <Entry Name="TipVRHRTF">Espacialización para auriculares de los sonidos posicionales. Auto lo activa solo si Windows detecta auriculares. Requiere reiniciar la aplicación para aplicarse.</Entry>

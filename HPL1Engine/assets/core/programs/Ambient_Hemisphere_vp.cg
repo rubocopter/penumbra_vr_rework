@@ -18,6 +18,7 @@ void main(	float4 position : POSITION,
 			out half4 oColor : COLOR,
 			out half2 oUv : TEXCOORD0,
 			out half oHemisphere : TEXCOORD1,
+			out half oAmbientDirection : TEXCOORD2,
 
 			uniform float4x4 worldViewProj,
 			uniform float4x4 objectNormalMatrix)
@@ -28,4 +29,6 @@ void main(	float4 position : POSITION,
 
 	float3 worldNormal = normalize(mul((float3x3)objectNormalMatrix, normal));
 	oHemisphere = saturate(worldNormal.y * 0.5 + 0.5);
+	float3 ambientDirection = normalize(float3(0.35, 0.85, 0.40));
+	oAmbientDirection = saturate(dot(worldNormal, ambientDirection) * 0.5 + 0.5);
 }
