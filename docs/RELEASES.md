@@ -2,11 +2,17 @@
 
 ## Unreleased
 
-Development checkpoint: the latest office-feedback v4 headset test was reported
-as better. Keep this calibration as the comparison baseline; this is not yet a
-new public release or a complete map-wide/performance sign-off. The published
-beta remains `v0.1.0-beta.1`; a push to `master` produces a CI package, not a
-GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
+No changes beyond the stable baseline yet. A push to `master` produces a CI
+package, not a new GitHub release.
+
+## v0.1.0 — 2 September 2026
+
+**First stable release.** Freeze the accepted v4 visual calibration and the
+231-image texture selection after positive multi-map PS VR2 Sense testing.
+Stable describes this tested baseline, not complete device/campaign coverage.
+See the [validation record](VALIDATION-v0.1.0.md) for measurements and caveats.
+The release preparation changes the version identifier and documentation only;
+it does not alter gameplay, rendering, textures or personal settings.
 
 ### Added
 
@@ -38,7 +44,7 @@ GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
 
 - Updated the lighting decision record with discarded SSAO/ambient-only tests, both brightness extremes, split GPU timings, bounded-ambient/held-light calibration and the conservative local texture selection/rollback
 - Corrected the controls guide to reflect the current collision-constrained visible palm instead of the obsolete pass-through description
-- Distinguished the published beta from development-only visual/texture features and recorded the positive v4 feedback, remaining checks and next-beta scope decision
+- Promoted the tested development visual/texture features into the stable baseline, retaining the experiment history, source credits, rollback and explicit device/memory limitations
 
 ### Validation
 
@@ -49,8 +55,18 @@ GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
 - Soft-toe v2 passed Release Win32, Large Address Aware, project validation, 289 engine/VR checks, 14 Cg compilations and 2231 CPU visual checks; the subsequent headset run rejected its excessive brightness. Those checks did not predict subjective acceptance
 - The dark-curve/held-light calibration passed a full Release Win32 rebuild (3m46s), Large Address Aware, project validation, 289 engine/VR checks, 16 Cg compilations, 8460 CPU visual checks and texture checks. Installer fixtures passed all 38 assertions, including Windows PowerShell 5.1. The subsequent headset test was better but reported office flashlight washout and slightly low ambient; session timings are documented in LIGHTING
 - V4 passed Release Win32 (safe incremental build, unchanged headers), Large Address Aware, 289 engine/VR checks, 16 offline Cg compilations with unchanged texture-fetch counts, 8752 CPU visual checks, source/texture validation and packaging. The subsequent headset feedback was positive ("está mejor"). This does not establish matched On/Off GPU cost, exhaustive map coverage or separate acceptance of every texture/halo condition
-- Expanded-texture offline checks: all 231 images decode through bundled x86 SDL_image; all 222 processed images pass sampled JPEG checks (minimum PSNR 37.065 dB, maximum mean RGB error 2.3163/255). Installer upgrade/rollback tests pass 944 assertions on PowerShell 7 and Windows PowerShell 5.1. This batch still needs its grouped headset/memory/performance test; decoder and arithmetic checks do not establish runtime cost or absence of map-specific visual regressions
+- Expanded-texture offline checks: all 231 images decode through bundled x86 SDL_image; all 222 processed images pass sampled JPEG checks (minimum PSNR 37.065 dB, maximum mean RGB error 2.3163/255). Installer upgrade/rollback tests pass 944 assertions on PowerShell 7 and Windows PowerShell 5.1. Decoder and arithmetic checks do not establish runtime cost or absence of map-specific visual regressions
 - Final expanded package passed Release Win32, 289 engine/VR tests, 16 Cg compilations, 8752 visual-reference checks and all 309 package hashes. Reimport produced identical texture/manifest hashes; the executable is byte-identical to tested v4, and the real installation was left unchanged
+- Subsequent user-installed expanded batch: all 231 installed images match the manifest; eight completed map loads across six distinct maps, successful HPL shutdown and no engine-reported leaks. User reports no problems across the tested zones
+- PS VR2 Sense, RTX 4070 Ti, 3400×3468 per eye, scale 1.00, Enhanced visuals On: roughly 17 minutes at a 90 Hz target; 92006 presents, 986 reprojected (1.072%) and 66 dropped (0.072%). Logged per-eye means are 1.851 / 2.520 ms from 707 windows per eye, not isolated texture/effect cost. No Off samples or peak-memory telemetry were collected
+
+### Known limitations
+
+- PS VR2 Sense remains the only physically validated controller family; app-visible Oculus/Touch property names in this session do not establish Quest hardware coverage
+- Recoverable legacy resource/script warnings remain. No warning names a selected image, and no new shader/FBO failure or fatal error was found. Initial height-calibration rejection and a brief tracking dropout recovered during the session
+- Right-eye MSAA resolve timings remain higher/variable; this is an open profiling item, not evidence of a measured texture regression. Full-campaign memory peaks and matched On/Off timings are not established
+- The Win32 address-space ceiling remains. The selection's 608.875 MiB incremental estimate is arithmetic, not measured process/VRAM use; `-SkipTexturePack` restores original textures without uninstalling VR
+- Hand collision is an approximate palm volume, not per-finger physics; one active grab and the current finger-rig limitations remain. Broader controller and unusual map-mechanism coverage is ongoing
 
 ---
 

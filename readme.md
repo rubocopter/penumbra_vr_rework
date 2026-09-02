@@ -2,9 +2,9 @@
 
 A community-made PCVR rework that brings **Penumbra: Overture** to full room-scale VR with motion-controlled hands, physical interactions, and a complete spatial-audio chain built for horror.
 
-> Public beta — current release: **v0.1.0-beta.1** (28 August 2026). You must own **Penumbra: Overture** on Steam; the original game is not included.
+> First stable — current release: **v0.1.0** (2 September 2026). You must own **Penumbra: Overture** on Steam; the original game is not included.
 
-**[Download v0.1.0-beta.1](https://github.com/rubocopter/penumbra_vr_rework/releases/tag/v0.1.0-beta.1)** · [Controls and VR settings](docs/INPUT.md)
+**[Download v0.1.0](https://github.com/rubocopter/penumbra_vr_rework/releases/tag/v0.1.0)** · [Controls and VR settings](docs/INPUT.md)
 
 ## Why try it?
 
@@ -17,6 +17,8 @@ A community-made PCVR rework that brings **Penumbra: Overture** to full room-sca
 - Standing or seated play, left- or right-handed controls, and height calibration
 - Snap, smooth, or physical-only turning plus adjustable movement and crouch modes
 - Performance, Balanced, and Quality presets with adjustable render scale
+- Optional Enhanced visuals: MSAA 2×, refined ambient/surface lighting, restrained flashlight/glowstick response and sharper dark image treatment; Off by default, switchable in game
+- 231 reviewed, bounded-resolution diffuse texture replacements with a texture-only rollback
 - SteamVR profiles for PS VR2 Sense, Valve Index, Meta Quest/Touch, Pico, WMR, and HTC Vive
 - Room-anchored menus and cinematics with scalable subtitles (no letterboxing)
 - Reversible installer that backs up every original file it replaces
@@ -40,8 +42,8 @@ Penumbra is about what you hear coming. This rework rebuilds the entire acoustic
 
 Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime ships inside the package since alpha.6.1. To remove the mod, run `Install-PenumbraVR.bat -Restore`; only files owned by the mod are removed, and backed-up originals are restored.
 
-Current **development builds** also include 231 reviewed model/scenery diffuse
-textures (not part of the published beta). They affect both visual modes and
+The release includes 231 reviewed model/scenery diffuse
+textures. They affect both visual modes and
 the monitor. New entries use bounded resizing and high-quality JPEG; the nine
 previously tested textures are retained unchanged. Run
 `Install-PenumbraVR.bat -SkipTexturePack` to omit them or restore their backed-up
@@ -52,17 +54,19 @@ creator credit; see [permissions](docs/TEXTURE_CREDITS.md) and [selection](docs/
 
 ## Status
 
-**v0.1.0-beta.1 — public beta.** The full game is playable in VR and the main tracking, interaction, collision, comfort, UI, audio, install, and shutdown paths now have repeatable automated and PS VR2 hardware validation. Beta does not mean hardware-complete: PS VR2 Sense remains the only controller family tested end to end on a physical device, while Index, Touch, Pico, WMR, and Vive use bundled profiles that still need device-specific reports. Hand collision uses one approximate palm volume rather than per-finger rigid bodies, the current hand mesh has limited thumb and ring/middle movement, and the original game state still permits only one active grab. See the [release history](docs/RELEASES.md) for build-specific status.
+**v0.1.0 — first stable baseline.** The full game is playable in VR and the main tracking, interaction, collision, comfort, UI, audio, install, and shutdown paths have automated and PS VR2 hardware validation. Stable does not mean hardware-complete or an exhaustively tested campaign: PS VR2 Sense remains the only controller family tested end to end on a physical device, while Index, Touch, Pico, WMR, and Vive use bundled profiles that still need device-specific reports. Hand collision uses one approximate palm volume rather than per-finger rigid bodies, the current hand mesh has limited thumb and ring/middle movement, and the original game state still permits only one active grab. See the [release history](docs/RELEASES.md) for build-specific status.
 
-**Development branch — not included in beta.1.** Off-by-default VR-only
+**Optional visual improvements.** Off-by-default VR-only
 Enhanced visuals combines MSAA 2×, stronger surface relief/masked highlights,
 dark image treatment, bounded ambient and restrained held-light/halo response.
-The latest v4 calibration received positive headset feedback; broader scene
-checks and matched GPU timings remain open. Off retains the original renderer,
-but does not undo installed texture replacements. The development branch also
+The v4 calibration and expanded texture batch received positive PS VR2 feedback.
+A 17-minute multi-map session at 90 Hz recorded 1.07% reprojection and a clean
+shutdown. This is not a matched On/Off benchmark or a peak-memory measurement.
+Off retains the original renderer,
+but does not undo installed texture replacements. The release also
 contains the two-column VR settings layout, flashlight alignment fix and the
-grouped texture selection above. See [Unreleased](docs/RELEASES.md#unreleased) and
-the [next-beta checkpoint](docs/ROADMAP.md#next-beta-checkpoint).
+grouped texture selection above. See the [validation record](docs/VALIDATION-v0.1.0.md)
+and [remaining work](docs/ROADMAP.md#post-stable-follow-up).
 
 ## Documentation
 
@@ -70,7 +74,8 @@ the [next-beta checkpoint](docs/ROADMAP.md#next-beta-checkpoint).
 - [Controls and VR settings](docs/INPUT.md) — bindings, comfort options, compatibility, and diagnostics
 - [VR architecture](docs/VR_ARCHITECTURE.md) — tracking space, world placement, UI, and hands
 - [Rendering and lighting research](docs/LIGHTING.md) — HPL1 light path, discarded SSAO measurements, baked-shadow diagnosis, and the current Enhanced visuals A/B
-- [Texture selection](docs/TEXTURES.md) — development allowlist, exclusions, memory budget and rollback
+- [Texture selection](docs/TEXTURES.md) — release allowlist, exclusions, memory budget and rollback
+- [Stable validation](docs/VALIDATION-v0.1.0.md) — tested installation, session timings, recoverable warnings and evidence limits
 - [Input architecture](docs/INPUT_ARCHITECTURE.md) — input flow and the engine/game boundary
 - [Roadmap](docs/ROADMAP.md) — current priorities and future work
 - [Release history](docs/RELEASES.md) — changes and known limitations by version

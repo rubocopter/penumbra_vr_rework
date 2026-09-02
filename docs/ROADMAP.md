@@ -9,27 +9,28 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
-- Graphics evaluation — v4 received positive headset feedback and remains the visual baseline. The complete supplied texture pack has now been audited and a single 231-image bounded-resolution batch prepared. Its grouped hardware test, memory observation and matched GPU timings remain open; provenance, decisions and rollback are documented
+- Graphics evaluation — stable v4 and the 231-image bounded-resolution batch passed a positive grouped PS VR2 run. Preserve that baseline; full-campaign memory peaks, matched GPU timings and the asymmetric right-eye resolve remain profiling work, not reasons to add untested effects
 
-## Next-beta checkpoint
+## Post-stable follow-up
 
-Keep the current work under **Unreleased** while committing and pushing tested
-checkpoints. Publishing source and CI packages does not require publishing a
-new release or moving an existing tag.
+`v0.1.0` freezes the positively tested visual/texture baseline. The
+[validation record](VALIDATION-v0.1.0.md) covers six distinct maps and a clean
+17-minute PS VR2 session, not an exhaustive campaign or hardware certification.
+Future changes belong under **Unreleased**; never move an existing release tag.
 
-Recommended bounded scope for the next beta:
+Keep follow-up work focused:
 
 1. Preserve v4 as the visual baseline, with Enhanced visuals Off by default and
    the original renderer/fallback intact. Do not reopen the discarded SSAO test.
-2. Test the prepared 231-image batch as one group. The expansion decision is
-   now made; do not keep adding textures or lighting changes before this test.
-   The original nine remain unchanged within it.
-3. Complete a short grouped regression run: lit office and dark cave, flashlight
-   and glowstick, On/Off at fixed scale, shadow silhouettes and map transitions.
-   Record per-eye timings and process-memory headroom, and verify installation
-   and texture-only rollback for the final package.
-4. Publish the next beta after that scope is frozen and the checks pass. Keep
-   larger textures and further lighting experiments for a later checkpoint.
+2. Do not expand the texture batch by default. Retain its budget, source credits,
+   protected VR assets and tested upgrade/texture-only rollback.
+3. When profiling, collect matched fixed-scene On/Off timings and process-memory
+   peaks across later campaign transitions. Separate GPU elapsed queries from
+   compositor timing; investigate right-eye resolve asymmetry without claiming
+   the existing logs isolate its cause.
+4. Track legacy content warnings and initial tracking/height calibration
+   separately from rendering regressions. Broaden real-device testing before
+   describing additional controller families as hardware-validated.
 
 ## Next
 

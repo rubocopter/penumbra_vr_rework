@@ -37,6 +37,22 @@ RTSS/MSI Afterburner, GeForce/Radeon overlay, Discord overlay, and RGB suites ho
 **Resolution too demanding.**
 Options ▸ VR Settings ▸ Display ▸ Render Scale multiplies the headset's recommended eye buffer. Above 1.0 the cost grows quadratically and the game stays a 32-bit process — prefer 1.0 or lower first, then raise shadows/anisotropy.
 
+**Enhanced visuals or the texture selection exceeds your budget.**
+Enhanced visuals is Off by default and can be switched off live in VR Settings.
+This restores the original renderer but does not remove installed textures.
+Close the game and run `Install-PenumbraVR.bat -SkipTexturePack` to restore the
+original images while retaining VR. Larger textures can consume more memory
+even though the JPEG download is small. A successful startup and the log's free
+address-space figure do not establish memory headroom during later map loads.
+
+**GPU numbers differ between the two eyes or from SteamVR.**
+`VR eye GPU` reports 120-sample elapsed-query averages for scene/UI, resolve and
+the final pass; it is not total application CPU time or a frame-time percentile.
+SteamVR's ApplicationTime uses different boundaries. Compare the same scene and
+light state at fixed scale before attributing a change to an option. The stable
+validation run has higher/variable right-eye resolve times, documented in the
+[validation record](VALIDATION-v0.1.0.md), without a demonstrated texture regression.
+
 ## Audio problems
 
 **Sound comes out of the wrong device.**
@@ -55,6 +71,19 @@ SteamVR remembers the binding it stored on first launch; an older alpha's bindin
 
 **Unrecognized controller.**
 Search `hpl.log` for `[VR input]`: it records the detected headset driver, both controller types, and whether a bundled profile matched. Include this when reporting new hardware.
+
+These are the properties exposed to the application, not proof of physical
+device identity. If PS VR2 appears as Oculus/Touch, also report the real headset
+and any compatibility tools; SteamVR's `vrserver.txt` can establish which driver
+and devices actually activated. Do not reset working bindings solely because
+the displayed identity differs.
+
+**Height calibration is rejected or the floor appears wrong.**
+The game rejects standing HMD heights outside 0.90–2.20 m. Wait for tracking to
+settle, check the runtime's floor/play-area calibration, then calibrate player
+height while in the intended stance. In-game orientation recenter does not fix
+an incorrect runtime floor. Persistent warnings should be reported with the
+`[VR comfort]` lines rather than bypassing the plausibility guard.
 
 ## Hand or world-interaction problems
 

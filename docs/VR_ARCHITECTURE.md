@@ -214,7 +214,7 @@ research](LIGHTING.md).
   script permits a safe incremental build. Legacy project metadata can
   otherwise reuse objects compiled against old class layouts and corrupt the
   heap. `/FS` serializes parallel PDB writes.
-- The 231-image development texture selection changes diffuse assets in On, Off and
+- The 231-image stable texture selection changes diffuse assets in On, Off and
   monitor views; it does not change their renderer selection. See [TEXTURES](TEXTURES.md)
   for bounded resolution, the 608.875 MiB global incremental estimate (not measured
   residency), legacy-decoder checks and installer-only opt-out/restore.

@@ -1,9 +1,9 @@
-# Development texture selection
+# Release texture selection
 
-## Current grouped test — 2 September 2026
+## Stable batch — 2 September 2026
 
-**231 opaque diffuse replacements** are included in development packages, not
-in the published `v0.1.0-beta.1`. This is one broad test batch: 130 images for
+**231 opaque diffuse replacements** are included in `v0.1.0` (they were not
+part of `v0.1.0-beta.1`). This is one reviewed batch: 130 images for
 models and 101 for scenery, covering doors, cupboards, desks, shelves, machinery,
 brickwork, metal, wood, caves and other surfaces. The nine previously tested
 images remain byte-identical. The other 222 are resized conventionally and
@@ -15,9 +15,13 @@ The office now includes `office_cabinet`, `office_drawermat`,
 HPL's `MaterialManager::GetAnimMode()` that an empty `AnimMode` means static,
 which admitted legacy office materials rejected by the first strict filter.
 
-This is a screened test selection, **not a guarantee that no map can regress**.
-There has not yet been an in-headset run of this expanded batch. The accepted
-v4 lighting, flashlight alignment and VR options layout are unchanged.
+This is a screened selection, **not a guarantee that no map can regress**.
+The user reports no problems after a grouped PS VR2 test; the inspected session
+covers eight loads across six maps and a clean shutdown. All 231 installed
+images match the manifest, with no selected-image warning in the log. Peak
+memory and matched original-texture timing remain unmeasured. See the
+[validation record](VALIDATION-v0.1.0.md). The accepted v4 lighting, flashlight
+alignment and VR options layout are unchanged.
 
 ## Source and review
 

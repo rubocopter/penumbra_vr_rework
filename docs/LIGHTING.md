@@ -31,10 +31,12 @@ silently become a shipping renderer dependency.
   washed-out flashlight surfaces and slightly insufficient ambient. Current v4
   keeps that final curve, reduces diffuse recovery/specular boost and lifts only
   the ambient cap slightly. The latest v4 headset feedback was positive
-  ("está mejor"); matched timing and broader regression checks remain open.
-- A 231-image bounded-resolution diffuse selection now accompanies development
+  ("está mejor"); the subsequent multi-map run supports the stable baseline.
+  Matched timing and exhaustive regression checks remain open.
+- A 231-image bounded-resolution diffuse selection now accompanies `v0.1.0`
   packages, preserving the original nine-image trial and expanding it in one
-  grouped test. This asset-only follow-up does not change the v4 shaders.
+  grouped test, reported successful on PS VR2. This asset-only follow-up does
+  not change the v4 shaders. See the [session record](VALIDATION-v0.1.0.md).
   They change assets in both On and Off, not the monitor/Off renderer. See
   [Texture selection](TEXTURES.md) for exclusions, memory estimates and rollback.
 
@@ -755,8 +757,12 @@ For the office-feedback v4 revision:
   calibration as the next comparison baseline. No matched v4 captures or
   controlled per-eye GPU benchmark accompany that report, and it does not
   separately validate every halo/fog condition or the full texture selection.
-- This checkpoint remains Unreleased. The next-beta scope and outstanding
-  grouped checks are tracked in [ROADMAP](ROADMAP.md#next-beta-checkpoint).
+- The 2 September follow-up tested all 231 installed images across multiple
+  maps with positive feedback and a clean shutdown. This calibration is now
+  frozen for `v0.1.0`; [validation](VALIDATION-v0.1.0.md) records the actual
+  coverage, 1.07% session reprojection, asymmetric resolve timings and absence
+  of a matched On/Off or peak-memory benchmark. Follow-up work is tracked in
+  [ROADMAP](ROADMAP.md#post-stable-follow-up).
 
 Relevant code entry points:
 
