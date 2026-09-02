@@ -24,6 +24,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'check-vr-shaders.ps1')
 & (Join-Path $PSScriptRoot 'test-vr-visuals.ps1')
 & (Join-Path $PSScriptRoot 'check-texture-selection.ps1')
+& (Join-Path $PSScriptRoot 'check-texture-decoder.ps1')
 
 # Bindings are generated from scripts/generate-bindings.ps1; fail before
 # building when the JSON files on disk drifted from that spec.

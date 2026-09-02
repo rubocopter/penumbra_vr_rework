@@ -15,7 +15,9 @@ GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
 - Offline compilation of all 16 VR shaders against the bundled x86 Cg runtime is a build preflight, including compiled texture-fetch-count checks
 - CPU-reference visual regression tests guard the restored tone, pure black, neutral monotonicity, bounded ambient display, halo profile/alpha and sharpening bounds
 - First conservative selection of nine opaque world diffuse textures (<=1024, 37.5 MiB estimated extra RGBA+mips), with audited material uses, hashes and budget checks. Not every compatible texture is included. Source confirmed as Bret2011's Penumbra Collection 4x AI upscale; verified permissions and credits accompany the package
-- Installer `-SkipTexturePack` omits or restores only those nine images using the existing backup/ownership mechanism; normal installation re-enables them
+- Full-pack follow-up on 2 September: audited all 1014 supplied files, reviewed 280 candidates and selected 231 opaque diffuse images (130 model/101 scenery). Preserve the first nine; resize 222 conventionally to 2× stock with a 1024 cap and JPEG quality 95. Selection is 59.23 MiB on disk and 608.875 MiB estimated extra RGBA+mips under a 640 MiB global budget; no material, normal-map or v4 renderer changes
+- Installer `-SkipTexturePack` omits or restores the entire current selection using the existing backup/ownership mechanism; normal installation re-enables it. Manifest v1/v2 support preserves originals when upgrading from nine images to the expanded batch
+- Per-file selection/exclusion audit, fixed processing policy, source/output/original hashes, legacy SDL_image decoder validation and compression-error checks
 
 ### Changed
 
@@ -47,6 +49,8 @@ GitHub release. See the [next-beta checkpoint](ROADMAP.md#next-beta-checkpoint).
 - Soft-toe v2 passed Release Win32, Large Address Aware, project validation, 289 engine/VR checks, 14 Cg compilations and 2231 CPU visual checks; the subsequent headset run rejected its excessive brightness. Those checks did not predict subjective acceptance
 - The dark-curve/held-light calibration passed a full Release Win32 rebuild (3m46s), Large Address Aware, project validation, 289 engine/VR checks, 16 Cg compilations, 8460 CPU visual checks and texture checks. Installer fixtures passed all 38 assertions, including Windows PowerShell 5.1. The subsequent headset test was better but reported office flashlight washout and slightly low ambient; session timings are documented in LIGHTING
 - V4 passed Release Win32 (safe incremental build, unchanged headers), Large Address Aware, 289 engine/VR checks, 16 offline Cg compilations with unchanged texture-fetch counts, 8752 CPU visual checks, source/texture validation and packaging. The subsequent headset feedback was positive ("está mejor"). This does not establish matched On/Off GPU cost, exhaustive map coverage or separate acceptance of every texture/halo condition
+- Expanded-texture offline checks: all 231 images decode through bundled x86 SDL_image; all 222 processed images pass sampled JPEG checks (minimum PSNR 37.065 dB, maximum mean RGB error 2.3163/255). Installer upgrade/rollback tests pass 944 assertions on PowerShell 7 and Windows PowerShell 5.1. This batch still needs its grouped headset/memory/performance test; decoder and arithmetic checks do not establish runtime cost or absence of map-specific visual regressions
+- Final expanded package passed Release Win32, 289 engine/VR tests, 16 Cg compilations, 8752 visual-reference checks and all 309 package hashes. Reimport produced identical texture/manifest hashes; the executable is byte-identical to tested v4, and the real installation was left unchanged
 
 ---
 

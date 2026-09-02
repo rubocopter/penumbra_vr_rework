@@ -214,8 +214,9 @@ research](LIGHTING.md).
   script permits a safe incremental build. Legacy project metadata can
   otherwise reuse objects compiled against old class layouts and corrupt the
   heap. `/FS` serializes parallel PDB writes.
-- A small local-only texture selection changes diffuse assets in On, Off and
+- The 231-image development texture selection changes diffuse assets in On, Off and
   monitor views; it does not change their renderer selection. See [TEXTURES](TEXTURES.md)
-  for the 37.5 MiB incremental estimate and installer-only opt-out/restore.
+  for bounded resolution, the 608.875 MiB global incremental estimate (not measured
+  residency), legacy-decoder checks and installer-only opt-out/restore.
 - World scale remains `1.0`; calibration, seated play, crouch, turning, and
   recentering operate through explicit offsets or the TrackingToWorld boundary.

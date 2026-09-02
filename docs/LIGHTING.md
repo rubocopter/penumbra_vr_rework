@@ -32,7 +32,9 @@ silently become a shipping renderer dependency.
   keeps that final curve, reduces diffuse recovery/specular boost and lifts only
   the ambient cap slightly. The latest v4 headset feedback was positive
   ("está mejor"); matched timing and broader regression checks remain open.
-- Nine selected diffuse texture replacements accompany development packages.
+- A 231-image bounded-resolution diffuse selection now accompanies development
+  packages, preserving the original nine-image trial and expanding it in one
+  grouped test. This asset-only follow-up does not change the v4 shaders.
   They change assets in both On and Off, not the monitor/Off renderer. See
   [Texture selection](TEXTURES.md) for exclusions, memory estimates and rollback.
 

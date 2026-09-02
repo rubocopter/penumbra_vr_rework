@@ -283,10 +283,11 @@ if ($SkipTexturePack) {
     $textureManifest = Join-Path $resolvedPackageRoot 'docs\TEXTURE_SELECTION.json'
     if (-not (Test-Path -LiteralPath $textureManifest)) { throw 'Texture selection manifest is missing.' }
     $selection = Get-Content -Raw -LiteralPath $textureManifest | ConvertFrom-Json
-    if ($selection.Version -ne 1) { throw 'Unsupported texture selection manifest.' }
+    if ($selection.Version -notin @(1,2)) { throw 'Unsupported texture selection manifest.' }
     foreach ($texture in $selection.Files) {
         $texturePath = [string]$texture.Path
-        if ($texturePath -notmatch '^textures/[a-z0-9_]+/[a-z0-9_]+\.jpg$') { throw 'Invalid selected texture path.' }
+        if ($texturePath -notmatch '^(textures|models)/([a-z0-9_]+/)+[a-z0-9_]+\.jpg$' -or
+            $texturePath -match '^models/(hud_objects|items|player)/') { throw 'Invalid or protected selected texture path.' }
         $mappings.Remove($texturePath)
     }
     Write-Host 'Selected texture pack skipped; previous managed copies will be restored from backup.'

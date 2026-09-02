@@ -40,9 +40,10 @@ Penumbra is about what you hear coming. This rework rebuilds the entire acoustic
 
 Requires Windows 10/11, SteamVR, and a PCVR headset — the Visual C++ runtime ships inside the package since alpha.6.1. To remove the mod, run `Install-PenumbraVR.bat -Restore`; only files owned by the mod are removed, and backed-up originals are restored.
 
-Current **development builds** also include nine reviewed world diffuse
+Current **development builds** also include 231 reviewed model/scenery diffuse
 textures (not part of the published beta). They affect both visual modes and
-the monitor. Run
+the monitor. New entries use bounded resizing and high-quality JPEG; the nine
+previously tested textures are retained unchanged. Run
 `Install-PenumbraVR.bat -SkipTexturePack` to omit them or restore their backed-up
 originals while retaining the mod. The pack is **Penumbra Collection 4x AI
 upscale**, by **Bret2011** (Nexus uploader **c3pohumancyborgrelations**), crediting
@@ -60,7 +61,7 @@ The latest v4 calibration received positive headset feedback; broader scene
 checks and matched GPU timings remain open. Off retains the original renderer,
 but does not undo installed texture replacements. The development branch also
 contains the two-column VR settings layout, flashlight alignment fix and the
-nine-texture selection above. See [Unreleased](docs/RELEASES.md#unreleased) and
+grouped texture selection above. See [Unreleased](docs/RELEASES.md#unreleased) and
 the [next-beta checkpoint](docs/ROADMAP.md#next-beta-checkpoint).
 
 ## Documentation

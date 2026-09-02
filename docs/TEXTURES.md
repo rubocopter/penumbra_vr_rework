@@ -1,116 +1,153 @@
 # Development texture selection
 
-These nine textures are included in development packages, not in the published
-`v0.1.0-beta.1`. Further expansion remains a separate scope decision; the latest
-positive graphics feedback is not an exhaustive texture-validation result.
+## Current grouped test — 2 September 2026
 
-The supplied folder was located as `Desktop/proyecto_penumbravr/reemplazo_texturas`.
-It contains 1014 files, about 2.45 GiB on disk, including HUD definitions,
-models, normal maps and uncompressed 4096 textures. It is **not** overlaid wholesale.
-The user subsequently identified it as **Penumbra Collection 4x AI upscale** by
-**Bret2011**, uploaded by **c3pohumancyborgrelations**, with original asset credit
-to **Frictional Games**. The source page and redistribution permissions were
-verified; see [attribution and permissions](TEXTURE_CREDITS.md). The initial
-unknown-provenance notice is superseded. No texture was edited or recompressed.
+**231 opaque diffuse replacements** are included in development packages, not
+in the published `v0.1.0-beta.1`. This is one broad test batch: 130 images for
+models and 101 for scenery, covering doors, cupboards, desks, shelves, machinery,
+brickwork, metal, wood, caves and other surfaces. The nine previously tested
+images remain byte-identical. The other 222 are resized conventionally and
+encoded as high-quality JPEG, as requested by the user. No generative edits,
+additional sharpening, material edits or renderer changes were made.
 
-## Selected resources
+The office now includes `office_cabinet`, `office_drawermat`,
+`mining_room_bookshelf` and `mining_room_desk`. The broad audit confirmed from
+HPL's `MaterialManager::GetAnimMode()` that an empty `AnimMode` means static,
+which admitted legacy office materials rejected by the first strict filter.
 
-Nine static opaque diffuse JPEGs were compared to the installed originals.
-This is a conservative first selection, **not every VR-compatible texture**.
-The initial filter yielded 55 candidates inside its restricted directory/1024
-budget rules; nine were selected after review. That filter excluded 882 files by
-scope/name/type, 75 by size and two by ambiguous resource name. Those exclusions
-do not prove incompatibility: ordinary prop textures and larger world textures
-need separate review and a memory budget. UI/cubemap issues mentioned by the
-pack author are distinct from actual conflicts with the VR hand/HUD assets.
-For example, the pack has `office_cabinet`, `mining_room_bookshelf` and
-`mining_room_desk` diffuse JPEGs at 2048² versus the originals' 512². None has
-an identical-path collision with current mod assets, and their inspected
-materials are opaque. They nevertheless fall outside the original cap and add
-about 20 MiB each (RGBA+mips); full resource-name, visual/UV and memory review
-is still needed before selection. They have **not** been imported.
-The nine selected images keep the same composition, aspect ratio and resource
-path. Each selected resource
-basename is unique in that installation. Material references were parsed and
-required to use the image only as non-animated 2D diffuse, with mipmaps,
-depth testing and no alpha. Original materials, normal/specular maps, UVs and
-sampling settings are retained. Visual review is not a map-wide guarantee.
+This is a screened test selection, **not a guarantee that no map can regress**.
+There has not yet been an in-headset run of this expanded batch. The accepted
+v4 lighting, flashlight alignment and VR options layout are unchanged.
 
-| Directory | Images | Replacement size |
-| --- | --- | --- |
-| iron_mine | iron_mine_briks, iron_mine_pillar | 1024² |
-| iron_mine | iron_mine_pipe_end | 512² |
-| locker_room | locker_room_walltiles, locker_room_walltiles_dirty | 1024² |
-| modern_mine | modern_mine_green_metal, modern_mine_pipe | 1024² |
-| modern_mine | modern_mine_bluemetal | 512² |
-| new_storage_room | new_storage_room_rust | 1024² |
+## Source and review
 
-All filenames end in `.jpg`. Their exact hashes, original hashes, dimensions,
-reviewed materials and estimates are in [TEXTURE_SELECTION.json](TEXTURE_SELECTION.json).
-Some are reused by the VR tutorial's world geometry; no hand, controller or
-held-item asset is replaced. Map coverage depends on the actual resources used
-in the scene: this is not a whole-game texture overhaul.
+The supplied folder, `Desktop/proyecto_penumbravr/reemplazo_texturas`, contains
+1014 files and approximately 2.45 GiB of data. The user identified it as
+**Penumbra Collection 4x AI upscale** by **Bret2011**, uploaded by
+**c3pohumancyborgrelations**, crediting **Frictional Games**. See
+[attribution and permissions](TEXTURE_CREDITS.md).
 
-Excluded: all `models`, HUD/hand/flashlight/glowstick assets; `.hud`, `.bnt`,
-`.beam`, material definitions, normals/specular/emissive maps, alpha/transparency,
-animated frames, signs/puzzle information, decals, ambiguous names, dimensions
-above 1024 and nonmatching aspect ratios. `mine_rustymetal.jpg` was dropped
-because its original material enables alpha. Near-uniform images and upscales
-with doubtful visual benefit were also left out; resolution alone is not merit.
+Every supplied file was inventoried. The final material/format/name audit found
+280 potential opaque diffuse replacements; 231 survived the resolution policy
+and visual review. Side-by-side sheets covered all 280 candidates, supplemented
+by downsampled colour/correlation checks and inspection of representative final
+outputs. These checks establish composition/colour consistency, not guaranteed
+perceptual improvement, correct appearance on every UV seam or freedom from VR
+shimmer.
 
-## Memory and LAA
+- [TEXTURE_AUDIT.json](TEXTURE_AUDIT.json) records inclusion/exclusion for all
+  1014 files, including files that were never candidates.
+- [TEXTURE_SELECTION.json](TEXTURE_SELECTION.json) records every included path,
+  source/output/original hash, dimensions, material references and memory cost.
+- [TEXTURE_POLICY.json](TEXTURE_POLICY.json) fixes the resolution, compression,
+  budget, original nine-image exception and explicit visual exclusions.
 
-Selected JPEG disk total: **4,016,328 bytes (3.83 MiB)**. A conservative
-uncompressed RGBA + full mip-chain estimate is **40 MiB total**, **37.5 MiB
-additional** over the original images, if all nine are resident together.
-The importer imposes a 40 MiB *incremental* budget. This is texture storage
-arithmetic, not measured VRAM, process commit or peak loading memory: driver
-copies, image decoding, fragmentation and the existing eye buffers also matter.
-There are no additional texture fetches from increasing these resolutions.
+The audit checks every indexed material use, not just the filename. A candidate
+must remain RGB24, opaque, static, diffuse-only, depth-tested and mipmapped, with
+the same path, aspect ratio and power-of-two dimensions. Resource basenames must
+be unique across installed image formats/directories because HPL resolves names
+globally. Actual HUD/player mesh image references and existing mod-owned images
+are protected. Originals already replaced by this mod are read from the
+installer's hash-verified backups, not from installed replacement files.
 
-Large Address Aware lets this 32-bit executable address up to **4 GiB of user
-virtual address space on 64-bit Windows**, versus the normal 2 GiB. It neither
-converts the engine to 64-bit nor grants unlimited texture memory. See
-[Microsoft's memory limits](https://learn.microsoft.com/en-us/windows/win32/memory/memory-limits-for-windows-releases).
-That extra headroom does not justify loading the entire multi-gigabyte pack.
-The full game plus VR targets still needs runtime observation over map changes.
+Excluded classes include normal/specular/emissive maps, transparencies, decals,
+animated images, special material uses, hand/HUD/held-item assets, definitions
+and meshes, ambiguous names and unused/unresolved resources. Navigation maps,
+keypad digits, instrument scales, notes, diagrams and suspect printed artwork
+remain original. Decorative labels on otherwise accepted props may change.
+Uniform grey, the changed rope/metal patterns and conspicuous new powder specks
+were rejected. Thirty otherwise eligible images already reach the dimension
+cap at stock resolution, so there is no resolution gain worth importing them.
+Exclusion does not necessarily mean an asset is incompatible; it can mean that
+its benefit is uncertain or it falls outside this low-risk scope.
 
-## Install and compare
+## Resolution, compression and memory
 
-The normal installer includes the nine files and backs up their previous
-versions using the existing deployment manifest. **Enhanced visuals Off does
-not undo asset replacements**: it selects the original renderer using whichever
-textures are installed. The monitor likewise sees the installed textures.
+New entries use **2× stock dimensions, capped at 1024 on the longest side**,
+with aspect ratio preserved, high-quality bicubic reduction and JPEG quality
+95. The nine existing images keep their original pack bytes and sizes (up to
+1024). No selected entry is lower-resolution than stock.
 
-- Include/re-enable: `Install-PenumbraVR.bat`.
-- Omit or restore only the texture selection: `Install-PenumbraVR.bat -SkipTexturePack`.
-- Restore the entire pre-mod installation: `Install-PenumbraVR.bat -Restore`.
+| Measurement for the same 231 images | Unmodified pack files | Selected outputs |
+| --- | ---: | ---: |
+| Disk size | 251.67 MiB | 59.23 MiB |
+| Conservative RGBA + complete mip chains | 3087.33 MiB | 801.83 MiB |
+| Increment over stock RGBA + mips | 2894.38 MiB | 608.875 MiB |
 
-Close the game before installing/restoring, then restart to reload textures.
-Renderer On/Off still changes live without reloading. Do not copy the full
-supplied folder into the game. Existing unrelated resources remain untouched.
-The installer refuses to replace externally modified stale files during restore.
+The enforced **global incremental budget is 640 MiB**. This deliberately sums
+all selected textures, not only one map. `MapHandler` loads the next world
+before destroying the previous one, and its world cache retains resource
+references, so a one-room estimate would miss transition overlap.
 
-## Reproduce and verify
+JPEG compression reduces disk/download size, **not the decoded GPU texture
+size**. Dimension reduction supplies the memory saving. The original materials'
+compression settings are untouched: this is not a DDS/BC texture-pipeline
+conversion. Full mip chains remain enabled by the original materials.
 
-`scripts/audit-texture-pack.ps1` inventories candidates without modifying the
-game or pack. `scripts/import-texture-selection.ps1 -SourceRoot ... -GameRoot ...`
-imports the fixed reviewed allowlist after rechecking metadata, unique names
-and every material use; it refuses to overwrite differing project assets.
-The JSON manifest is generated from that import. `check-texture-selection.ps1`
-verifies hashes, formats, dimensions, budget and absence of extra selected-folder
-JPEGs before building and after packaging. No installed game is needed for those
-build checks. Source and installed game files were not changed by the import.
+These figures are storage arithmetic, not measured process commit, peak load
+memory or VRAM. Decoder temporaries, driver copies, fragmentation, caches and
+the existing VR eye buffers add overhead. There are no additional texture
+fetches, but larger textures can still affect loading, cache traffic and GPU
+time. Large Address Aware allows up to 4 GiB of user virtual address space on
+64-bit Windows; it does not remove these limits or prove runtime headroom.
+See [Microsoft's memory limits](https://learn.microsoft.com/en-us/windows/win32/memory/memory-limits-for-windows-releases).
 
-`scripts/test-texture-deploy.ps1` passed 38 assertions on PowerShell 7 and
-Windows PowerShell 5.1: install, selective restore, re-enable, full restore and
-retention/removal of the mod executable as appropriate, all in disposable
-fixtures. At the initial import/fixture-validation checkpoint, the real
-installed texture hashes still matched the original baseline; this is not a
-claim about the user's installation after later tests. Release Win32 full build
-and package checks passed.
+## Install once, compare as a group
 
-Pending hardware checks: compare close-up brick/metal detail and moving-head
-shimmer, verify normal-map alignment and transitions, revisit several maps,
-observe peak process memory and per-eye GPU timings. No claim of zero risk or
-zero performance cost is made before that test.
+Close the game, then run the packaged `Install-PenumbraVR.bat`. Existing originals
+are backed up; upgrading from the previous nine-image selection preserves their
+original backups. **Enhanced visuals Off does not remove textures**: both On,
+Off and the monitor see installed assets. The lighting toggle remains live;
+changing the texture selection requires closing/restarting the game.
+
+- Include/re-enable the whole selection: `Install-PenumbraVR.bat`.
+- Restore only these images and retain the VR mod:
+  `Install-PenumbraVR.bat -SkipTexturePack`.
+- Restore the pre-mod installation: `Install-PenumbraVR.bat -Restore`.
+
+One useful grouped session: inspect office desks/shelves/cupboards with and
+without the flashlight, then brick/metal surfaces and a cave; move the head to
+check shimmer and cross map boundaries to exercise loading/caching. Keep render
+scale 1.00 and the accepted lighting calibration. Inspect logs and process-memory
+headroom afterwards. There is no need to reinstall individual textures or run
+a separate experiment for each image. If the batch regresses, the single
+texture-only rollback restores the original asset baseline. The installer
+refuses to overwrite externally modified managed files during rollback.
+
+## Reproduce and validate
+
+- `audit-texture-pack.ps1 -SourceRoot ... -GameRoot ...` inventories the complete
+  folder and checks material/resource/VR conflicts without modifying the game.
+- `review-texture-candidates.ps1 -SourceRoot ... -GameRoot ...` creates diagnostic
+  comparison sheets and source/original hash-bound colour/alignment metrics in
+  `build/texture-audit`. Inspect those sheets before importing.
+- `import-texture-selection.ps1 -SourceRoot ... -GameRoot ... -UseCurrentAudit`
+  applies the reviewed policy to those exact inputs, stages the entire batch,
+  validates it, then copies only selected images into `data`. Without that switch
+  it regenerates audit/review data and stops for inspection. It rejects stale
+  image reviews and unowned/externally modified project destinations.
+- `check-texture-selection.ps1` checks hashes, formats, policy/audit agreement,
+  the budget and absence of extra JPEGs before build and after packaging.
+- `check-texture-decoder.ps1` loads **all 231 images with bundled x86 SDL_image**,
+  verifying RGB24 and exact dimensions. It runs before every build without a
+  game, OpenGL context or headset.
+- `check-texture-processing.ps1 -SourceRoot ...` compared sampled pixels of all
+  222 encoded outputs to their uncompressed resized references: minimum PSNR
+  **37.065 dB**, maximum mean RGB error **2.3163/255**. These are compression
+  checks, not a guarantee of invisible loss or better graphics.
+- Installer fixtures passed **944 assertions** on PowerShell 7 and Windows
+  PowerShell 5.1: old nine-image install/skip, upgrade, texture-only restore,
+  re-enable and full restore. Tests use disposable fixtures, never the real game.
+- Final Release Win32 build/package passed project validation, 16 Cg shader
+  compilations, 8752 visual-reference checks and 289 engine/VR tests. All 309
+  packaged file hashes were verified, including another legacy-decoder pass on
+  the packaged images. The executable SHA-256 remains the tested v4
+  `A88F605CE01D5E1F053B2F8450E7EFA77F8C6E50622303AC2D6736C2694DBC71`.
+- Reimporting the selection reproduced the identical manifest and image hashes.
+  Read-only checks confirmed that the real installation still contained the
+  previous nine-image selection and the 222 unchanged originals before handoff.
+
+The source pack and actual installed game are not modified by the audit/import
+workflow. The first nine-image trial (37.5 MiB incremental estimate) remains in
+the lighting/release history; the current expansion supersedes its scope, not
+its original-file backups or credits.

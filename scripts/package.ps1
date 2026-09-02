@@ -97,6 +97,7 @@ $requiredPackagePaths = @(
     'config\English.lang', 'config\Espanol.lang', 'textures\light_player_flashlight_spot.lnt',
     'docs\INPUT.md', 'docs\LIGHTING.md', 'docs\TROUBLESHOOTING.md', 'docs\ROADMAP.md',
     'docs\TEXTURE_CREDITS.md', 'docs\TEXTURES.md', 'docs\TEXTURE_SELECTION.json',
+    'docs\TEXTURE_POLICY.json', 'docs\TEXTURE_AUDIT.json',
     'maps', 'models', 'vr\actions.json', 'vr\bindings\psvr2_sense.json',
     'vr\bindings\vive_controller.json', 'vr\bindings\knuckles.json',
     'vr\bindings\oculus_touch.json', 'vr\bindings\microsoft_motion_controller.json',

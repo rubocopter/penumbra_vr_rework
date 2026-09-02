@@ -15,10 +15,15 @@ asset-use permission does not require it. These are the pack author's stated
 permissions, not a new GPL licence for the original game assets.
 
 The user identified the supplied local folder as this pack. The exact selected
-local-file hashes are in [TEXTURE_SELECTION.json](TEXTURE_SELECTION.json);
+source and distributed-file hashes are in [TEXTURE_SELECTION.json](TEXTURE_SELECTION.json);
 no claim is made that the entire folder was compared to a Nexus archive.
 Only the reviewed selection is included, not the full collection or game.
 Players must still own Penumbra: Overture.
+
+The expanded development selection conventionally resizes and JPEG-encodes
+222 images at quality 95, retaining the first nine without changes. The pack's
+modification permission covers these derivatives; attribution is retained.
+No new AI generation or material/normal-map conversion is performed here.
 
 The earlier documentation marked provenance as unknown because the local folder
 had no attribution file. That uncertainty is superseded by the user's source

@@ -1,0 +1,36 @@
+{
+  "Version": 2,
+  "MaxDimension": 1024,
+  "StockScale": 2,
+  "JpegQuality": 95,
+  "ExtraRGBABytesBudget": 671088640,
+  "MinimumCorrelation": 0.93,
+  "MinimumLumaDeviation": 0.01,
+  "MaximumMeanRGBError": 0.035,
+  "RetainSourcePaths": [
+    "textures/iron_mine/iron_mine_briks.jpg",
+    "textures/iron_mine/iron_mine_pillar.jpg",
+    "textures/iron_mine/iron_mine_pipe_end.jpg",
+    "textures/locker_room/locker_room_walltiles.jpg",
+    "textures/locker_room/locker_room_walltiles_dirty.jpg",
+    "textures/modern_mine/modern_mine_bluemetal.jpg",
+    "textures/modern_mine/modern_mine_green_metal.jpg",
+    "textures/modern_mine/modern_mine_pipe.jpg",
+    "textures/new_storage_room/new_storage_room_rust.jpg"
+  ],
+  "ExcludedAfterVisualReview": {
+    "models/office/office_folderholder.jpg": "Retain the original printed document attached to the folder holder",
+    "models/mine/mine_pile_gunpowder.jpg": "Upscale adds conspicuous bright specks to nearly uniform powder",
+    "textures/mining_room/mining_room_oldmoss.jpg": "Upscale invents a strongly outlined pattern from fine original noise",
+    "textures/boat/boat_postcards.jpg": "Retain original photographs and artwork",
+    "textures/door_shaft/door_shaft_pinups.jpg": "Retain original printed artwork",
+    "textures/mine/mine_emergency_exit_note.jpg": "Retain original readable navigation information",
+    "textures/mine/mine_emergency_procedures.jpg": "Retain original readable instructions",
+    "textures/mining_room/mining_room_greenboard.jpg": "Retain original writing and diagrams",
+    "textures/modern_mine/modern_mine_keypanel.jpg": "Retain original keypad digits",
+    "textures/modern_mine/modern_mine_map01.jpg": "Retain original navigation map",
+    "textures/modern_mine/modern_mine_map02.jpg": "Retain original navigation map",
+    "textures/modern_mine/modern_mine_map03.jpg": "Retain original navigation map",
+    "textures/iron_mine/iron_mine_meters.jpg": "Retain original instrument scales"
+  }
+}

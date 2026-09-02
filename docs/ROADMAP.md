@@ -9,7 +9,7 @@ The rework is intentionally incremental. Every phase should leave a testable bui
 - Map-wide mechanism validation — unusual doors, wheels, levers, ladders, and constrained props beyond the opening area
 - Controller coverage — hardware testing beyond PS VR2 Sense and follow-up on early Index feedback
 - Performance — CPU/GPU profiling and sensible defaults for modern headset resolutions
-- Graphics evaluation — the office-feedback v4 calibration received positive headset feedback after reduced diffuse recovery/specular gain and a small ambient-only lift. Keep it as the current comparison baseline; broader scene checks and matched GPU timings remain open. The nine-texture selection is not exhaustive; provenance and redistribution credits are documented
+- Graphics evaluation — v4 received positive headset feedback and remains the visual baseline. The complete supplied texture pack has now been audited and a single 231-image bounded-resolution batch prepared. Its grouped hardware test, memory observation and matched GPU timings remain open; provenance, decisions and rollback are documented
 
 ## Next-beta checkpoint
 
@@ -21,9 +21,9 @@ Recommended bounded scope for the next beta:
 
 1. Preserve v4 as the visual baseline, with Enhanced visuals Off by default and
    the original renderer/fallback intact. Do not reopen the discarded SSAO test.
-2. Decide whether to include one more reviewed texture batch or defer it. The
-   current nine can ship independently; do not wait for the entire pack or an
-   open-ended series of graphics experiments.
+2. Test the prepared 231-image batch as one group. The expansion decision is
+   now made; do not keep adding textures or lighting changes before this test.
+   The original nine remain unchanged within it.
 3. Complete a short grouped regression run: lit office and dark cave, flashlight
    and glowstick, On/Off at fixed scale, shadow silhouettes and map transitions.
    Record per-eye timings and process-memory headroom, and verify installation
