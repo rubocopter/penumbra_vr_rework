@@ -1,5 +1,14 @@
 # Penumbra: Overture VR Rework
 
+<p align="center">
+  <a href="HPL1Engine/COPYING"><img alt="License: GPL v3+" src="https://img.shields.io/badge/license-GPL%20v3%2B-blue?style=flat-square"></a>
+  <img alt="Status: stable" src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
+  <a href="https://github.com/rubocopter/penumbra_vr_rework/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/rubocopter/penumbra_vr_rework?style=flat-square&label=release"></a>
+</p>
+<p align="center">
+  <a href="https://ko-fi.com/onitaku"><img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg"></a>
+</p>
+
 **Play Penumbra: Overture in full room-scale PCVR, with motion-controlled hands, physical interaction and spatial audio.**
 
 > **v0.1.0 — first stable release.** Requires your own copy of **Penumbra: Overture**. The original game is not included.
