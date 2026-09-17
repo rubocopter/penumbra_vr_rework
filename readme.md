@@ -71,10 +71,6 @@ The audio path is built around a bundled OpenAL Soft runtime and includes head-t
 
 Development artifacts are available through [GitHub Actions](https://github.com/rubocopter/penumbra_vr_rework/actions/workflows/build.yml); they are not public releases.
 
-## Support
-
-If you enjoy the project and would like to support its continued development, you can [support me on Ko-fi](https://ko-fi.com/onitaku).
-
 ## About and license
 
 This is an unofficial community-maintained continuation of [veryjos/penumbra_vr](https://github.com/veryjos/penumbra_vr). It is not affiliated with Frictional Games, Valve or Sony Interactive Entertainment.
