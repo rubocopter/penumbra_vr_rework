@@ -9,70 +9,56 @@
   <a href="https://ko-fi.com/onitaku"><img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg"></a>
 </p>
 
-**Play Penumbra: Overture in full room-scale PCVR, with motion-controlled hands, physical interaction and spatial audio.**
+**Play Penumbra: Overture in full room-scale PCVR with motion-controlled hands, physical interaction and spatial audio.**
 
-> **v0.1.0 — first stable release.** Requires your own copy of **Penumbra: Overture**. The original game is not included.
+> **v0.1.0 is the current stable release.** You need your own copy of **Penumbra: Overture**; the game itself is not included.
 
-[**Download v0.1.0**](https://github.com/rubocopter/penumbra_vr_rework/releases/tag/v0.1.0) · [Controls & VR settings](docs/INPUT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Roadmap](docs/ROADMAP.md)
+[**Download v0.1.0**](https://github.com/rubocopter/penumbra_vr_rework/releases/tag/v0.1.0) · [Controls & settings](docs/INPUT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Roadmap](docs/ROADMAP.md)
 
 ## Highlights
 
-- Full room-scale VR: walk, crouch, lean and reach naturally.
-- Motion-controlled hands with animated fingers and collision-constrained palms.
-- Physical interaction with objects, doors, drawers, hatches and mechanisms.
-- Assisted acquisition for visible inventory items that are difficult to reach.
-- Standing and seated play, height calibration and left- or right-handed controls.
-- Snap, smooth and physical-only turning, with configurable movement and crouch modes.
-- Binaural HRTF audio, distance absorption, occlusion and ambient reverb.
-- Performance, Balanced and Quality presets with adjustable render scale.
-- Optional Enhanced visuals and 231 reviewed diffuse texture replacements.
-- SteamVR profiles for PS VR2 Sense, Valve Index, Meta Quest/Touch, Pico, WMR and HTC Vive.
-- Room-anchored menus and cinematics with scalable subtitles.
-- Reversible installer that backs up every original file it replaces.
-- Spanish localization for the VR tutorial, menus and controller notes.
+- Full room-scale movement: walk, crouch, lean and reach naturally.
+- Motion-controlled hands with animated fingers and physical interaction.
+- Doors, drawers, hatches, objects and mechanisms adapted for VR.
+- Standing/seated play, height calibration and left/right-handed controls.
+- Snap, smooth and physical-only turning plus configurable movement modes.
+- Binaural HRTF audio with distance, occlusion and ambient reverb.
+- Performance, Balanced and Quality presets plus optional enhanced visuals.
+- SteamVR bindings for PS VR2 Sense, Index, Touch, Pico, WMR and Vive.
+- Room-anchored menus/cinematics and scalable subtitles.
+- Reversible installer with backups of replaced files.
 
 ## Quick start
 
-1. Download the release `.zip` and extract it completely.
-2. Run `Install-PenumbraVR.bat`; it locates the Steam installation and backs up replaced files.
+1. Download and fully extract the release `.zip`.
+2. Run `Install-PenumbraVR.bat` and let it locate/back up your Steam installation.
 3. Start SteamVR and launch **Penumbra: Overture** normally from Steam.
 
-Requires Windows 10/11, SteamVR and a PCVR headset. The Visual C++ runtime is included in the package. To remove the mod, run `Install-PenumbraVR.bat -Restore`.
+Requires Windows 10/11, SteamVR and a PCVR headset. Restore the original installation at any time with `Install-PenumbraVR.bat -Restore`.
 
-The texture pack can be omitted with `Install-PenumbraVR.bat -SkipTexturePack`. See [texture credits and permissions](docs/TEXTURE_CREDITS.md) for provenance and redistribution terms.
+PS VR2 Sense is the controller family currently validated end to end on physical hardware. Other bundled profiles still benefit from device-specific reports.
 
-## Status
+## Project status
 
-**v0.1.0 is the stable baseline.** The full game is playable in VR, and the main tracking, interaction, collision, comfort, UI, audio, installation and shutdown paths have automated and PS VR2 hardware validation.
+The full game is playable in VR and the main tracking, interaction, collision, comfort, UI, audio, installation and shutdown paths have automated and PS VR2 hardware validation.
 
-PS VR2 Sense is currently the only controller family tested end to end on physical hardware. Index, Touch, Pico, WMR and Vive profiles are bundled but still need device-specific reports. Known limitations and validation details are tracked in the [release history](docs/RELEASES.md), [validation record](docs/VALIDATION-v0.1.0.md) and [roadmap](docs/ROADMAP.md).
-
-The newer [Penumbra VR Framework](https://github.com/rubocopter/penumbra_vr_framework) is extending the proven work from this Rework toward **Black Plague** and **Requiem**. This repository remains the playable Overture implementation and behavioral reference.
-
-## Spatial audio
-
-The audio path is built around a bundled OpenAL Soft runtime and includes head-tracked positional audio, optional binaural HRTF, distance absorption, geometry-aware occlusion and restrained ambient reverb. The goal is not just positional sound: walls, distance and the shape of the environment affect how threats are perceived.
+The newer [Penumbra VR Framework](https://github.com/rubocopter/penumbra_vr_framework) is carrying this work forward toward **Black Plague** and **Requiem**. This repository remains the playable Overture implementation and behavioral reference.
 
 ## Documentation
 
-- [Controls and VR settings](docs/INPUT.md)
-- [Troubleshooting and compatibility](docs/TROUBLESHOOTING.md)
-- [VR architecture](docs/VR_ARCHITECTURE.md)
-- [Input architecture](docs/INPUT_ARCHITECTURE.md)
-- [Rendering and lighting research](docs/LIGHTING.md)
-- [Texture selection](docs/TEXTURES.md)
-- [Stable validation](docs/VALIDATION-v0.1.0.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Release history](docs/RELEASES.md)
+[Controls](docs/INPUT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Validation](docs/VALIDATION-v0.1.0.md) · [Release history](docs/RELEASES.md) · [VR architecture](docs/VR_ARCHITECTURE.md) · [Input architecture](docs/INPUT_ARCHITECTURE.md) · [Texture credits](docs/TEXTURE_CREDITS.md)
 
-## Development
+<details>
+<summary><strong>Development</strong></summary>
 
-`scripts/build.ps1` validates the project, builds Win32, runs tests and can package or deploy a release layout. SteamVR bindings are generated from the project specification with `scripts/generate-bindings.ps1`, and CI builds/packages Win32 on pushes, pull requests and tags.
+`scripts/build.ps1` validates the project, builds Win32, runs tests and can package/deploy a release layout. SteamVR bindings are generated from the project specification with `scripts/generate-bindings.ps1`; CI builds and packages Win32 on pushes, pull requests and tags.
 
-Development artifacts are available through [GitHub Actions](https://github.com/rubocopter/penumbra_vr_rework/actions/workflows/build.yml); they are not public releases.
+[Development artifacts](https://github.com/rubocopter/penumbra_vr_rework/actions/workflows/build.yml) are not public releases.
+
+</details>
 
 ## About and license
 
 This is an unofficial community-maintained continuation of [veryjos/penumbra_vr](https://github.com/veryjos/penumbra_vr). It is not affiliated with Frictional Games, Valve or Sony Interactive Entertainment.
 
-Licensed under GPL v3 or later. See `HPL1Engine/COPYING` and `PenumbraOverture/COPYING` for details and third-party notices. Externally supplied textures retain their own [attribution and permissions](docs/TEXTURE_CREDITS.md).
+Licensed under GPL v3 or later. See `HPL1Engine/COPYING`, `PenumbraOverture/COPYING` and the [texture credits](docs/TEXTURE_CREDITS.md) for third-party terms.
