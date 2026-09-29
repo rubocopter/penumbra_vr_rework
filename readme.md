@@ -1,3 +1,7 @@
+Archived / Superseded by Penumbra VR Framework
+This repository is no longer actively maintained. Development has moved to:
+https://github.com/rubocopter/penumbra_vr_framework
+
 # Penumbra: Overture VR Rework
 
 <p align="center">
